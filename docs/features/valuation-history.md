@@ -1,6 +1,6 @@
 ---
 title: Valuation history
-status: review
+status: accepted
 phase: 3
 language: en
 owner: ""
@@ -42,7 +42,7 @@ And three page changes: a chart and the folded total on the Adviser Portal Dashb
 
 New: route `GET /net-worth/funds-under-management`; field `folded` on `GET /net-worth` and `GET /users/customers/{id}/net-worth`; parameter `date` of the Adviser Balances Report; Domain function `FxFold.Compute` with `FoldLineStatus`; Application query `GetFundsUnderManagement`. No script, table, index, permission, problem code, domain event, `TransactionType`, port, job, setting or simulator change. The BFFs do not change: both already proxy `/net-worth` and `/accounts`.
 
-**Status is `review` (2026-11-26).** The twelve points of §11 wait for an answer. Nothing here is a build contract until the spec is `accepted`.
+**Status is `accepted` (2026-11-26).** The twelve points of §11 were confirmed as recommended. Point 5 refines valuation-run R26, which was reworded.
 
 ---
 
@@ -169,7 +169,7 @@ Subtotals, Custodial and All accounts: NZD cash 14,356.60, market value 3,915.00
 | R4 | **The accounts of the scope.** The Custodial accounts of the Customers in the scope now (R1), whatever the status of the Account or the Customer. An Adviser's series is the history of the Customers assigned to them now, not of the book as it was on each day: the platform keeps no history of assignments. External accounts are never counted (roadmap Q6). |
 | R5 | **What a day counts.** For day `d`, the stored valuations of `d` of the accounts of R4 (valuation-run R8). Per currency, `total` is the sum of their `total`, not rounded again (it is already rounded line by line, account-valuation R15). Nothing is valued again: a stored valuation is read as it was stored, and a price or rate row inserted after it was stored changes nothing (valuation-run R10). |
 | R6 | **Expected accounts.** An account of R4 is **expected** on day `d` when `d` is on or after its first day (the UTC date of `Accounts.Created`) and, for a Closed account, on or before the UTC date of `CompletedAt` of its latest completed account closure: the days valuation-run R3 stores for it. A reopened account is expected again from its first day on, and its Closed days are stored as empty days. `accounts` on a day is the number of accounts expected on it. |
-| R7 | **Complete.** A day is **complete** when every account expected on it has a stored valuation of `d` and each of them is complete, and every currency of the day is `Folded` (R10). `incompleteAccounts` is the number of stored valuations of the day with `complete` `false`; `missingAccounts` the number of expected accounts with no stored valuation of `d` (a run failed, or has not reached the day). An incomplete day still has its totals; they leave the missing parts out. This refines the completeness of valuation-run R26, which did not exclude a Closed account after its closure (§11 point 5). |
+| R7 | **Complete.** A day is **complete** when every account expected on it has a stored valuation of `d` and each of them is complete, and every currency of the day is `Folded` (R10). `incompleteAccounts` is the number of stored valuations of the day with `complete` `false`; `missingAccounts` the number of expected accounts with no stored valuation of `d` (a run failed, or has not reached the day). An incomplete day still has its totals; they leave the missing parts out. This refines the completeness of valuation-run R26, which did not exclude a Closed account after its closure (§11 point 5); R26 was reworded to match. |
 | R8 | **Every day of the range.** The series has one item per calendar day from `from` to `to`, oldest first, also for a day with no expected account (`accounts` 0, no currency, `total` 0, `complete` `true`). There is no paging. |
 
 ### 4.3 The fold
@@ -370,7 +370,7 @@ Keep the resource catalog in [api-design.md](../api-design.md) pointing here for
 
 ## 9. UI
 
-Page contracts amended when this spec is accepted: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D107–D109), [adviser-portal-reports.md](../adviser-portal/adviser-portal-reports.md) (D110) and [customer-portal.md](../customer-portal/customer-portal.md) (C45–C47). Neither BFF changes: `/net-worth` and `/accounts` are on both allow-lists.
+Page contracts amended when this spec was accepted: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D107–D109), [adviser-portal-reports.md](../adviser-portal/adviser-portal-reports.md) (D110) and [customer-portal.md](../customer-portal/customer-portal.md) (C45–C47). Neither BFF changes: `/net-worth` and `/accounts` are on both allow-lists.
 
 Both portals draw the charts as plain SVG with no chart library (§11 point 9): a line of the daily total, a vertical axis in the currency's major units, the dates on the horizontal axis. An incomplete day is drawn with a hollow marker. Hovering or focusing a point shows the date, the total and, for an incomplete day, the reason. The figures of the chart are also in a table under it ("Show figures"), so that every figure can be read without the chart.
 
@@ -417,7 +417,7 @@ No Infrastructure.IntegrationTests: there is no script and no mapping. No Simula
 
 ## 11. Locked in this spec
 
-No new ADR. [ADR 0003](../adr/0003-react-redux-typescript-vite-tailwind-frontend.md) is unchanged if point 9 is confirmed.
+No new ADR. [ADR 0003](../adr/0003-react-redux-typescript-vite-tailwind-frontend.md) is unchanged: point 9 adds no library.
 
 | Item | Lock |
 | --- | --- |
@@ -432,13 +432,13 @@ No new ADR. [ADR 0003](../adr/0003-react-redux-typescript-vite-tailwind-frontend
 
 ### Points to confirm
 
-Each point is written into the rules above as recommended. The alternatives are kept for the record.
+Each point was confirmed as recommended (2026-11-26) and is written into the rules above as stated here. The alternatives are kept for the record.
 
 1. **The series covers funds under management only** (R4, §2 Out). Recommended in roadmap V4: it is a sum of stored rows that never change, it is the figure the advisory fee will use, and a read of a year needs one grouped query. Net worth of a past day with External accounts would value each External account on read for each day (a year of 20 accounts is 7,300 valuation reads), and the figures would change when a caller enters a backdated Transaction (account-valuation R8). Alternatives: `GET /net-worth?date=` for one day with External accounts valued on read; a series with External accounts valued on read, limited to a short range.
 2. **The route sits under `/net-worth`** (R3). Recommended: both BFFs already proxy `/net-worth`, funds under management is the `Custodial` breakdown of net worth (custody-mode-grouping R8), and the route answers the scope of `GET /net-worth`. Alternative: a top-level `/funds-under-management`, which adds a prefix to both BFF allow-lists.
 3. **A range with defaults, up to 366 days, every day listed, no paging** (R3, R8). Recommended: a chart reads one range at once; 366 items are small; listing a day with no account keeps the axis even. `to` after the last final day is refused rather than cut, so that a reader never takes a missing tail for a fall. Alternatives: a paged list as `GET /accounts/{id}/valuations`; leave out days with no account; cut `to` silently.
 4. **The fold: per currency per day, at the rate of that day, into the reporting currency now** (R9, R10). Recommended: roadmap Q7 says the fold is done on read with the rate of the same day; converting the sum of each currency once (not each account) gives one rate and one rounding per currency, which a reader can check against `GET /fx-rates`. The age limit and the statuses are those of a valuation line, so one rule covers both. The reporting currency is read now, because the platform keeps no history of it. Alternatives: fold each stored valuation and add the results; fold at today's rate for every day (a chart that moves with today's rate, not with the account); keep the reporting currency of each day.
-5. **A Closed account is not expected after the day its closure completed** (R6, R7). Recommended: valuation-run R3 stores no day after it, so R26 as written would mark every later day of a scope incomplete for ever once one account had been closed. This refines R26 when the spec is accepted. Alternative: none that keeps the series usable.
+5. **A Closed account is not expected after the day its closure completed** (R6, R7). Recommended: valuation-run R3 stores no day after it, so R26 as written would mark every later day of a scope incomplete for ever once one account had been closed. This refines R26, which was reworded. Alternative: none that keeps the series usable.
 6. **Net worth now gains a top-level `folded`** (R14, R15). Recommended: the roadmap closes "FX fold" of net-worth Out with this step, and a Customer or a firm with two currencies sees one total. It folds the values net worth has, a missing price counted as 0 included, and says so (D108). Alternatives: no fold on net worth now, only on the series; also fold every breakdown and the Dashboard figures.
 7. **The Adviser Balances Report of a past date uses the stored valuations for Custodial accounts and the valuation read for External accounts** (R17–R19). Recommended: the Custodial figures then equal the chart of the same day and the fee base (valuation-run R25), and an External account, which has no stored valuation, is valued by the one rule that values a day. Alternatives: the valuation read for every account (a Custodial figure could then differ from the stored one after a late price); Custodial accounts only.
 8. **`date` on a manual request only, up to the last final day, any account status, no cost** (R16, R20). Recommended: a fixed past date in a recurring schedule repeats one report; a relative date is a parameter of its own (§2 Out). The last final day keeps Custodial and External figures on the same final rows. Status is not read because an account closed since `date` held money on it. Alternatives: a date up to today, with today and yesterday from the valuation read; `includeClosedAccounts` kept and read as status now.
@@ -449,7 +449,7 @@ Each point is written into the rules above as recommended. The alternatives are 
 
 ### Found while writing, not changed here
 
-- **valuation-run R26** counts every Custodial account of a scope whose first day is on or before the day, a Closed one after its closure too. Point 5 refines it when this spec is accepted.
+- **valuation-run R26** counted every Custodial account of a scope whose first day is on or before the day, a Closed one after its closure too. Point 5 refines it, and R26 was reworded.
 - **The Adviser of a Customer can change, and the series follows the assignment now.** A book that grew by reassignment shows a rise in its past that no money caused. Fixing it needs a history of assignments, which no spec owns.
 - **The reporting currency can change** ([api-design.md](../api-design.md) §7.3, `PUT /tenants/{id}`), and every folded past figure changes with it. A later fee or performance report that folds should store the currency it used.
 - **The Adviser Balances PDF of now still counts a missing price as 0** (reports §9.2). With this spec the same report for a past date lists such a holding as not valued, so the two kinds of report treat it differently. Changing the report of now is a change to reports R14, not made here.
@@ -468,7 +468,7 @@ Still open, not this slice:
 
 ## 12. Changes to other docs
 
-To be made when this spec is accepted:
+Made when this spec was accepted (2026-11-26):
 
 [net-worth.md](net-worth.md) (R6: the fold is `folded`, the arrays stay per currency; §2 Out and "Still open": the series and the fold point here; §8.1 `folded`; §9 charts point here), [custody-mode-grouping.md](custody-mode-grouping.md) (Out and "Still open": the history of funds under management is the series here; the fold of funds under management stays open), [valuation-run.md](valuation-run.md) (R26: the expected accounts of R6 here, and "no route reads it" becomes this route; §2 Out and "Still open": V4 points here), [account-valuation.md](account-valuation.md) (§2 Out and "Still open": V4 points here), [reports.md](reports.md) (R14 and §9.2: the optional `date`; §2 Out "Historical as-of snapshots" points here; §7.1 the `date` field; History row), [fx-rates.md](fx-rates.md) (Out: "Net-worth FX fold" points here; R7: a fold catches a missing pair as a valuation does), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (a section "Valuation history" with D107–D109; Out "Charts, historical comparison, FX fold" and "Still open: Daily snapshots and historical charts" point here), [adviser-portal-reports.md](../adviser-portal/adviser-portal-reports.md) (D110; Out "Historical as-of snapshots" points here), [customer-portal.md](../customer-portal/customer-portal.md) (a section "Valuation history" with C45–C47; Out and "Still open" charts point here), [bff-adviser-portal.md](bff-adviser-portal.md) and [bff-customer-portal.md](bff-customer-portal.md) (no change to the allow-list; a note that `/net-worth/funds-under-management` is under the existing prefix), [api-design.md](../api-design.md) (§6 the net-worth resource row; §7.18 the series; change log), [domain-model.md](../domain-model.md) (§8.22 `FxFold`), [architecture.md](../architecture.md) (none expected; checked on accept), [function-plan.md](../function-plan.md) (§5.4: the historical series), [glossary.md](../glossary.md) (the review terms become accepted; "Net worth" gains its folded total; "Funds under management" points at the series), [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §1 (no change: V4 is not a business roadmap step), and [valuation-roadmap.md](../valuation-roadmap.md) (§5 V4, §8; Q7 points here for the read half).
 

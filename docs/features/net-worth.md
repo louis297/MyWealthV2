@@ -37,7 +37,7 @@ A TenantAdmin or Adviser reads current net worth for the customers they can alre
 
 Cash per Account is the `SUM` of the cash legs whose `AccountId` is that Account (leg-accounts R19); holdings come from the projection. Both reads carry `breakdowns.byCustodyMode`: one entry `{ custodyMode, currencies }` per custody mode that has an Open account in scope, `Custodial` then `External`, with the currency shape of §8.1. Per currency, the entries add up to the top-level values, and the `Custodial` entry is the scope's funds under management ([custody-mode-grouping.md](custody-mode-grouping.md) R4–R9).
 
-Cash is the existing computed `SUM` of posted cash legs. Holding market value is current quantity × the `IMarketData` price in the instrument quote currency. Results are grouped by currency. There is no FX fold into a single number. Closed accounts are excluded. Phase 2 has no Credit, so liabilities are empty.
+Cash is the existing computed `SUM` of posted cash legs. Holding market value is current quantity × the `IMarketData` price in the instrument quote currency. Results are grouped by currency. Both reads also carry `folded`: the per-currency net of now folded into the Tenant's reporting currency at today's stored rates ([valuation-history.md](valuation-history.md) R14, R15). Closed accounts are excluded. Phase 2 has no Credit, so liabilities are empty.
 
 Two endpoints: a firm / adviser list and a single-Customer read. Both return the same shape. The Customer read reuses the existing assignment and isolation rules.
 
@@ -57,8 +57,8 @@ Two endpoints: a firm / adviser list and a single-Customer read. Both return the
 
 **Out**
 
-- Daily snapshots, historical series, “vs yesterday”. The daily stored valuations of Custodial accounts are [valuation-run.md](valuation-run.md); the series is valuation roadmap V4
-- FX fold to one number
+- Daily snapshots, historical series, “vs yesterday”. The daily stored valuations of Custodial accounts are [valuation-run.md](valuation-run.md); the series of funds under management is [valuation-history.md](valuation-history.md). Net worth of a past day with External accounts stays open
+- An FX fold of the breakdowns. The fold of the top-level totals is `folded` ([valuation-history.md](valuation-history.md))
 - Live vendor prices or live FX
 - Credit / Property as selectable types
 - A hand-edited account-level `CurrentValue`
@@ -90,7 +90,7 @@ Two endpoints: a firm / adviser list and a single-Customer read. Both return the
 | R3 | Reads are `GET /net-worth` (firm / adviser scope) and `GET /users/customers/{id}/net-worth` (one Customer). The Customer route sits under the existing people namespace. |
 | R4 | TenantAdmin / Adviser omit `tenantId` (400 if present). SystemAdmin may pass `tenantId` on the firm read, same as other ledger lists. The Customer read uses the customer PublicId only. |
 | R5 | Closed accounts are excluded. Open accounts only. |
-| R6 | Results are arrays per currency. Do not fold with FX. Same-currency FX is not applied. |
+| R6 | Results are arrays per currency: `currencies` and every breakdown are not folded. Same-currency FX is not applied. The one folded figure is the top-level `folded`, the `net` of each entry of `currencies` folded into the Tenant's reporting currency at today's rates ([valuation-history.md](valuation-history.md) R14, R15). |
 | R7 | Cash = existing computed cash balance (SUM of posted cash legs). Holding market value = quantity × `IMarketData` price in quote currency. No price → market value 0, and the holding is still listed. Quantity ≤ 0 is omitted. |
 | R8 | Phase 2 has no Credit. Liabilities array is empty. Do not invent a negative-cash rule. |
 | R9 | Adviser sees only assigned Customers. TenantAdmin sees the firm. SystemAdmin sees the chosen tenant. |
@@ -141,6 +141,14 @@ Optional query on the firm read: `customerId` (PublicId) to narrow to one Custom
       "net": 6000.00
     }
   ],
+  "folded": {
+    "currency": "NZD",
+    "total": 6000.00,
+    "complete": true,
+    "currencies": [
+      { "currency": "NZD", "total": 6000.00, "status": "Folded", "fx": null, "value": 6000.00 }
+    ]
+  },
   "breakdowns": {
     "byCustomer": [
       { "customerId": "<publicId>", "name": "Demo Customer", "currencies": [ /* same currency shape */ ] }
@@ -155,7 +163,7 @@ Optional query on the firm read: `customerId` (PublicId) to narrow to one Custom
 }
 ```
 
-Field rules stay in this file. Update the resource catalog in [api-design.md](../api-design.md) on accept.
+Field rules stay in this file; the rules of `folded` are [valuation-history.md](valuation-history.md) R14, R15 and §8.1. The resource catalog is in [api-design.md](../api-design.md).
 
 ### 8.2 Errors
 
@@ -174,7 +182,7 @@ Recommended first Dashboard widgets (from discussion):
 - Customer list with net worth (click through to customer detail)
 - Recent activity (reuse existing transactions list)
 
-Defer: charts, historical comparison, FX fold, Credit/Property, snapshots.
+Defer: Credit/Property. The charts, the series and the folded total are [valuation-history.md](valuation-history.md) §9.
 
 No portal page in this slice. Pages live in [adviser-portal/](../adviser-portal/README.md).
 
@@ -199,13 +207,13 @@ No new ADR.
 | --- | --- |
 | Scripts / policy | None. Reuse `accounts.read`. Add `instruments.read` only if the price path requires a second policy. |
 | Caller | TenantAdmin, Adviser, SystemAdmin (Scalar). Customer 403. |
-| Scope | Current point-in-time. Per-currency arrays. No FX fold. Open accounts only. Two routes. Breakdowns as sketched. |
+| Scope | Current point-in-time. Per-currency arrays, and the top-level `folded` ([valuation-history.md](valuation-history.md)). Open accounts only. Two routes. Breakdowns as sketched. |
 | No-price / zero-qty | No price → market value 0 (holding still listed in topHoldings). Quantity ≤ 0 omitted. |
 | Breakdown sort | Currencies: ascending by code. `byCustomer`: by `name` then `customerId`. `byAccountType`: by enum name. `topHoldings`: `marketValue` descending, then `symbol`, then `instrumentId`. |
 
 Still open, not this slice:
 
-- Daily snapshots and historical series (stored valuations: [valuation-run.md](valuation-run.md); series: valuation roadmap V4)
+- Net worth of a past day with External accounts (stored valuations: [valuation-run.md](valuation-run.md); the funds under management series: [valuation-history.md](valuation-history.md))
 - Live market data
 - Portal page implementation (Dashboard and ledger pages)
 - Top-N limits for breakdowns (sort is locked; limit is not)
@@ -223,3 +231,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-18 | [custody-mode-grouping.md](custody-mode-grouping.md) | `breakdowns.byCustodyMode` |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
 | 2026-11-26 | [valuation-run.md](valuation-run.md) | Out: daily snapshots point at the stored valuations |
+| 2026-11-26 | [valuation-history.md](valuation-history.md) | R6 and §8.1: the top-level `folded`; Out, §9 and "Still open": the series and the charts point there |

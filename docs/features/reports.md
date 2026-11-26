@@ -84,7 +84,7 @@ A shared request pipeline checks the coarse policy, the tenant grant, and allowe
 **Out**
 
 - Per-report policies finer than customer / book.
-- Historical as-of snapshots.
+- Historical as-of snapshots. The Adviser Balances Report for the end of a past day (`date`) is [valuation-history.md](valuation-history.md) R16–R20; a relative date in a schedule stays out.
 - FX fold.
 - Live vendor prices.
 - Email delivery of results.
@@ -125,7 +125,7 @@ Note: Customer has `reports.customer.read` but no first-phase UI. The policy exi
 | R11 | A schedule change updates the Hangfire recurring job before the next fire. |
 | R12 | Only succeeded executions expose a download. |
 | R13 | Customer Transactions Report: `customerId` + `from` + `to` required; `includeClosedAccounts` defaults false; reversals marked and placed next to the original. |
-| R14 | Adviser Balances Report: server sets `asOf` at job creation; zero-balance accounts omitted; holdings with quantity ≤ 0 omitted; `includeClosedAccounts` defaults false; subtotals required; Adviser may omit `adviserId`, other roles may not. |
+| R14 | Adviser Balances Report: server sets `asOf` at job creation; zero-balance accounts omitted; holdings with quantity ≤ 0 omitted; `includeClosedAccounts` defaults false; subtotals required; Adviser may omit `adviserId`, other roles may not. An optional `date` (manual requests only) makes it the report of the end of that past day ([valuation-history.md](valuation-history.md) R16–R20). |
 | R15 | Catalog `IsActive` may be written by SystemAdmin (`tenants.manage`). Transition to false revokes every `TenantReports` row for that report (Hangfire jobs removed; `ReportSchedule` and `ReportExecution` rows stay; schedule `IsActive` is unchanged). Transition to true restores no grants. |
 | R16 | Catalog `AllowedTriggers` may be written by SystemAdmin (`tenants.manage`). Removing `"scheduled"` disables every existing schedule for that report (IsActive false + Hangfire RemoveIfExists) but leaves the rows and does not revoke grants. Adding `"scheduled"` does not re-enable those schedules. |
 | R17 | `GET /tenants/{tenantId}/reports` returns active catalog rows only. Granting a platform-inactive report is 404 and inserts no row. `GET /reports/catalog` returns every catalog row, including inactive, and has no `granted` field. |
@@ -251,7 +251,7 @@ Manual request and schedule create both use:
 `parameters` is a free-form JSON object. Its contents are defined by the report:
 
 - Customer Transactions Report: `{ "customerId": "uuid", "from": "2026-01-01", "to": "2026-03-31", "includeClosedAccounts": false }`
-- Adviser Balances Report: `{ "adviserId": "uuid", "includeClosedAccounts": false }` (Adviser may omit `adviserId`)
+- Adviser Balances Report: `{ "adviserId": "uuid", "includeClosedAccounts": false }` (Adviser may omit `adviserId`), or with `"date": "2026-03-11"` for the end of a past day on a manual request ([valuation-history.md](valuation-history.md) R16). The snapshot keeps `date` only when it was sent
 
 Schedule create adds `cron` and `isActive` beside `parameters`, not inside it.
 
@@ -432,7 +432,8 @@ Parameters:
 | Field | Required | Notes |
 | --- | --- | --- |
 | `adviserId` | Adviser: no (defaults to self). TenantAdmin / SystemAdmin: yes | Omit → 400 for non-Adviser |
-| `includeClosedAccounts` | no | Default `false` |
+| `includeClosedAccounts` | no | Default `false`. `true` with `date` → 400 `includeClosedAccounts` |
+| `date` | no | `yyyy-MM-dd`, up to the last final day (today minus two days, UTC). Manual requests only: refused on a schedule (400 `date`). Not set: the report of now ([valuation-history.md](valuation-history.md) R16–R20) |
 
 Rules:
 
@@ -445,6 +446,7 @@ Rules:
 - Sort: customer, then account, then cash line (if any) then holding lines.
 - Every cash and holding line has a "Custody" column (enum name) after "Type"; the line order does not depend on it. The PDF ends with subtotals: one block per custody mode present (`Custodial`, then `External`), then an "All accounts" block with the per-currency totals (cash total and market-value total) (custody-mode-grouping R10–R16).
 - Header includes report name, tenant, Adviser, `asOf`, and `includeClosedAccounts`.
+- With `date`, the rules above give way to [valuation-history.md](valuation-history.md) R17–R19: every account of the Adviser's Customers, Custodial accounts from the stored valuation of that day and External accounts from the valuation read; the price and its date and a status on each holding line, no cost column; a holding that could not be valued is listed and left out of the subtotals; the header says "Balances at the end of <date> (UTC)" and whether the report is incomplete.
 
 ### 9.2a Bank Reconciliation Report
 
@@ -547,3 +549,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-22 | [interest-run.md](interest-run.md) | §9.1: the Tax column |
 | 2026-11-24 | [dividends.md](dividends.md) | §9.1: a `Dividend` row |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
+| 2026-11-26 | [valuation-history.md](valuation-history.md) | R14, §7.1, §9.2: the optional `date` of the Adviser Balances Report; Out: historical as-of snapshots point there |

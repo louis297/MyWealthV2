@@ -245,7 +245,7 @@ The same mapping, `/api{prefix}` → `{prefix}`, holds for every prefix on the a
 | Prefix | Methods | Who has a permission under it | Routes of |
 | --- | --- | --- | --- |
 | `/users`, `/tenants`, `/currencies`, `/accounts`, `/instruments`, `/transactions` | As the routes | TenantAdmin, Adviser | The Phase 1 and ledger specs |
-| `/net-worth` | GET | TenantAdmin, Adviser | [net-worth.md](net-worth.md) |
+| `/net-worth` | GET | TenantAdmin, Adviser | [net-worth.md](net-worth.md); `GET /net-worth/funds-under-management` is under the same prefix ([valuation-history.md](valuation-history.md)), no change to the list |
 | `/reports` | GET, POST, PUT, DELETE | TenantAdmin, Adviser | [reports.md](reports.md) |
 | `/portfolios` | GET, POST, PUT, DELETE | TenantAdmin, Adviser | [portfolios.md](portfolios.md) |
 | `/fees` | GET, POST, PUT, DELETE | TenantAdmin, Adviser | [trade-fees.md](trade-fees.md) |
@@ -404,3 +404,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-12 | [deployment.md](../deployment.md) | §8.5: the BFF serves the SPA build (P1–P10) |
 | 2026-11-13 | — | §4.1: refresh single-flight (RF1–RF8) |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
+| 2026-11-26 | [valuation-history.md](valuation-history.md) | §8.3: `/net-worth/funds-under-management` is under the existing prefix. The allow-list does not change |

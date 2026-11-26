@@ -135,7 +135,7 @@ What the example shows:
 **Out**
 
 - A stored valuation, a valuation run, a series of days and funds under management per day: [valuation-run.md](valuation-run.md) (roadmap V3)
-- Net worth on a past day, a fold into the Tenant's reporting currency, a chart and the Adviser Balances Report for a past date (V4). `GET /net-worth` is unchanged and still counts a missing price as 0 (net-worth R7)
+- The funds under management series, a fold into the Tenant's reporting currency, the charts and the Adviser Balances Report for a past date: [valuation-history.md](valuation-history.md) (V4). `GET /net-worth` still counts a missing price as 0 (net-worth R7). Net worth on a past day with External accounts stays open
 - Cost, average cost and unrealised gain on a past day. They need ledger replay (roadmap §6)
 - Income earned but not posted: daily accruals not yet posted, and a dividend between its ex-date and its payment (Q8)
 - A valuation of several Accounts in one call (a Customer, a Book, a Tenant)
@@ -404,7 +404,7 @@ Keep the resource catalog in [api-design.md](../api-design.md) pointing here for
 
 None in this slice. No Adviser Portal, Customer Portal or Back Office page shows a valuation of a day.
 
-`bff-adviser-portal` and `bff-customer-portal` already proxy the prefix `/accounts`, so the route can be reached through both by a signed-in user who may read the Account. No page calls it. The charts and the past-date views are roadmap V4.
+`bff-adviser-portal` and `bff-customer-portal` already proxy the prefix `/accounts`, so the route can be reached through both by a signed-in user who may read the Account. No page calls it. The charts and the past-date views are [valuation-history.md](valuation-history.md); the account page chart reads the stored valuations, not this route.
 
 ### 9.1 Seeds and hosting
 
@@ -460,14 +460,14 @@ Each point was confirmed as recommended (2026-11-26) and is written into the rul
 - **corporate-actions R23** says that with the first price dated from the ex-date "the quantity and the price a holding is valued at change together". They change within a minute of each other on the clock, but not on the same valuation day when the bar arrives on the next UTC day, which is the usual case for a US instrument. R18 handles it for a valuation. `GET /net-worth` reads now and is not affected.
 - **Trades between an ex-date and the posting of the entitlement.** A fill booked in that window is on the new basis in the market and is multiplied again by the entitlement (corporate-actions R25 takes the holding at that moment; the Adviser Portal warns about it, D66). R18 restates such a day with the same factor and inherits the error. It is a gap of the corporate action flow, not of the valuation.
 - **A holding of an inactive Instrument goes stale.** `instrument-price-sync` does not fetch an inactive Instrument (instrument-prices R3), and an Instrument may be disabled while it is held (holdings R7). Five days later its line is `StalePrice` and every valuation of the account is incomplete. A fix would be to keep fetching an Instrument that any Account still holds.
-- **Net worth and a valuation can disagree today.** `GET /net-worth` counts a holding with no price as 0 and uses a price of any age (net-worth R7). The valuation of the same account for today says incomplete. Roadmap V4 decides whether net worth follows.
+- **Net worth and a valuation can disagree today.** `GET /net-worth` counts a holding with no price as 0 and uses a price of any age (net-worth R7). The valuation of the same account for today says incomplete. [valuation-history.md](valuation-history.md) keeps net worth now as it is (its R15); the series and the Adviser Balances Report for a past date follow the valuation.
 - **London shares in pence** (market-data-history §11) is still unchecked. If EODHD quotes them in pence, the valuation of a `GBP` holding is 100 times too high.
 - **A corporate action from the feed around midnight UTC.** The simulator's job posts the entitlement and then reads the price. A run that starts before 00:00 and reads the price after it leaves one day with the new quantity and the old price. R19 (a) does not cover it.
 
 Still open, not this slice:
 
 - Storing a valuation, the daily run, the order of that run after `corporate-action-apply`, and `TestSeed` history: [valuation-run.md](valuation-run.md) (roadmap V3)
-- Net worth on a past day, the fold into the reporting currency, charts (V4)
+- Net worth on a past day with External accounts (the series of funds under management, the fold and the charts: [valuation-history.md](valuation-history.md))
 - Cost and unrealised gain on a past day (ledger replay)
 - Income earned but not posted as part of a value (roadmap step 5)
 - NZX and Tokyo prices ([known issue](../known-issues/eodhd-nz-jp-coverage.md))

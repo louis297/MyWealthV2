@@ -72,7 +72,7 @@ Implementation notes (2026-11-19), where the rules left a detail open:
 - A `custodyMode` query parameter on the net-worth reads or a custody parameter on either report
 - A custody split inside `byCustomer`, `byAccountType` or `topHoldings`, and on the Adviser Portal customer page (`/customers/:id` shows no breakdowns, D5)
 - A custody filter control on the Adviser Portal `/accounts` list (the API filter from slice 1 already exists)
-- Daily snapshots or a history of funds under management. The daily stored valuations are [valuation-run.md](valuation-run.md); the series is valuation roadmap V4
+- Daily snapshots or a history of funds under management. The daily stored valuations are [valuation-run.md](valuation-run.md); the series is [valuation-history.md](valuation-history.md)
 - The advisory fee and platform billing that will use Custodial accounts as their base ([future-plans.md](../future-plans.md) §1 step 4, §8)
 - A mark on a single transaction that a number was entered by the caller (the FX detail source `Caller` and a fee detail without a schedule already record it, [external-caller-numbers.md](external-caller-numbers.md))
 - Back Office, the two BFFs, the seeds
@@ -109,7 +109,7 @@ Implementation notes (2026-11-19), where the rules left a detail open:
 | R5 | **Entries.** One entry per custody mode that has at least one Open account in scope, as `byAccountType` has one entry per account type. An Open account with no cash legs and no holdings still makes an entry, with zero amounts in the account's currency (the existing `byAccountType` behaviour). No Open account of a mode → no entry for it. No Open account at all → an empty array. Sorted by enum name: `Custodial`, then `External`. |
 | R6 | **Partition.** For every currency, the sums over the `byCustodyMode` entries of `assets.cash`, `assets.holdings`, `assets.total` and `net` equal the top-level values for that currency. |
 | R7 | **Both routes.** `GET /net-worth` (firm, adviser or Customer self scope, with the existing optional `customerId`) and `GET /users/customers/{id}/net-worth` return the breakdown for their scope. A Customer gets their own. |
-| R8 | **Funds under management.** The `Custodial` entry is the scope's funds under management. The `External` entry is its External assets. Both are per currency. Funds under management of a past day is a different figure, the sum of the stored valuations of that day ([valuation-run.md](valuation-run.md) R26). |
+| R8 | **Funds under management.** The `Custodial` entry is the scope's funds under management. The `External` entry is its External assets. Both are per currency. Funds under management of a past day is a different figure, the sum of the stored valuations of that day ([valuation-run.md](valuation-run.md) R26), read through the series of [valuation-history.md](valuation-history.md). |
 | R9 | **Additive.** `currencies`, `byCustomer`, `byAccountType` and `topHoldings` do not change. A client that ignores the new field keeps working. |
 
 Worked example. A Customer has an NZD Custodial account with cash `1,000.00` and holdings worth `5,000.00`, an NZD External account with cash `2,500.00`, and a USD External account with holdings worth `800.00`. Top-level: NZD cash `3,500.00`, holdings `5,000.00`, total `8,500.00`; USD holdings `800.00`. `byCustodyMode`: `Custodial` → NZD `1,000.00` / `5,000.00` / `6,000.00`; `External` → NZD `2,500.00` / `0` / `2,500.00` and USD `0` / `800.00` / `800.00`.
@@ -290,6 +290,5 @@ Still open, not this slice:
 
 - Funds under management per Customer (in `byCustomer` or on the Adviser Portal customer page)
 - A custody filter on the Adviser Portal accounts list and on the net-worth reads
-- An FX fold of funds under management into a reporting currency
-- A history of funds under management (the rows: [valuation-run.md](valuation-run.md) R26; the route and series: valuation roadmap V4)
+- An FX fold of funds under management now into a reporting currency (the series of a past day is folded: [valuation-history.md](valuation-history.md))
 - The advisory fee and platform billing base

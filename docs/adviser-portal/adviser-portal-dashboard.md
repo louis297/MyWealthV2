@@ -28,6 +28,7 @@ related:
   - ../features/custody-mode-grouping.md
   - ../features/transaction-source.md
   - ../features/deposit-matching.md
+  - ../features/valuation-history.md
   - ../features/withdrawals.md
   - ../features/bank-returns.md
   - ../features/bank-reconciliation.md
@@ -77,13 +78,13 @@ Session remains the BFF cookie. All API calls go through `/api`. Do not re-intro
 
 **Out**
 
-- Charts, historical comparison, “vs yesterday”, FX fold.
+- Historical comparison, “vs yesterday”. The charts and the folded total are [Valuation history](#valuation-history).
 - Credit / Property as selectable account types.
 - Instruments catalog pages (list / create / rename / disable). Firm-wide master data stays on Scalar (SystemAdmin / TenantAdmin) or a later Back Office client. Adviser Portal only consumes the catalog as a picker.
 - Typeahead instrument search (input 2–3 characters then backend search + candidates). Reuses the existing list `search` query if needed later; may add a small dedicated endpoint or ranking rules. Defer as an independent small feature.
 - SystemAdmin ledger screens (Scalar remains the back-office surface).
 - Customer Portal.
-- Daily snapshots.
+- Daily snapshots (stored by the valuation run; shown in [Valuation history](#valuation-history)).
 - Lots, realized-gain reports, multi-instrument tickets.
 - Hand-edited holding quantity or cost outside the accepted write types.
 
@@ -467,6 +468,16 @@ Field rules: [adjustment-review](../features/adjustment-review.md). Calls: `/adj
 | D105 | `/accounts/:id` of a Custodial account shows a TenantAdmin the account's open requests above the activity, each linking to `/adjustments/:id`. The Close account page (D54) shows the refusal of adjustment-review R17 with its other blockers. |
 | D106 | `/transactions/:id` of an `Adjustment` posted from a request: the Source line (D26) shows "Adjustment request", for a TenantAdmin with a link to the request. Reverse is never offered on an `Adjustment`. |
 
+### Valuation history
+
+Field rules: [valuation-history](../features/valuation-history.md). Calls: `GET /net-worth/funds-under-management` and `GET /accounts/{id}/valuations`, under the existing `/net-worth` and `/accounts` prefixes; the BFF does not change. The charts are plain SVG with no chart library: a line of the daily total, a vertical axis in the currency's major units and the dates on the horizontal axis. An incomplete day has a hollow marker. Hovering or focusing a point shows the date, the total and, for an incomplete day, the reason. A "Show figures" table under each chart lists the same figures.
+
+| ID | Behaviour |
+| --- | --- |
+| D107 | `/dashboard`: under the "Funds under management" and "External assets" figures (D24), a chart "Funds under management over time" from `GET /net-worth/funds-under-management` with a range choice of 30 days, 90 days (the default) and 1 year, sent as `from` with no `to`. Above it: "In <reportingCurrency>, at each day's exchange rate. Up to <to>; a day is added once its prices are final." The line starts at the first day with `accounts` above 0; with none in the range the chart shows "No funds under management in this period." The point of an incomplete day says "Incomplete:" with the parts that apply: "<n> accounts not fully valued", "<n> accounts not valued yet", "<currency> not converted (no exchange rate)" or "(exchange rate too old)". |
+| D108 | `/dashboard`: under the per-currency totals (D2), one line "Total in <folded.currency>: <folded.total> at today's exchange rates". When `folded.complete` is `false` it adds "Not counted: <currency> (no exchange rate)" or "(exchange rate too old)" for each such line. With one currency only, which is the reporting currency, the line is not shown. |
+| D109 | `/accounts/:id` of a Custodial account: a chart "Value over the last 90 days" from `GET /accounts/{id}/valuations?from=&to=&pageSize=100` (`to` the account's `valuedThrough`, `from` 89 days before it), in the account's currency, oldest day first, with the hollow marker for `complete` `false` ("Some holdings were not valued on this day."). With `valuedThrough` `null`: "Not valued yet. The first value appears two days after the account was opened." An External account shows no chart. |
+
 ---
 
 ## Tests
@@ -479,7 +490,7 @@ Portal tests assert routes, role visibility, and that the Dashboard consumes the
 
 - Exact widget layout and empty states.
 - Top-N limits on breakdowns (sort is locked in the Feature Spec; limit is not).
-- Daily snapshots and historical charts.
+- A chart on the customer page (`/customers/:id`) and a series of one Customer (valuation-history, Out).
 - Multi-instrument tickets, lots, realized-gain views.
 - Instruments management UI (Back Office / Scalar only; not this portal).
 - Instrument typeahead search (later independent small feature; existing list `search` is enough for a simple picker now).
@@ -514,4 +525,5 @@ What changed in this file after it was accepted. Each row is a subsection of "Ac
 | 2026-11-24 | [in-kind-transfers](../features/in-kind-transfers.md) | In-kind transfers |
 | 2026-11-24 | [dividends](../features/dividends.md) | Dividends |
 | 2026-11-25 | [adjustment-review](../features/adjustment-review.md) | Adjustment review |
+| 2026-11-26 | [valuation-history](../features/valuation-history.md) | Valuation history |
 | 2026-11-26 | — | The amendments became the subsections above, and the rows they changed (D10, D15, D18, D26, D27, D29, D31, D39, D44, D53, D69) now state the current behaviour. No behaviour changed |
