@@ -201,6 +201,17 @@ public class RolePermissionsTests
         RolePermissions.Has(UserRole.SimulatorOperator, policy).ShouldBeFalse();
     }
 
+    [TestCase(Policies.ValuationRunsRead, true, true, false, false)]
+    [TestCase(Policies.ValuationRunsStart, true, false, false, false)]
+    public void Valuations_MatchTheValuationRunGrants(string policy, bool systemAdmin, bool tenantAdmin, bool adviser, bool customer)
+    {
+        RolePermissions.Has(UserRole.SystemAdmin, policy).ShouldBe(systemAdmin);
+        RolePermissions.Has(UserRole.TenantAdmin, policy).ShouldBe(tenantAdmin);
+        RolePermissions.Has(UserRole.Adviser, policy).ShouldBe(adviser);
+        RolePermissions.Has(UserRole.Customer, policy).ShouldBe(customer);
+        RolePermissions.Has(UserRole.SimulatorOperator, policy).ShouldBeFalse();
+    }
+
     [TestCase(Policies.OrdersRead, true, true, true)]
     [TestCase(Policies.OrdersPlace, true, true, false)]
     public void Orders_MatchTheOrderGrants(string policy, bool tenantAdmin, bool adviser, bool customer)
