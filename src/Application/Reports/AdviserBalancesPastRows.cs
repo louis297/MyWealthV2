@@ -65,9 +65,84 @@ public sealed record AdviserBalancesPastSelection(
 /// <summary>Valuation-history R17–R19: the lines and subtotals of the Adviser Balances Report for a past date.</summary>
 public static class AdviserBalancesPastRows
 {
-    public static AdviserBalancesPastSelection Select(IReadOnlyList<AdviserPastAccount> accounts) =>
-        new([], [], [], 0, 0);
+    public static AdviserBalancesPastSelection Select(IReadOnlyList<AdviserPastAccount> accounts)
+    {
+        var lines = new List<AdviserBalanceLine>();
+        var ordered = accounts
+            .OrderBy(account => account.CustomerName, StringComparer.Ordinal)
+            .ThenBy(account => account.CustomerId)
+            .ThenBy(account => account.AccountName, StringComparer.Ordinal)
+            .ThenBy(account => account.AccountId);
+        foreach (var account in ordered)
+        {
+            if (account.NotValuedYet)
+            {
+                lines.Add(new AdviserNotValuedLine(
+                    account.CustomerId, account.CustomerName, account.AccountId, account.AccountName, account.AccountType,
+                    account.CustodyMode));
+                continue;
+            }
+
+            // R17: an account with no cash and no holding on the day is left out.
+            if (account.Cash != 0m)
+            {
+                lines.Add(new AdviserCashLine(
+                    account.CustomerId, account.CustomerName, account.AccountId, account.AccountName, account.AccountType,
+                    account.CustodyMode, account.Currency, account.Cash));
+            }
+
+            foreach (var holding in account.Holdings
+                         .OrderBy(holding => holding.Symbol, StringComparer.Ordinal)
+                         .ThenBy(holding => holding.InstrumentId))
+            {
+                lines.Add(new AdviserPastHoldingLine(
+                    account.CustomerId, account.CustomerName, account.AccountId, account.AccountName, account.CustodyMode,
+                    holding.InstrumentId, holding.Symbol, holding.Quantity, holding.LedgerQuantity, holding.Status,
+                    holding.PriceAmount, holding.PriceDate, holding.MarketValue, holding.QuoteCurrency.Trim().ToUpperInvariant()));
+            }
+        }
+
+        return new AdviserBalancesPastSelection(
+            lines,
+            Subtotals(lines),
+            lines.GroupBy(line => line.CustodyMode)
+                .OrderBy(group => group.Key, StringComparer.Ordinal)
+                .Select(group => new AdviserBalanceModeSubtotals(group.Key, Subtotals(group.ToList())))
+                .ToList(),
+            lines.OfType<AdviserPastHoldingLine>().Count(line => line.MarketValue is null),
+            lines.OfType<AdviserNotValuedLine>().Count());
+    }
 
     /// <summary>R18: the label of a line that is not valued; none for a valued line or one with no rate.</summary>
-    public static string? StatusLabel(ValuationLineStatus status) => null;
+    public static string? StatusLabel(ValuationLineStatus status) => status switch
+    {
+        ValuationLineStatus.NoPrice => "No price",
+        ValuationLineStatus.StalePrice => "Price too old",
+        ValuationLineStatus.PriceBeforeCorporateAction => "Price from before a corporate action",
+        ValuationLineStatus.NegativeQuantity => "Quantity below 0",
+        _ => null
+    };
+
+    /// <summary>R19: per currency, the cash and the market value of the lines that have one. A line with no market
+    /// value (and an account not valued yet) is left out; a line with no rate counts in its quote currency.</summary>
+    private static IReadOnlyList<AdviserBalanceSubtotal> Subtotals(IReadOnlyList<AdviserBalanceLine> lines)
+    {
+        var totals = new SortedDictionary<string, (decimal Cash, decimal Market)>(StringComparer.Ordinal);
+        foreach (var line in lines)
+        {
+            switch (line)
+            {
+                case AdviserCashLine cash:
+                    var cashTotal = totals.GetValueOrDefault(cash.Currency);
+                    totals[cash.Currency] = (cashTotal.Cash + cash.Balance, cashTotal.Market);
+                    break;
+                case AdviserPastHoldingLine { MarketValue: { } value } holding:
+                    var marketTotal = totals.GetValueOrDefault(holding.MarketCurrency);
+                    totals[holding.MarketCurrency] = (marketTotal.Cash, marketTotal.Market + value);
+                    break;
+            }
+        }
+
+        return totals.Select(pair => new AdviserBalanceSubtotal(pair.Key, pair.Value.Cash, pair.Value.Market)).ToList();
+    }
 }

@@ -172,8 +172,110 @@ public static class AdviserBalancesPdf
         }).GeneratePdf();
     }
 
-    public static byte[] RenderPast(AdviserBalancesPastPdfModel model) =>
-        Render(new AdviserBalancesPdfModel(model.TenantName, model.AdviserName, model.AsOf, model.GeneratedAt, false, [], [], []));
+    /// <summary>Valuation-history R18, R19: the report for the end of a past day. A holding line shows its price with
+    /// its date and its status; there is no cost column.</summary>
+    public static byte[] RenderPast(AdviserBalancesPastPdfModel model)
+    {
+        QuestPDF.Settings.License = LicenseType.Community;
+        var date = model.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+        return Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4.Landscape());
+                page.Margin(30);
+                page.DefaultTextStyle(style => style.FontSize(9));
+                page.Content().Column(column =>
+                {
+                    column.Spacing(4);
+                    column.Item().Text("Adviser Balances Report").Bold().FontSize(16);
+                    column.Item().Text($"Tenant: {model.TenantName}");
+                    column.Item().Text($"Adviser: {model.AdviserName}");
+                    column.Item().Text($"Balances at the end of {date} (UTC)").SemiBold();
+                    column.Item().Text($"As of: {Format(model.AsOf)} UTC");
+                    column.Item().Text($"Generated: {Format(model.GeneratedAt)} UTC");
+                    if (model.HoldingsNotValued > 0 || model.AccountsNotValuedYet > 0)
+                    {
+                        column.Item().Text(
+                            $"Incomplete: {model.HoldingsNotValued} holdings not valued, {model.AccountsNotValuedYet} accounts not valued yet. The subtotals leave them out.");
+                    }
+
+                    if (model.Rows.Count == 0)
+                    {
+                        column.Item().PaddingTop(12).Text("No balances.");
+                    }
+                    else
+                    {
+                        column.Item().PaddingTop(12).Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn(2);
+                                columns.RelativeColumn(2);
+                                columns.RelativeColumn();
+                                columns.RelativeColumn();
+                                columns.RelativeColumn();
+                                columns.RelativeColumn();
+                                columns.RelativeColumn(1.5f);
+                                columns.RelativeColumn();
+                                columns.RelativeColumn();
+                                columns.RelativeColumn(1.5f);
+                            });
+                            table.Header(header =>
+                            {
+                                foreach (var title in new[]
+                                         {
+                                             "Customer", "Account", "Type", "Custody", "Instrument", "Quantity", "Price",
+                                             "Balance", "Market value", "Status"
+                                         })
+                                {
+                                    header.Cell().Text(title).Bold();
+                                }
+                            });
+                            foreach (var row in model.Rows)
+                            {
+                                string[] cells = row switch
+                                {
+                                    AdviserBalancesPdfCashRow cash =>
+                                        [cash.Customer, cash.Account, cash.AccountType, cash.Custody, "", "", "", cash.Balance, "", ""],
+                                    AdviserBalancesPdfPastHoldingRow holding =>
+                                    [
+                                        holding.Customer, holding.Account, "", holding.Custody, holding.Instrument, holding.Quantity,
+                                        holding.Price, "", holding.MarketValue, holding.Status
+                                    ],
+                                    AdviserBalancesPdfNotValuedRow notValued =>
+                                    [
+                                        notValued.Customer, notValued.Account, notValued.AccountType, notValued.Custody, "", "", "", "",
+                                        "", "Not valued yet"
+                                    ],
+                                    _ => throw new InvalidOperationException($"Unsupported row {row.GetType().Name}.")
+                                };
+                                foreach (var cell in cells)
+                                {
+                                    table.Cell().Text(cell);
+                                }
+                            }
+                        });
+                    }
+
+                    if (model.Subtotals.Count > 0)
+                    {
+                        column.Item().PaddingTop(12).Text("Subtotals").Bold();
+                        foreach (var block in model.ModeSubtotals)
+                        {
+                            SubtotalBlock(column, block.Title, block.Subtotals);
+                        }
+
+                        SubtotalBlock(column, "All accounts", model.Subtotals);
+                    }
+
+                    column.Item().PaddingTop(8).Text(
+                        "Custodial accounts: the daily valuation of that day. External accounts: the ledger as it stood when this report was made.");
+                });
+            });
+        }).GeneratePdf();
+    }
 
     private static void SubtotalBlock(
         ColumnDescriptor column,

@@ -45,7 +45,7 @@ public class AdviserBalancesPastDateTests : TestBase
         text.ShouldContain("USD cash 0.00 USD market value 9520.00 USD");
         text.ShouldContain("NZD cash 500.00 NZD market value 0.00 NZD");
         text.ShouldContain("NZD cash 14856.60 NZD market value 3915.00 NZD");
-        text.ShouldNotContain("B1");
+        text.ShouldNotContain("Bea Customer");
     }
 
     [Test]
