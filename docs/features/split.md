@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-12
-last_updated: 2026-11-17
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -29,14 +29,11 @@ Security-only legs on the existing Transaction aggregate. Public write stays `PO
 
 Do not model these as `StockIn` / `StockOut`. No cash leg. No portal page. No price call.
 
+On an External account a person enters the three types with the new total quantity. On a Custodial account no person enters them: `Split` and `Bonus` are written by corporate actions from a ratio ([corporate-actions.md](corporate-actions.md)), and `Scrip` is not written at all.
+
+This file states the rules as they are today. §14 lists what changed here, by date.
+
 **Status is `accepted`.** Implementation follows this file. `Split` = 12, `Bonus` = 13, `Scrip` = 14. Script `0017_transaction_type_split.sql` widens `CK_Transactions_Type` to 0–14.
-
-
-**Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md). The security leg carries the create body's `accountId`; the header has no Account. The item JSON in §8.1 is replaced by leg-accounts §8.1 (shown below).
-
-**Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R14: a `Split`, `Bonus` or `Scrip` can be reversed only while it is the latest security activity on its holding. R16 follows posting R24, which now refuses a `bookedAt` in the future.
-
-**Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). R8: `Split`, `Bonus` and `Scrip` are refused on a Custodial account (400 with `errors.Type`) until corporate action events exist. Until then a Custodial holding in an instrument that splits shows a wrong market value ([known issue](../known-issues/custodial-account-gaps.md)). An External account is unchanged.
 
 ---
 
@@ -99,13 +96,13 @@ This increment treats the three type names as the same book rule. The name is th
 | R5 | Account must be Open, same tenant, and visible to the caller. Closed → 400. Disabled Customer on create / reverse → 400 `disabled` / `target=user`. |
 | R6 | Account type must be Brokerage or Other. Bank / Cash → 400. |
 | R7 | Instrument must exist, same tenant, and `IsActive`. Disabled or missing → 400. |
-| R8 | Type on create in this increment: `Split`, `Bonus`, or `Scrip` (plus already-accepted types). Unknown → 400. |
+| R8 | The types of this spec are `Split`, `Bonus` and `Scrip`. On an External account a person enters them on `POST /transactions`; the entry has source `Manual` and no corporate action detail. On a Custodial account the hand entry of all three is refused (400 `errors.Type`, custody-modes §4.2.1). There `Split` and `Bonus` are written by corporate actions from a ratio (`Transaction.PostCorporateAction`, source `CorporateAction`): one security leg of `quantityAfter − quantityBefore` with cost `0`, no cash leg, and a corporate action detail (corporate-actions R26, R27); a consolidation is posted as `Split`. `Scrip` is not written on a Custodial account: a dividend taken in shares is a `Dividend` with a reinvestment (a `Reinvestment` cash leg and a security leg with a cost; dividends R40). Unknown → 400. |
 | R9 | Body `security` is an array of exactly one leg: `instrumentId` and `quantity` `> 0` (the **new total**). No `ratio`, no `cost`, no `price`, no `cash` / `amount` → 400 if present. |
 | R10 | A holding for that `(Account, Instrument)` must already exist. No holding → 400. This type does not create a holding. |
 | R11 | Body quantity is the new total, `decimal(18,8)`, `> 0`, and not equal to the current quantity (400 if equal). Delta = new − old. Stored security-leg quantity is the signed delta. A reverse split is a smaller new quantity. |
-| R12 | No cash leg. Holding **total cost is unchanged**. Average cost becomes total cost / new quantity. The security leg stores cost `0` in the quote currency (nothing was added or released). |
+| R12 | No cash leg. Holding **total cost is unchanged**. Average cost becomes total cost / new quantity. The security leg stores cost `0` in the quote currency (nothing was added or released). This holds for an entitlement posting too: average cost becomes total cost / `quantityAfter` (corporate-actions R29). |
 | R13 | After insert, quantity `SUM` per `(Account, Instrument)` `> 0` and equals the new quantity. Projection cost equals the cost from before the command. |
-| R14 | Posted rows are not updated or deleted. Reverse copies the opposite security quantity and cost `0`. One reversal per original. No client `rowVersion`. Account Open. Reverse that would make quantity `≤ 0` → 400; original stays. Only the latest security activity on a holding can be reversed: a live later security leg on the same `(Account, Instrument)` → 400 ([ledger-write-guards](../fixes/ledger-write-guards.md)). |
+| R14 | Posted rows are not updated or deleted. Reverse copies the opposite security quantity and cost `0`. One reversal per original. No client `rowVersion`. Account Open. Reverse that would make quantity `≤ 0` → 400; original stays. Only the latest security activity on a holding can be reversed: a live later security leg on the same `(Account, Instrument)` → 400 ([ledger-write-guards](../fixes/ledger-write-guards.md)). By hand, on a Custodial account only a Transaction with source `Manual` is reversed (transaction-source R13). |
 | R15 | `Idempotency-Key` required on create and reverse, same as posting. |
 | R16 | `bookedAt` required instant, as [posting](posting.md) R24. Memo optional 1–200. Reference optional, stored, no uniqueness. |
 | R17 | Customer has no ledger-write policy → 403. |
@@ -223,11 +220,13 @@ None. Pages live in [docs/adviser-portal/](../adviser-portal/). Scalar is enough
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | Quantity delta; total cost unchanged; reverse split; new quantity equal to current rejected; no holding rejected; Bank/Cash refuse; cannot mutate posted header |
-| Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; happy Split to a new total; Bonus and Scrip same cost; reverse split; reverse restores quantity and cost; no holding → 400; quantity equal to current → 400; cash or ratio field → 400; idempotent replay; hash mismatch 409 |
-| Infrastructure.IntegrationTests | Two-tenant fixture: other tenant’s account or instrument → 404. TestSeed idempotent. |
+| Domain.UnitTests | `Entities/SplitTests.cs` |
+| Application.FunctionalTests | `Transactions/SplitTests.cs`; entitlement postings in `CorporateActions/` |
+| Infrastructure.IntegrationTests | Two-tenant fixture: other tenant's account or instrument → 404 |
 
 TestSeed (Development / TestAppHost only): one `Split` on the existing demo brokerage holding. Not a Buy. Functional tests create their own rows.
 
@@ -265,42 +264,25 @@ Open questions: none that block review.
 ## 13. Out / later
 
 - Fractional-share cash-in-lieu.
-- Vendor corporate-action feed.
+- A vendor corporate-action feed on External accounts.
 - Price / market value on the holdings read. Net worth. Dashboard.
 - Fees, lots, realized gain.
 - Multi-instrument header.
 - A different cost rule per name (for example bonus at a stated cost). That would be a later amendment, not this slice.
-- Corporate-action workflow that accepts a ratio and computes quantity. That layer posts into this write; it is not this slice.
+- A corporate-action workflow that accepts a ratio and computes the quantity is [corporate-actions.md](corporate-actions.md). It posts the same legs; it is not this spec.
 
 ---
 
-## 14. Suggested commits
+## 14. History
 
-The repository should build after each commit. Agents split each line into red then green.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/split.md`).
 
-1. `0017_transaction_type_split.sql` + enum values + domain invariants + unit tests.
-2. Application: extend `CreateTransaction` / `ReverseTransaction`; functional tests.
-3. API bodies and item shape; isolation tests.
-4. TestSeed one `Split`. Amend posting, holdings, and buy-sell type tables in the same change that accepts this file.
-
-## Amendment 2026-11-14 (UTC instants)
-
-Accepted with [utc-instants](../fixes/utc-instants.md). R16 follows posting R24. The item example shows the UTC form.
-
----
-
-## Amendment 2026-11-22 (corporate actions) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md). Rules R22–R33 live there; this section records what changes here.
-
-- R8 and §13: on a Custodial account `Split` and `Bonus` are written by **corporate actions** from a ratio (`Transaction.PostCorporateAction`, source `CorporateAction`): one security leg of `quantityAfter − quantityBefore` with cost `0`, no cash leg, and a corporate action detail (corporate-actions R26, R27). A consolidation is posted as `Split`. A hand `Split`, `Bonus` or `Scrip` on a Custodial account is still refused (400 `errors.Type`).
-- External accounts are unchanged: the hand entry sends the new total quantity (R9), keeps source `Manual` and has no corporate action detail. `Scrip` stays a hand entry of External accounts until roadmap C3.
-- R12 and R13 hold for an entitlement posting too: the holding's total cost is unchanged and average cost becomes total cost / `quantityAfter` (corporate-actions R29).
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R40 and R43 live there; this section records what changes here.
-
-- §13: `Scrip` is not written on a Custodial account. A dividend taken in shares is a `Dividend` with a reinvestment (a `Reinvestment` cash leg and a security leg with a cost), not a `Scrip`. External accounts keep hand `Scrip`.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-10 | [leg-accounts.md](leg-accounts.md) | §8.1: the Account is on the security leg |
+| 2026-11-14 | [utc-instants](../fixes/utc-instants.md) | R16 follows posting R24 |
+| 2026-11-16 | [ledger-write-guards](../fixes/ledger-write-guards.md) | R14: only the latest security activity is reversed |
+| 2026-11-17 | [custody-modes.md](custody-modes.md) | R8: the hand entry is refused on a Custodial account |
+| 2026-11-22 | [corporate-actions.md](corporate-actions.md) | R8, R12, §13: `Split` and `Bonus` on a Custodial account are entitlement postings |
+| 2026-11-24 | [dividends.md](dividends.md) | R8: `Scrip` is not written on a Custodial account |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
