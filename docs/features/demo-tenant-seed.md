@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-14
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 related:
   - ../deployment.md
   - ../future-plans.md
@@ -72,8 +72,8 @@ This is the first part of [future-plans.md](../future-plans.md) §6 (demo data f
 | R1 | `webapi` runs the seed only when its first argument is exactly `--seed-demo`. It builds the host services, runs the schema applicator and reloads the currency catalog as start-up does, runs the seed, then exits. It does not listen on any port. |
 | R2 | In seed mode `webapi` does not run the Development seeds (`DevelopmentIdentitySeeder`, `TestSeed`, `DevelopmentSmokeSeeder`) or `SystemAdminBootstrap`. |
 | R3 | The command runs in every environment. Nothing runs it automatically: not host start-up, not `deploy.sh`, not the deploy workflow. |
-| R4 | Tenant: Code `demo`, Name `Demo Advisory`, reporting currency `USD`, enabled. It is created through `Tenant.Create`, with the same validation as a tenant created through the API. |
-| R5 | When a tenant with Code `demo` already exists, the seed does not change it: name, reporting currency and enabled flag stay as they are. It still ensures the instruments (R6) and grants (R8) for that tenant. A disabled demo tenant is logged as a warning, not an error. |
+| R4 | Tenant: Code `demo`, Name `Demo Advisory`, reporting currency `USD`, enabled. It is created through `Tenant.Create`, with the same validation as a tenant created through the API. The tenant allows both custody modes (`Tenant.Create` allows both). Its `brokerConnection` is set to `simulator` when a broker connection of that name is configured on `webapi`; otherwise it gets none (orders §9.1). |
+| R5 | When a tenant with Code `demo` already exists, the seed does not change it: name, reporting currency and enabled flag stay as they are. It still ensures the instruments (R6) and grants (R8) for that tenant. A disabled demo tenant is logged as a warning, not an error. That includes its allowed custody modes and its broker connection. The seed adds no client money account, on a new or an existing `demo` tenant: until SystemAdmin adds one in the Back Office, no new Custodial account can be opened in the demo tenant (client-money-accounts R11). The account numbers must match the simulator bank's accounts, which the seed cannot know. |
 | R6 | Instruments: every row of the demo catalog (§5.1), all active. Idempotent on `(TenantId, Symbol)`. An existing row with the same symbol is left unchanged, even if its name, quote currency or `IsActive` differ. |
 | R7 | The NZD and JPY rows stay in the catalog, although EODHD has no price for them ([known-issues/eodhd-nz-jp-coverage.md](../known-issues/eodhd-nz-jp-coverage.md)). Until it does, valuation, Buy and Sell see no price for them, as on any tenant. |
 | R8 | Report grants: `customer-transactions` and `adviser-balances`. Idempotent on `(TenantId, ReportId)`. A platform-inactive catalog report is not granted and is logged as a warning, matching `POST /tenants/{tenantId}/reports`. A missing catalog code is an error (R11). |
@@ -205,39 +205,13 @@ Still open, not this slice ([future-plans.md](../future-plans.md) §6):
 
 ---
 
-## 12. Suggested commits
+## 12. History
 
-The repository should build after each commit. Agents split each line into red then green.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/demo-tenant-seed.md`).
 
-1. Move the demo tenant code, name and the 18-row demo catalog into one shared definition used by `DevelopmentIdentitySeeder` and `TestSeed` (refactor; existing `TestSeed` tests stay green)
-2. `DemoTenantSeed`: tenant, instruments and grants, idempotent, one transaction (R4–R12) + integration tests
-3. `webapi --seed-demo` argument check and entry point: run the seed, exit 0 or 1, do not listen (R1–R3) + unit test
-4. [deployment.md](../deployment.md) §12 runbook step and §13 item 7 updated (docs)
-
----
-
-## Amendment 2026-11-18 (allowed custody modes) — accepted, landed
-
-Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody-modes.md](tenant-custody-modes.md).
-
-- R4: the demo tenant the command creates allows both custody modes. It is still created through `Tenant.Create`, which allows both; the seed code does not change.
-- R5: an existing `demo` tenant is not changed, and that includes its allowed custody modes. A `demo` tenant that existed before script `0033` allows both from the back-fill.
-- §10: the integration test for a new run also asserts that `demo` allows both; the test with an existing `demo` tenant also asserts that a narrowed setting stays as it was.
-
----
-
-## Amendment 2026-11-20 (client money accounts) — accepted
-
-Status of this amendment: `accepted` (2026-11-20), together with [client-money-accounts.md](client-money-accounts.md).
-
-- The seed adds no client money account, on a new or an existing `demo` tenant. Until SystemAdmin adds one in the Back Office, no new Custodial account can be opened in the demo tenant (client-money-accounts R11). The account numbers must match the simulator bank's accounts once the simulator bank exists (roadmap S1), which the seed cannot know.
-- §10: no test change.
-
----
-
-## Amendment 2026-11-23 (orders and settlement) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). §9.1 lives there; this section records what changes here.
-
-- `webapi --seed-demo` sets `brokerConnection` to `simulator` on the demo tenant it creates, when a broker connection of that name is configured on `webapi`; otherwise the tenant gets none. An existing tenant is never changed, as before.
-- §10: one test for each case.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-18 | [tenant-custody-modes.md](tenant-custody-modes.md) | R4, R5: the demo tenant allows both custody modes |
+| 2026-11-20 | [client-money-accounts.md](client-money-accounts.md) | R5: the seed adds no client money account |
+| 2026-11-23 | [orders.md](orders.md) | R4: the broker connection of a new demo tenant |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
