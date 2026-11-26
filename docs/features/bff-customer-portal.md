@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-26
+last_updated: 2026-11-27
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -102,7 +102,7 @@ The allow-list on IdentityHost is Customer only. A TenantAdmin, Adviser, or Syst
 | R14 | SPA `fetch` / RTK Query uses `credentials: 'include'` and base URL `/api`. It does not set `Authorization`. Mutating calls send `X-MyWealth-Request: 1` (R18). |
 | R15 | Cross-origin browser calls to `webapi` are not part of the product path after this slice. Scalar may keep calling `webapi` directly with Bearer. The BFF does not enable credentialed CORS for a foreign `Origin`. |
 | R16 | The BFF does not run the schema applicator and does not reference `Application` handlers. |
-| R17 | There is no SPA `/callback`. OIDC callback is `/signin-oidc` on the BFF. Deep-link return uses the OIDC handler `state`, still only in-app paths. `returnUrl` must be a relative path: starts with `/`, must not start with `//` or `/\`, must not contain `\`. Redirect URIs registered on the client are exact. A `*.dev.localhost` alias may be upserted only when that host is a browser entry. Do not register a wildcard, the BFF http endpoint, or the Vite origin. |
+| R17 | There is no SPA `/callback`. OIDC callback is `/signin-oidc` on the BFF. Deep-link return uses the OIDC handler `state`, still only in-app paths. `returnUrl` must be a relative path: starts with `/`, must not start with `//` or `/\`, must not contain `\`, and every character is printable ASCII (U+0020 to U+007E). Browsers drop a tab or line break from a URL, so `/<TAB>/host` would become `//host`. Redirect URIs registered on the client are exact. A `*.dev.localhost` alias may be upserted only when that host is a browser entry. Do not register a wildcard, the BFF http endpoint, or the Vite origin. |
 | R18 | Mutating browser calls (`POST` / `PUT` / `PATCH` / `DELETE` under `/api`, and `POST /bff/logout`) require header `X-MyWealth-Request: 1`. Missing header → **400**, do not proxy. GET does not require it. This is not a second CSRF token. SameSite=Lax stays. |
 | R19 | Do not proxy `/connect/*` to the browser. The SPA has no identity origin in env for protocol calls. |
 | R20 | Proxy only these `webapi` prefixes: `/users`, `/accounts`, `/transactions`, `/net-worth`, `/reports`. Any other `/api/*` path → **404**, not forwarded. Do not forward `/scalar`, `/openapi`, `/health`, `/connect`, `/instruments`, `/tenants`, `/currencies`. Destination is Aspire `webapi` only. Prefixes added by later slices, so the Customer Portal can read the Customer's own data: `/nominated-bank-accounts` and `/withdrawals` ([withdrawals.md](withdrawals.md) C22, C24), `/orders` ([orders.md](orders.md) C32) and `/in-kind-transfers` ([in-kind-transfers.md](in-kind-transfers.md) R29). The portal uses GET only; `webapi` refuses every write for a Customer (403), so the BFF does not filter by role. `/fees`, `/custody-movements` and `/custodian-reconciliations` stay blocked (404). |
@@ -316,3 +316,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-20 – 11-24 | [withdrawals.md](withdrawals.md), [orders.md](orders.md), [in-kind-transfers.md](in-kind-transfers.md) | R20: four prefixes added to the allow-list |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
 | 2026-11-26 | [valuation-history.md](valuation-history.md) | Route table: the series and the stored valuations, under the existing `/net-worth` and `/accounts` prefixes. R20 does not change |
+| 2026-11-27 | — | R17: a return URL with a control character or a character outside ASCII is rejected |
