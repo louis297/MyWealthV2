@@ -4,7 +4,7 @@ status: accepted
 phase: 2
 language: en
 created: 2026-11-09
-updated: 2026-11-09
+updated: 2026-11-26
 related:
   - README.md
   - back-office.md
@@ -45,7 +45,7 @@ Session is the Back Office cookie. Calls go to `webapi` with Bearer. No BFF. No 
 
 **Out**
 
-- Price display or price edit (catalog HTTP does not return a price; `IMarketData` is server-side only). The item names the market data connection that prices it (amendment 2026-11-22 below); that is not a price.
+- Price display or price edit (catalog HTTP does not return a price; `IMarketData` is server-side only). The item names the market data connection that prices it ("Market data connection" below below); that is not a price.
 - Changing `QuoteCurrency` after create.
 - Physical delete.
 - Cross-tenant ledger pages (Accounts, Transactions, Holdings, Net worth) — separate later slice.
@@ -139,10 +139,21 @@ Back Office tests assert routes, the tenant-required list, and that the UI clien
 
 ---
 
-## Amendment 2026-11-22 (market data connection) — accepted
+## Market data connection
 
-Status of this amendment: `accepted` (2026-11-22), together with [simulated-instruments.md](../features/simulated-instruments.md) R6 and [back-office.md](back-office.md) BO22.
+Field rules: [simulated-instruments.md](../features/simulated-instruments.md). Rule R6 there; [back-office.md](back-office.md) BO22.
 
 - List and detail: under the symbol of an instrument whose `marketDataConnection` is set, the line "Prices from <connection>". No line when it is `null`. No filter on it.
 - Create: under the symbol field, the note "A symbol that ends with a market data suffix (for example .SIM) is priced by that connection." The create body does not change.
 - Rename: renaming the symbol can change the line, from the item the page reloads.
+
+---
+
+## History
+
+What changed in this file after it was accepted. Each row is a section above. The text of each change is in git (`git log -p -- docs/backoffice/back-office-instruments.md`).
+
+| Date | With | Section |
+| --- | --- | --- |
+| 2026-11-22 | [simulated-instruments.md](../features/simulated-instruments.md) | Market data connection |
+| 2026-11-26 | — | The amendments became the sections above. No behaviour changed |
