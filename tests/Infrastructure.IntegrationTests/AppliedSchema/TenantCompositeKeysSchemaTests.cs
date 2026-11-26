@@ -795,8 +795,46 @@ public class TenantCompositeKeysSchemaTests
             AdjustmentRequestRow(status: "1", decidedBy: "@a_customer", transaction: "@{p}_buy")),
         ("FK_AdjustmentRequests_Users_TenantId_RequestedByUserId", "Users", AdjustmentRequestRow(requestedBy: "@{p}_adviser")),
         ("FK_AdjustmentRequests_Users_TenantId_DecisionByUserId", "Users",
-            AdjustmentRequestRow(status: "2", decidedBy: "@{p}_customer"))
+            AdjustmentRequestRow(status: "2", decidedBy: "@{p}_customer")),
+        ("FK_StoredValuations_Accounts_TenantId_AccountId", "Accounts",
+            ValuationRunRow("a") + StoredValuationRow(account: "@{p}_brokerage")),
+        ("FK_StoredValuations_ValuationRuns_TenantId_ValuationRunId", "ValuationRuns",
+            ValuationRunRow("{p}") + StoredValuationRow(run: "@{p}_vrun")),
+        ("FK_StoredValuationLines_StoredValuations_TenantId_StoredValuationId", "StoredValuations",
+            ValuationRunRow("{p}") + StoredValuationRow(tenant: "@{p}_tenant", account: "@{p}_brokerage", run: "@{p}_vrun")
+            + StoredValuationLineRow()),
+        ("FK_StoredValuationLines_Instruments_TenantId_InstrumentId", "Instruments",
+            ValuationRunRow("a") + StoredValuationRow() + StoredValuationLineRow(instrument: "@{p}_instrument"))
     ];
+
+    /// <summary>A Scheduled valuation run of tenant <paramref name="prefix"/> in <c>@{prefix}_vrun</c> (script 0059).</summary>
+    private static string ValuationRunRow(string prefix) => $"""
+        INSERT INTO [ValuationRuns]
+            ([PublicId], [TenantId], [ThroughDate], [Trigger], [RanByUserId], [StartedAt], [AccountsProcessed], [AccountsFailed],
+             [DaysValued], [DaysIncomplete], [Created], [CreatedBy])
+        VALUES (NEWID(), @{prefix}_tenant, '2026-11-24', 0, NULL, SYSDATETIMEOFFSET(), 0, 0, 0, 0, SYSDATETIMEOFFSET(), N'test');
+        DECLARE @{prefix}_vrun int = SCOPE_IDENTITY();
+
+        """;
+
+    /// <summary>An empty stored valuation in <c>@svaluation</c> (script 0059); one argument names a row of the other
+    /// tenant.</summary>
+    private static string StoredValuationRow(
+        string tenant = "@a_tenant", string account = "@a_brokerage", string run = "@a_vrun") => $"""
+        INSERT INTO [StoredValuations]
+            ([TenantId], [AccountId], [ValuationDate], [Currency], [Cash], [HoldingsValue], [Total], [Complete], [UnvaluedCount],
+             [ValuationRunId], [ValuedAt])
+        VALUES ({tenant}, {account}, '2026-11-24', 'NZD', 0, 0, 0, 1, 0, {run}, SYSDATETIMEOFFSET());
+        DECLARE @svaluation bigint = SCOPE_IDENTITY();
+
+        """;
+
+    /// <summary>A <c>NoPrice</c> line of tenant <c>a</c> on <c>@svaluation</c> (script 0059).</summary>
+    private static string StoredValuationLineRow(string instrument = "@a_instrument") => $"""
+        INSERT INTO [StoredValuationLines] ([TenantId], [StoredValuationId], [InstrumentId], [Quantity], [LedgerQuantity], [Status])
+        VALUES (@a_tenant, @svaluation, {instrument}, 1, 1, 1);
+
+        """;
 
     /// <summary>An adjustment request of tenant <c>a</c> (script 0058); one argument names a row of the other tenant.</summary>
     private static string AdjustmentRequestRow(
@@ -840,7 +878,7 @@ public class TenantCompositeKeysSchemaTests
     ];
 
     private static readonly string[] Parents =
-        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions", "Orders", "ClientMoneyAccounts", "TradeSettlements", "AccountPortfolioAssignments", "Rebalances", "MigrationBatches", "MigrationBatchEntries", "SafekeepingAccounts", "OrderFills", "InKindTransfers", "CustodyMovements", "CustodianReconciliations", "AdjustmentRequests"];
+        ["Users", "Accounts", "Instruments", "Transactions", "Portfolios", "ReportSchedules", "TradeFeeSchedules", "TransactionCashLegs", "NominatedBankAccounts", "Withdrawals", "BankStatementLines", "BankReconciliations", "InterestRateSchedules", "CorporateActions", "Orders", "ClientMoneyAccounts", "TradeSettlements", "AccountPortfolioAssignments", "Rebalances", "MigrationBatches", "MigrationBatchEntries", "SafekeepingAccounts", "OrderFills", "InKindTransfers", "CustodyMovements", "CustodianReconciliations", "AdjustmentRequests", "ValuationRuns", "StoredValuations"];
 
     /// <summary>A safekeeping account of tenant <paramref name="prefix"/> in <c>@{prefix}_safekeeping</c> (script 0055).</summary>
     /// <summary>An effective Manual dividend; the optional columns point at the parent under test.</summary>
