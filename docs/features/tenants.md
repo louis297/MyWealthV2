@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-13
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -34,7 +34,9 @@ Creating a Tenant does **not** create a TenantAdmin or any Identity user. People
 
 ## 1. Summary
 
-SystemAdmin onboards a firm with `name`, `code`, and an enabled `reportingCurrency`. Code is the hosted-login key and does not change. Disable leaves person `Status` alone, raises `TenantDisabled`, and revokes every subject in that tenant (handler already in identity-auth). Re-enable restores login for people who are still `Active`. Manage verbs stay SystemAdmin. TenantAdmin / Adviser may **read** their own firm by code (`tenants.read`). There is no portal manage page.
+SystemAdmin onboards a firm with `name`, `code`, and an enabled `reportingCurrency`. Code is the hosted-login key and does not change. Disable leaves person `Status` alone and raises `TenantDisabled`: hosted login for that Code fails at once, and every subject in that tenant is revoked when the `worker` delivers the event (R11). Re-enable restores login for people who are still `Active`. Manage verbs stay SystemAdmin. TenantAdmin / Adviser may **read** their own firm by code (`tenants.read`). There is no portal manage page.
+
+This file states the rules as they are today. §12 lists what changed here, by date.
 
 ---
 
@@ -71,7 +73,7 @@ SystemAdmin onboards a firm with `name`, `code`, and an enabled `reportingCurren
 1. As a SystemAdmin I create a tenant (`name`, `code`, `reportingCurrency`) so a firm can exist before anyone in it has a login.
 2. As a SystemAdmin I list and open tenants (filter, search, page) so I can find a firm in Scalar.
 3. As a SystemAdmin I rename a tenant or change its reporting currency without touching Code.
-4. As a SystemAdmin I disable a tenant so that Code cannot complete hosted login and existing refresh fails, without rewriting people rows.
+4. As a SystemAdmin I disable a tenant so that Code cannot complete hosted login and existing refresh fails once the event is delivered, without rewriting people rows.
 5. As a SystemAdmin I re-enable a tenant so Active people in that firm can sign in again.
 6. As a TenantAdmin or Adviser I may read **my** firm with `GET /tenants/by-code/{code}` so the Adviser Portal shell can show the Name. Another firm’s code is 404.
 7. As a Customer I receive 403 on `tenants.read` and on every `tenants.manage` verb.
@@ -94,13 +96,22 @@ SystemAdmin onboards a firm with `name`, `code`, and an enabled `reportingCurren
 | R8 | `IsActive` is not on PUT. Disable / enable are `POST …/disable` and `POST …/enable`. |
 | R9 | Disable / enable are idempotent: already in the target state → 204, no second domain event. |
 | R10 | Disable does **not** UPDATE `Users.Status`. Login already requires an enabled tenant **and** `Status = Active`. |
-| R11 | `Disable()` raises `TenantDisabled`. identity-auth `RevokeTokensOnTenantDisabled` revokes every Domain user in that tenant (`sub` = user PublicId). This slice does not rewrite that handler. |
+| R11 | `Disable()` raises `TenantDisabled`. Disable commits `IsActive = false` and the `TenantDisabled` outbox row together; `RevokeTokensOnTenantDisabled` (identity-auth) revokes every Domain user in that tenant (`sub` = user PublicId) when the `worker` delivers the event, not inside the disable request ([outbox.md](outbox.md)). Hosted login for that Code fails at once. An existing refresh token keeps working until the event is delivered. If the tenant is re-enabled before the event is delivered, the handler still revokes every subject when it runs. |
 | R12 | `Enable()` raises `TenantEnabled`. No session action in Phase 1. Login works again only for people who are still Active. |
 | R13 | PUT / disable / enable require `rowVersion`. Conflict → 409. List / get return `rowVersion` as an opaque string (same encoding as `/users/me`). |
 | R14 | No physical delete. FK `Users.TenantId` is RESTRICT. |
 | R15 | List query: `page` (1-based, default 1), `pageSize` (default 20, max 100), optional `isEnabled`, optional `search`. `search` matches Name or Code contains (CI) or `PublicId` exact. Sort: `name` ascending, then `code`. Disabled rows stay on the same list (filter if the caller asks). |
 | R16 | Tenants is a **platform** resource. It has no `TenantId` column. Dual-check isolation of *tenant-owned rows* starts as a reusable two-tenant fixture here and is asserted on later slices. This slice’s own gate is policy 403, not a 404-for-other-tenant pattern. |
-| R17 | Functional tests create their own tenants and never rely on seeded ones. Development may seed only the named fixture tenants `demo`, `demo2` (`TestSeed`) and `smoke` ([smoke-test.md](../smoke-test.md) §3). Outside Development, only the demo tenant `demo` may be seeded, and only by the operator command `webapi --seed-demo` ([demo-tenant-seed.md](demo-tenant-seed.md)). SystemAdmin seed stays identity-auth. Amended 2026-11-12, 2026-11-14. |
+| R17 | Functional tests create their own tenants and never rely on seeded ones. Development may seed only the named fixture tenants `demo`, `demo2` (`TestSeed`) and `smoke` ([smoke-test.md](../smoke-test.md) §3, when both smoke passwords are configured). Outside Development nothing creates a tenant on start. The demo tenant `demo` may be created in any environment, production included, by the operator command `webapi --seed-demo` only ([demo-tenant-seed.md](demo-tenant-seed.md)): it writes the tenant row, its demo catalog and its two report grants, seeds no people and no ledger data, and never changes an existing tenant. `demo2` is Development only; in production the smoke tenant is created by hand. SystemAdmin seed stays identity-auth. |
+
+Settings and sub-resources added by later specs. Disable and enable touch none of them:
+
+| ID | Rule |
+| --- | --- |
+| R18 | **Allowed custody modes.** `POST /tenants` requires `allowedCustodyModes` (array of enum names, exact case, non-empty, no repeats; else 400 `errors.AllowedCustodyModes`). `PUT /tenants/{id}` may carry it; omitted or `null` leaves the setting unchanged. The item on list, get-by-id and by-code carries it, in the order `External`, `Custodial`. Only `POST /accounts` reads the setting, and narrowing it changes no existing account. `Tenant.Create` keeps its signature and allows both; `SetAllowedCustodyModes` (refuses an empty set) and `Allows(CustodyMode)`; no event. Script `0033_tenants_allowed_custody_modes.sql`. It is the one per-tenant setting [ADR 0020](../adr/0020-account-custody-mode.md) item 1 allows; §2 Out "per-tenant currency allow-lists" still holds. Field rules: [tenant-custody-modes.md](tenant-custody-modes.md). |
+| R19 | **Client money accounts.** Sub-resource `/tenants/{tenantId}/client-money-accounts` (list, get, create, disable, enable), `tenants.manage` only. A client money account is the firm's trust bank account for one currency; at most one active per currency; no edit. Create on a disabled tenant → 400 `disabled` / `target=tenant`. The tenant item carries `clientMoneyCurrencies`: the codes with an active client money account, sorted A–Z, `[]` when none; no bank details. It is read from the client money accounts, not a setting, and it limits only the currency of a new Custodial account. Field rules: [client-money-accounts.md](client-money-accounts.md). |
+| R20 | **Broker connection.** `POST /tenants` and `PUT /tenants/{id}` take an optional `brokerConnection`, a name configured on `webapi`; unknown → 400 `errors.BrokerConnection` (`Unknown broker connection.`). Omitted or `null` on PUT leaves it unchanged; it cannot be cleared. The item carries `brokerConnection`, or `null`. A Tenant with no broker connection, or with one that is not configured on `webapi`, can place no order; changing it routes only new orders. `Tenant.BrokerConnection` and `SetBrokerConnection(name)`; `Create` sets none. Script `0051_orders.sql` adds the column and set `simulator` on every existing row. Field rules: [orders.md](orders.md) R3, R7. |
+| R21 | **Safekeeping accounts.** Sub-resource `/tenants/{tenantId}/safekeeping-accounts` (`tenants.manage`, SystemAdmin only): one active per currency, never edited, each naming a custodian connection. `GET /custodian-connections` lists the configured connections. Field rules: [in-kind-transfers.md](in-kind-transfers.md) R2–R7. |
 
 ---
 
@@ -129,7 +140,7 @@ Invariants (domain-model §4.1 — do not reopen):
 - Code globally unique CI; `[a-z0-9-]{2,50}`; login key.
 - Name globally unique CI.
 - New reporting currency ∈ enabled catalog row.
-- Disabled Code cannot complete login; existing refresh fails.
+- Disabled Code cannot complete login; existing refresh fails once `TenantDisabled` is delivered (R11).
 - Re-enable does not revive `Disabled` people by itself.
 - `RowVersion` conflict → 409.
 
@@ -190,6 +201,9 @@ Root path. `{id}` = PublicId.
   "code": "north-advisory",
   "reportingCurrency": "NZD",
   "isActive": true,
+  "allowedCustodyModes": ["External", "Custodial"],
+  "clientMoneyCurrencies": ["NZD", "USD"],
+  "brokerConnection": "simulator",
   "rowVersion": "<opaque>",
   "created": "2026-09-13T00:00:00+00:00"
 }
@@ -228,7 +242,8 @@ POST `/tenants`:
 {
   "name": "North Advisory",
   "code": "North-Advisory",
-  "reportingCurrency": "nzd"
+  "reportingCurrency": "nzd",
+  "allowedCustodyModes": ["External", "Custodial"]
 }
 ```
 
@@ -270,15 +285,17 @@ Do not add a tenants **manage** page to the Adviser Portal. SystemAdmin uses Sca
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `Rename` rejects blank; `Enable` flips and raises `TenantEnabled` once; second `Enable` / `Disable` is a no-op and raises nothing; `Create` still raises `TenantCreated` |
-| Application.FunctionalTests | No Bearer → 401 not 302; TenantAdmin / Adviser / Customer → 403 on every **manage** verb; Customer → 403 on `GET /tenants/by-code/{code}`; TenantAdmin / Adviser → 200 for their own code, 404 for another tenant’s code or an unknown code; SystemAdmin → 200 for any existing code, 404 if missing; SystemAdmin create → 201 `{ id }` and get matches normalised code + upper currency; duplicate name / code (different case) → 400; disabled / unknown currency on create → 400; PUT same historical disabled currency (omit or equal) → 204; PUT new disabled currency → 400; PUT with `code` in body → 400; disable → tenant `isActive=false`, users in that tenant stay `Active`, refresh for those subjects fails; enable → 204; bad / stale `rowVersion` → 409; missing PublicId → 404; list default paging; `isEnabled=true` omits disabled; `search` hits name and code |
-| Infrastructure.IntegrationTests | No new script. Two-tenant fixture: insert A and B; disable A leaves B enabled. Later slices reuse this fixture for cross-tenant 404 |
+| Domain.UnitTests | `Entities/TenantTests.cs` |
+| Application.FunctionalTests | Folder `Tenants/` |
+| Infrastructure.IntegrationTests | Folder `Tenants/`; `AppliedSchema/TenantsAllowedCustodyModesSchemaTests.cs` |
 
-`TenantDisabled` revocation is already covered by identity-auth. This slice asserts the event still fires on a real disable HTTP call (refresh for a seeded person in that tenant fails). Creating that person in the test is allowed (Domain `User.Create` + `UserManager`) without shipping `/users/tenant-admins`.
+The functional tests assert that refresh still succeeds right after disable and after disable + enable, because the functional host does not run the worker. Revocation itself is covered in Infrastructure.IntegrationTests.
 
-### Acceptance (amendment B)
+### Acceptance of `GET /tenants/by-code/{code}`
 
 No new script. Item JSON matches get-by-id (`id`, `name`, `code`, `reportingCurrency`, `isActive`; `rowVersion` / `created` may be present but the portal must not PUT through this route).
 
@@ -325,93 +342,17 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
+## 12. History
 
-The repository should build after each commit.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/tenants.md`).
 
-1. `Rename` / `Enable` / `TenantCreated` / `TenantEnabled` + Domain.UnitTests
-2. List envelope type + `GetTenants` / `GetTenantById` + GET functional tests (401 / 403 / 200)
-3. `CreateTenant` + POST 201 / uniqueness / catalog 400 tests
-4. `UpdateTenant` + PUT 204 / 409 / historical-vs-new currency tests
-5. `DisableTenant` / `EnableTenant` + refresh-fail + Status-unchanged tests
-6. Two-tenant fixture documented in the test project for later slices
-
-Do not put `/users/tenant-admins` in these commits.
-
----
-
-## Amendment 2026-11-11 (revocation is delivered by the outbox)
-
-Records behaviour that landed with [outbox.md](outbox.md) (`e9b8b81`). Supersedes the timing in the summary, story 4, R11, the §9 acceptance line "existing refresh fails", the §10 functional row "refresh for those subjects fails", the note under §10, and commit 5 "refresh-fail" in §12. Same rules as the identity-auth amendment of the same date.
-
-- Disable commits `IsActive = false` and the `TenantDisabled` outbox row together. `RevokeTokensOnTenantDisabled` runs when the `worker` delivers the event, not inside the disable request.
-- Hosted login for that Code fails at once. An existing refresh token keeps working until the event is delivered.
-- Re-enable restores login for people who are still `Active` (unchanged). If the tenant is re-enabled before the event is delivered, the handler still revokes every subject when it runs.
-- Functional tests assert that refresh still succeeds right after disable and after disable + enable, because the functional host does not run the worker. Revocation itself is covered in Infrastructure.IntegrationTests.
-
----
-
-## Amendment 2026-11-12 (Development fixture tenants)
-
-Supersedes R17 as first written ("Do not seed a demo firm in Development").
-
-- `TestSeed` already seeds `demo` and `demo2` in Development (function-plan "Test seed per slice"). R17 now records that.
-- The smoke tenant `smoke` joins them. Its rows and the condition for seeding it (both smoke passwords configured) are owned by [smoke-test.md](../smoke-test.md) §3.
-- No other tenant is seeded. No tenant is seeded outside Development. In production the smoke tenant is created by hand.
-- Functional tests still create their own tenants and must not depend on any seeded tenant.
-
----
-
-## Amendment 2026-11-14 (demo tenant outside Development)
-
-Accepted with [demo-tenant-seed.md](demo-tenant-seed.md). Supersedes the R17 sentence "No tenant is seeded outside Development" and the same line in the amendment of 2026-11-12, for the demo tenant only.
-
-- The demo tenant `demo` may be created in any environment, production included, by the operator command `webapi --seed-demo` only. Nothing creates it on start outside Development.
-- That command writes the tenant row, its demo catalog and its two report grants. It seeds no people and no ledger data, and never changes an existing tenant.
-- `demo2` and `smoke` stay as R17 says: `demo2` is Development only; the smoke tenant is created by hand in production.
-- Functional tests still create their own tenants and must not depend on any seeded tenant.
-
----
-
-## Amendment 2026-11-18 (allowed custody modes) — accepted, landed
-
-Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody-modes.md](tenant-custody-modes.md). That spec owns the field rules; this list says what changes here.
-
-- §2 Out "Quotas, billing, branding, per-tenant currency allow-lists" still holds. The allowed custody modes are the one per-tenant setting [ADR 0020](../adr/0020-account-custody-mode.md) item 1 allows.
-- §6: the slice that ships this adds script `0033_tenants_allowed_custody_modes.sql`: `Tenants.AllowsExternalAccounts` and `Tenants.AllowsCustodialAccounts`, `bit NOT NULL`, DEFAULT 1, CHECK at least one. Existing tenants allow both.
-- §5: `Tenant.Create` keeps its signature and allows both. `SetAllowedCustodyModes` (refuses an empty set) and `Allows(CustodyMode)` are added. No event.
-- §8.1: the item on list, get-by-id and by-code carries `allowedCustodyModes`, in the order `External`, `Custodial`.
-- §8.3: `POST /tenants` requires `allowedCustodyModes` (array of enum names, exact case, non-empty, no repeats; else 400 `errors.AllowedCustodyModes`). `PUT /tenants/{id}` may carry it; omitted or `null` leaves the setting unchanged.
-- Disable and enable do not touch the setting.
-- Only `POST /accounts` reads the setting (tenant-custody-modes R7). Narrowing it changes no existing account.
-
----
-
-## Amendment 2026-11-20 (client money accounts) — accepted
-
-Status of this amendment: `accepted` (2026-11-20), together with [client-money-accounts.md](client-money-accounts.md). That spec owns the field rules; this list says what changes here.
-
-- New sub-resource `/tenants/{tenantId}/client-money-accounts` (list, get, create, disable, enable), `tenants.manage` only. A client money account is the firm's trust bank account for one currency; at most one active per currency; no edit. Create on a disabled tenant → 400 `disabled` / `target=tenant`.
-- §8.1: the item on list, get-by-id and by-code carries `clientMoneyCurrencies`: the codes with an active client money account, sorted A–Z, `[]` when none. No bank details on the tenant item.
-- §2 Out "per-tenant currency allow-lists" still holds: `clientMoneyCurrencies` is read from the client money accounts, not a setting, and it limits only the currency of a new Custodial account (client-money-accounts R11).
-- Disabling or enabling the Tenant does not touch its client money accounts.
-
----
-
-## Amendment 2026-11-23 (orders and settlement) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rule R3 lives there; this section records what changes here.
-
-- §8.1: the item on list, get-by-id and by-code carries `brokerConnection`: the name of the Tenant's broker connection, or `null`.
-- §8.3: `POST /tenants` and `PUT /tenants/{id}` take an optional `brokerConnection`, a name configured on `webapi`; unknown → 400 `errors.BrokerConnection` (`Unknown broker connection.`). Omitted or `null` on PUT leaves the setting unchanged. It cannot be cleared in this slice.
-- §5: `Tenant.BrokerConnection` (`null` or a name) and `SetBrokerConnection(name)`. `Create` keeps its signature and sets none.
-- §6: script `0051_orders.sql` adds `Tenants.BrokerConnection nvarchar(50) NULL` and sets `simulator` on every existing row (roadmap D19).
-- A Tenant with no broker connection, or with one that is not configured on `webapi`, can place no order (orders R7). Changing it routes only new orders. Disabling or enabling the Tenant does not touch it.
-
----
-
-## Amendment 2026-11-24 (in-kind transfers) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R2–R7 live there; this section records what changes here.
-
-- A Tenant gains safekeeping accounts under `/tenants/{tenantId}/safekeeping-accounts` (`tenants.manage`, SystemAdmin only): one active per currency, never edited, each naming a custodian connection. `GET /custodian-connections` lists the configured connections.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-11 | [outbox.md](outbox.md) | R11: revocation is delivered by the outbox |
+| 2026-11-12 | [smoke-test.md](../smoke-test.md) | R17: the Development fixture tenants |
+| 2026-11-14 | [demo-tenant-seed.md](demo-tenant-seed.md) | R17: the demo tenant outside Development |
+| 2026-11-18 | [tenant-custody-modes.md](tenant-custody-modes.md) | R18: allowed custody modes |
+| 2026-11-20 | [client-money-accounts.md](client-money-accounts.md) | R19: client money accounts |
+| 2026-11-23 | [orders.md](orders.md) | R20: the broker connection |
+| 2026-11-24 | [in-kind-transfers.md](in-kind-transfers.md) | R21: safekeeping accounts |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
