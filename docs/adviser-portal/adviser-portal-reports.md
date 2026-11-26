@@ -4,7 +4,7 @@ status: accepted
 phase: 3
 language: en
 created: 2026-10-14
-updated: 2026-11-21
+updated: 2026-11-26
 related:
   - adviser-portal.md
   - adviser-portal-dashboard.md
@@ -277,6 +277,16 @@ Use the existing portal empty / error patterns. Do not invent a second toast lib
 
 ---
 
+### Tenant-scoped reports
+
+Field rules: [bank-reconciliation](../features/bank-reconciliation.md). Report scope `Tenant` (policies `reports.tenant.*`, TenantAdmin only) and report `bank-reconciliation` (`3e7b9d14-6c2a-4f58-b0e1-9a4d2c7f8e33`). The BFF prefix `/reports` already covers it. Calls: `GET /reports?scope=Tenant`, `GET /reports/schedules?scope=Tenant`, `GET /reports/executions?scope=Tenant`, the existing request, schedule and download routes, and `GET /bank-reconciliations/overview` for the account picker. Tests: the Reports page calls `scope=Tenant` only for a TenantAdmin.
+
+| ID | Behaviour |
+| --- | --- |
+| D52 | The Reports tab (`/reports`) also lists Tenant-scoped reports for a TenantAdmin (`GET /reports?scope=Tenant`), under the heading "Firm reports". For `bank-reconciliation` the generate and schedule forms ask for the client money account (from the overview of D51) and send no `reconciliationId`. An Adviser does not see the heading. The run page of D51 has no PDF button. |
+
+---
+
 ## Tests
 
 Portal tests assert routes, role visibility, that the Customer section calls `scope=Customer` and the Reports page calls `scope=Book`, that the Generate dropdown switches the hard-coded parameter form, that Generate and Schedule send the documented body shapes, that Schedule create is hidden when `allowedTriggers` omits `"scheduled"`, that History defaults to all reports and the report filter adds `reportId`, that the Adviser picker is present only for TenantAdmin, and that Download is offered only for `Succeeded`. On `/reports`, tests also assert Reports, Schedules, and History are tabs and that only the selected panel is shown. The customer Reports section keeps the three panels in one section. Do not re-prove backend isolation, PDF content, or Hangfire behaviour here.
@@ -294,10 +304,11 @@ Portal tests assert routes, role visibility, that the Customer section calls `sc
 
 ---
 
-## Amendment 2026-11-21 (Tenant-scoped reports) — accepted
+## History
 
-Status of this amendment: `accepted` (2026-11-21), together with [bank-reconciliation](../features/bank-reconciliation.md). Report scope `Tenant` (policies `reports.tenant.*`, TenantAdmin only) and report `bank-reconciliation` (`3e7b9d14-6c2a-4f58-b0e1-9a4d2c7f8e33`). The BFF prefix `/reports` already covers it. Calls: `GET /reports?scope=Tenant`, `GET /reports/schedules?scope=Tenant`, `GET /reports/executions?scope=Tenant`, the existing request, schedule and download routes, and `GET /bank-reconciliations/overview` for the account picker. Tests: the Reports page calls `scope=Tenant` only for a TenantAdmin.
+What changed in this file after it was accepted. Each row is a section above. The text of each change is in git (`git log -p -- docs/adviser-portal/adviser-portal-reports.md`).
 
-| ID | Behaviour |
-| --- | --- |
-| D52 | The Reports tab (`/reports`) also lists Tenant-scoped reports for a TenantAdmin (`GET /reports?scope=Tenant`), under the heading "Firm reports". For `bank-reconciliation` the generate and schedule forms ask for the client money account (from the overview of D51) and send no `reconciliationId`. An Adviser does not see the heading. The run page of D51 has no PDF button. |
+| Date | With | Section |
+| --- | --- | --- |
+| 2026-11-21 | [bank-reconciliation](../features/bank-reconciliation.md) | Tenant-scoped reports |
+| 2026-11-26 | — | The amendments became the sections above. No behaviour changed |
