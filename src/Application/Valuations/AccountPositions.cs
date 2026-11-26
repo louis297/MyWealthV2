@@ -1,5 +1,6 @@
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Domain.Entities;
+using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Valuations;
 
 namespace MyWealthV2.Application.Valuations;
@@ -46,6 +47,41 @@ public class AccountPositions(IApplicationDbContext db) : IAccountPositions
             .Select(row => new PositionLine(row.InstrumentId, row.Quantity))
             .ToList();
 
-        return new AccountPositionRead(new AccountPosition(day, cash, lines), []);
+        return new AccountPositionRead(new AccountPosition(day, cash, lines), await BasisChangesAsync(account, cancellationToken));
+    }
+
+    /// <summary>
+    /// R18: the entitlement postings on the Account of any <c>bookedAt</c>: a <c>Split</c> or <c>Bonus</c> with source
+    /// <c>CorporateAction</c>, not reversed, whose corporate action has origin <c>Manual</c>, with the ex-date and ratio
+    /// of its detail. A corporate action from the feed and a hand <c>Split</c> on an External account are not read
+    /// (R19).
+    /// </summary>
+    private async Task<IReadOnlyList<BasisChange>> BasisChangesAsync(Account account, CancellationToken cancellationToken)
+    {
+        var rows = await (
+                from transaction in db.Transactions.IgnoreQueryFilters()
+                join detail in db.TransactionCorporateActionDetails.IgnoreQueryFilters() on transaction.Id equals detail.TransactionId
+                join leg in db.TransactionSecurityLegs.IgnoreQueryFilters() on transaction.Id equals leg.TransactionId
+                join action in db.CorporateActions.IgnoreQueryFilters() on transaction.SourcePublicId equals (Guid?)action.PublicId
+                where transaction.TenantId == account.TenantId
+                      && leg.AccountId == account.Id
+                      && (transaction.Type == TransactionType.Split || transaction.Type == TransactionType.Bonus)
+                      && transaction.SourceKind == TransactionSourceKind.CorporateAction
+                      && transaction.ReversedByTransactionId == null
+                      && action.TenantId == account.TenantId
+                      && action.Origin == CorporateActionOrigin.Manual
+                select new
+                {
+                    leg.InstrumentId,
+                    detail.ExDate,
+                    transaction.BookedAt,
+                    detail.Kind,
+                    detail.RatioNew,
+                    detail.RatioHeld
+                })
+            .ToListAsync(cancellationToken);
+        return rows
+            .Select(row => new BasisChange(row.InstrumentId, row.ExDate, row.BookedAt, row.Kind, row.RatioNew, row.RatioHeld))
+            .ToList();
     }
 }
