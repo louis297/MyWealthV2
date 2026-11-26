@@ -81,7 +81,7 @@ A TenantAdmin or Adviser moves cash from one Open Account to another Open Accoun
 
 | ID | Rule |
 | --- | --- |
-| R1 | Unchanged from posting R1–R4a and leg-accounts R1: 401 / 403 / 404, PublicId only, `tenantId` rules for TenantAdmin / Adviser (omit) and SystemAdmin (required on create). Customer → 403. TenantAdmin / Adviser of a disabled tenant → 403 (identity-auth amendment 2026-11-13). SystemAdmin naming a disabled tenant on create → 400 `disabled` / `target=tenant`. |
+| R1 | Unchanged from posting R1–R4a and leg-accounts R1: 401 / 403 / 404, PublicId only, `tenantId` rules for TenantAdmin / Adviser (omit) and SystemAdmin (required on create). Customer → 403. TenantAdmin / Adviser of a disabled tenant → 403 (identity-auth §4.5). SystemAdmin naming a disabled tenant on create → 400 `disabled` / `target=tenant`. |
 | R2 | **Route.** `POST /transactions/transfer` creates an `InternalTransfer`. `POST /transactions` with `type = InternalTransfer` → 400. There is one create route per type. |
 | R3 | **Body.** `fromAccountId` and `toAccountId` (Account PublicIds) are required. `amount` is required and `> 0`. `bookedAt`, `memo`, `reference` follow posting (R23 for memo / reference). The body has no `type`, no `accountId`, no `currency`, no legs array. Any of those present → 400. `amount` has no more decimal places than the Accounts' currency's `DecimalPlaces`, else 400 `errors.Amount`. Between two External Accounts `bookedAt` is required and not later than the server clock plus 5 minutes (400 `errors.BookedAt`); between two Custodial Accounts the server sets it, and a body that sends it → 400 (custody-modes R10). |
 | R4 | **Legs.** Application builds exactly two cash legs: `−amount` on the from Account and `+amount` on the to Account, both in the Accounts' currency. No security leg. |
@@ -214,7 +214,7 @@ List:
 
 Ordinary validation in `errors`: same Account, currency mismatch, Closed Account, `amount ≤ 0`, forbidden body field, insufficient cash on create or reverse, `InternalTransfer` sent to `POST /transactions`, unknown `type` filter.
 
-§4.1 `disabled`: `target=tenant` when a SystemAdmin names a disabled tenant (tenant users get 403 first, identity-auth amendment 2026-11-13), `target=user` when either Customer is Disabled.
+§4.1 `disabled`: `target=tenant` when a SystemAdmin names a disabled tenant (tenant users get 403 first, identity-auth §4.5), `target=user` when either Customer is Disabled.
 
 Any Account outside the caller's scope or tenant → **404**, not 403.
 

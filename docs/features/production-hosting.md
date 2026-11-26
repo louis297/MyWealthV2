@@ -47,7 +47,7 @@ Outside Development, `identity` signs and encrypts with certificates from files 
 **Out**
 
 - Serving the SPA build (BFF amendments 2026-11-12)
-- Bootstrap SystemAdmin (identity-auth amendment 2026-11-12)
+- Bootstrap SystemAdmin (identity-auth §4.6)
 - The compose file, the Caddyfile and the deploy workflow ([deployment.md](../deployment.md) §5, §9; config)
 - Loading two signing certificates at once for rotation. A certificate swap signs everyone out once
 - Encrypting Data Protection keys at rest

@@ -16,7 +16,7 @@ related:
 
 ## Problem
 
-Hosted login locks an identity user for five minutes after five wrong passwords in a row ([identity-auth.md](../features/identity-auth.md), amendment 2026-11-13, lockout). Anyone who knows a tenantCode and an email can send those five wrong passwords and keep that account locked, from any IP. The person only sees the uniform `Invalid login.` (R3); the page does not say the account is locked.
+Hosted login locks an identity user for five minutes after five wrong passwords in a row ([identity-auth.md](../features/identity-auth.md) §4.4). Anyone who knows a tenantCode and an email can send those five wrong passwords and keep that account locked, from any IP. The person only sees the uniform `Invalid login.` (R3); the page does not say the account is locked.
 
 The smoke tenant's TenantCode and emails are in [smoke-test.md](../smoke-test.md) §3, so the smoke accounts are the easiest target. A locked smoke Adviser or Customer fails the post-deploy smoke test, and the deploy rolls back.
 

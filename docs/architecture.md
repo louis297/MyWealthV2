@@ -75,7 +75,7 @@ Portals:
 
 - **Adviser Portal** — only frontend in Phase 1. OIDC client id `adviser-portal` is held by `bff-adviser-portal`, not by the browser.
 - Customer Portal — second BFF + client on the same authorization server; accepted ([customer-portal/customer-portal.md](customer-portal/customer-portal.md), [features/bff-customer-portal.md](features/bff-customer-portal.md))
-- Back Office — landed ([backoffice/back-office.md](backoffice/back-office.md)). Blazor host `back-office` with MudBlazor (no BFF). Scalar remains. Back Office is the only client that issues SystemAdmin a code; `adviser-portal` refuses SystemAdmin (identity-auth amendment 2026-11-11).
+- Back Office — landed ([backoffice/back-office.md](backoffice/back-office.md)). Blazor host `back-office` with MudBlazor (no BFF). Scalar remains. Back Office is the only client that issues SystemAdmin a code; `adviser-portal` refuses SystemAdmin (identity-auth §4.2).
 
 - Simulator — landed 2026-11-19 ([features/simulator.md](features/simulator.md), [ADR 0021](adr/0021-outside-parties-behind-ports.md)). Plays the outside parties. Own database `MyWealthSimulatorDb`; references no platform `Domain`, `Application`, `Infrastructure` or `Web`. Confidential client `simulator`, signed in only by `SimulatorOperator`; keeps no token and never calls `webapi`.
 
@@ -123,14 +123,14 @@ Hosted in `src/IdentityHost` (ADR 0014). Aspire resource name: `identity`.
 | --- | --- |
 | Protocol | OpenIddict **defaults, do not remap**: `/.well-known/openid-configuration`, `/.well-known/jwks`, `/connect/authorize`, `/connect/token`, `/connect/revocation`, `/connect/logout` (plus default `/connect/userinfo`). Callers follow discovery; do not hard-code |
 | Hosted login | Password page on `identity`: email + password + tenantCode (SystemAdmin omits tenantCode) |
-| Client | Four confidential clients. `adviser-portal` is held by `bff-adviser-portal`. `back-office` is held by `src/BackOffice`. `customer-portal` is held by `bff-customer-portal` (accepted). Authorization code + PKCE + refresh. No password grant. The fourth, `simulator`, is held by `src/Simulator`: code + PKCE, scopes `openid profile email` only, no refresh, no `api` (identity-auth amendment 2026-11-19). |
+| Client | Four confidential clients. `adviser-portal` is held by `bff-adviser-portal`. `back-office` is held by `src/BackOffice`. `customer-portal` is held by `bff-customer-portal` (accepted). Authorization code + PKCE + refresh. No password grant. The fourth, `simulator`, is held by `src/Simulator`: code + PKCE, scopes `openid profile email` only, no refresh, no `api` (identity-auth §4.2). |
 | Access | Short-lived JWT. **Asymmetric** signing. Public keys on JWKS |
 | Refresh | OpenIddict token store. Revoked on logout (at once), and on password change and disable (when the outbox delivers the event). Rotated when presented. No custom `RefreshTokens` table |
 | Scopes | `openid`, `profile`, `offline_access`, `api`. Role and tenant are JWT claims, not scopes. Permissions are not expanded into the token |
 
 The login gate on the authorization server reads domain invariants: tenant enabled, `UserStatus = Active`, valid Identity link, then the client × role allow-list. `adviser-portal` issues a code only to TenantAdmin and Adviser. `back-office` issues a code only to SystemAdmin. `customer-portal` issues a code only to Customer. SystemAdmin may complete login with no tenantCode. Adviser-management resource policies stay 403.
 
-IdentityHost isolates the two first-party clients with a per-client cookie scheme (identity-auth amendment 2026-10-27). `/connect/authorize` and hosted `/login` authenticate and sign in only against the scheme for the current `client_id`. `/connect/logout` signs out only that scheme. A login on one client does not silently authenticate the other. This is server-side; clients do not send a special parameter.
+IdentityHost isolates the two first-party clients with a per-client cookie scheme (identity-auth §4.3). `/connect/authorize` and hosted `/login` authenticate and sign in only against the scheme for the current `client_id`. `/connect/logout` signs out only that scheme. A login on one client does not silently authenticate the other. This is server-side; clients do not send a special parameter.
 
 The BFF redeems the adviser-portal code and stores tokens. The SPA does not. It does not own a password form that issues tokens. Contract: [features/bff-adviser-portal.md](features/bff-adviser-portal.md). The Back Office host redeems its own code the same way and calls `webapi` with Bearer. Contract: [backoffice/back-office.md](backoffice/back-office.md).
 
@@ -259,7 +259,7 @@ Tenant resolution: login requires tenantCode except for SystemAdmin. The JWT car
 
 API paths and JSON use PublicId only. Internal code still uses `int`.
 
-Password change, disable, and logout revoke that subject’s OpenIddict tokens. The User aggregate does not hold tokens. Logout revokes at once. Password change, person disable and tenant disable revoke when the outbox delivers the domain event ([features/outbox.md](features/outbox.md)); until then an existing refresh token still works, because the token endpoint does not re-check status on a refresh grant. `webapi` does re-check: the current-user load applies `LoginEligibility` to the person and tenant rows on every request, so an access token for a disabled person or tenant is refused at once, even when the outbox event is late or dead-lettered ([features/identity-auth.md](features/identity-auth.md) amendment 2026-11-13). After a tenant is disabled, that Code must not complete login, and existing refresh fails once the event is delivered. Disabling a tenant does **not** bulk-update `User.Status`. Person status is independent; login checks both.
+Password change, disable, and logout revoke that subject’s OpenIddict tokens. The User aggregate does not hold tokens. Logout revokes at once. Password change, person disable and tenant disable revoke when the outbox delivers the domain event ([features/outbox.md](features/outbox.md)); until then an existing refresh token still works, because the token endpoint does not re-check status on a refresh grant. `webapi` does re-check: the current-user load applies `LoginEligibility` to the person and tenant rows on every request, so an access token for a disabled person or tenant is refused at once, even when the outbox event is late or dead-lettered ([features/identity-auth.md](features/identity-auth.md) §4.5). After a tenant is disabled, that Code must not complete login, and existing refresh fails once the event is delivered. Disabling a tenant does **not** bulk-update `User.Status`. Person status is independent; login checks both.
 
 ---
 

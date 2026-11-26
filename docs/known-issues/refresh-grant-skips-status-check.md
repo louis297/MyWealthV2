@@ -16,13 +16,13 @@ related:
 
 ## Problem
 
-The token endpoint does not re-check `Users.Status` or the tenant flag on a refresh grant. Disable and password change revoke the subject's tokens through the outbox: `UserDisabled`, `TenantDisabled` and `UserPasswordChanged` are written to `OutboxMessages`, and the `worker` runs the revocation handlers after commit ([identity-auth.md](../features/identity-auth.md), amendment 2026-11-11, revocation is delivered by the outbox).
+The token endpoint does not re-check `Users.Status` or the tenant flag on a refresh grant. Disable and password change revoke the subject's tokens through the outbox: `UserDisabled`, `TenantDisabled` and `UserPasswordChanged` are written to `OutboxMessages`, and the `worker` runs the revocation handlers after commit ([identity-auth.md](../features/identity-auth.md) §4.5).
 
 Until the event is delivered, an existing refresh token still works. The window is normally the outbox poll interval plus retries. After five failed attempts the row becomes `DeadLettered` ([outbox.md](../features/outbox.md)), and the refresh token stays valid until its 14-day absolute lifetime.
 
 What limits the damage:
 
-- `webapi` re-checks person and tenant status on every request, so the access tokens minted by that refresh get 403 on every `webapi` route ([identity-auth.md](../features/identity-auth.md), amendment 2026-11-13, `webapi` re-checks person and tenant status).
+- `webapi` re-checks person and tenant status on every request, so the access tokens minted by that refresh get 403 on every `webapi` route ([identity-auth.md](../features/identity-auth.md) §4.5).
 - New hosted login and `/connect/authorize` check `LoginEligibility` on every request.
 - A password change also ends silent re-authorization through the identity cookie (amendment 2026-11-13, identity cookie checks the security stamp). The refresh token itself still waits for the outbox.
 

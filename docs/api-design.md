@@ -97,14 +97,14 @@ Protocol scopes (not permissions): `openid`, `profile`, `offline_access`, `api`.
 
 | Role | How tokens are obtained | Phase 1 resource scope |
 | --- | --- | --- |
-| SystemAdmin | Hosted login on `back-office`, no tenantCode. `adviser-portal` issues no code (identity-auth amendment 2026-11-11) | `/tenants` manage + `GET /tenants/by-code/{code}`, `/users/tenant-admins`, `/users/me`, `/currencies` |
+| SystemAdmin | Hosted login on `back-office`, no tenantCode. `adviser-portal` issues no code (identity-auth §4.2) | `/tenants` manage + `GET /tenants/by-code/{code}`, `/users/tenant-admins`, `/users/me`, `/currencies` |
 | TenantAdmin | Hosted login on `adviser-portal` + tenantCode | `/users/advisers`, tenant `/users/customers`, `GET /tenants/by-code/{own}`, `/users/me`, `/currencies` |
 | Adviser | Hosted login on `adviser-portal` + tenantCode | Assigned `/users/customers`, `GET /tenants/by-code/{own}`, `/users/me`, `/currencies` |
 | Customer | Hosted login on `customer-portal` + tenantCode. `adviser-portal` issues no code | The routes §3.1 grants a Customer, for the caller's own data only. `/users/advisers`, `/users/customers`, `/users/tenant-admins`, `/tenants` including by-code → 403 |
 
 Disable / enable for people: `POST /{id}/disable`, `POST /{id}/enable` (`Disabled` ↔ `Active`). Not a physical delete. Disabling an Adviser requires assigned non-disabled Customers to be handled first. Disabling the last TenantAdmin is allowed in Phase 1 (known gap).
 
-Disabling a tenant does **not** bulk-update `User.Status`. Person status is independent; login checks both. After a tenant is disabled, that Code must not complete login, and existing refresh fails once the outbox delivers `TenantDisabled`. Its people get 403 from `webapi` at once (identity-auth amendment 2026-11-13).
+Disabling a tenant does **not** bulk-update `User.Status`. Person status is independent; login checks both. After a tenant is disabled, that Code must not complete login, and existing refresh fails once the outbox delivers `TenantDisabled`. Its people get 403 from `webapi` at once (identity-auth §4.5).
 
 Password change, disable, and logout revoke that subject’s OpenIddict tokens. The User aggregate does not hold tokens.
 
@@ -186,7 +186,7 @@ The fifth role `SimulatorOperator` ([ADR 0013](adr/0013-roles-authorization-sing
 | Target exists but is disabled and the caller tries to create / attach / post on it (§4.1) | 400 `disabled` | `webapi` |
 | Missing / invalid Bearer; calling resources after refresh was revoked | 401 | `webapi` |
 | Tenant disabled, Status ≠ Active, bad password, wrong tenant (at login) | Authorization does not complete (login failure to the caller) | Gate on `identity` |
-| Tenant disabled or Status ≠ Active, with a still-valid access token | 403 on every route that needs a permission (identity-auth amendment 2026-11-13) | `webapi` current-user load |
+| Tenant disabled or Status ≠ Active, with a still-valid access token | 403 on every route that needs a permission (identity-auth §4.5) | `webapi` current-user load |
 | Authenticated but policy fails (including Customer on adviser-management routes) | 403 | `webapi` |
 | Cross-tenant / cross-adviser / missing | 404 | `webapi` |
 | State conflict: stale `rowVersion`, reused `Idempotency-Key`, changed FX rate, … | 409 with a problem `code` (§4.2) | `webapi` |

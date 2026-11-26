@@ -33,7 +33,7 @@ Tenant **management** (create / rename / reporting currency / disable) is not th
 
 **In repo master.** Shell 2026-09-13. BFF cut `6aae5c7` (slice head `5e85e9c`). Do not rebuild the public-client shell.
 
-Vite stays an Aspire resource. Product origin is `bff-adviser-portal`. The SPA is not an OIDC client. No `/callback`. Session probe is `GET /api/users/me` with credentials. 401 does not refresh in the browser. No React password page. SystemAdmin has no session on this client (identity-auth amendment 2026-11-11); Back Office is the SystemAdmin host.
+Vite stays an Aspire resource. Product origin is `bff-adviser-portal`. The SPA is not an OIDC client. No `/callback`. Session probe is `GET /api/users/me` with credentials. 401 does not refresh in the browser. No React password page. SystemAdmin has no session on this client (identity-auth §4.2); Back Office is the SystemAdmin host.
 
 | Path | Behaviour (landed) |
 | --- | --- |
@@ -51,7 +51,7 @@ People HTTP, amendment A, and amendment B have landed in repo master (`09dc6ec`)
 
 | Step | Spec | Ships |
 | --- | --- | --- |
-| A | [identity-auth](../features/identity-auth.md) | Client × role allow-list on IdentityHost: after password, before the authorization code. `adviser-portal` allows TenantAdmin, Adviser (SystemAdmin removed by identity-auth amendment 2026-11-11). A Customer with a correct password does **not** get a code. Uniform login failure. Customers hosted-login smoke expects failure on this client. |
+| A | [identity-auth](../features/identity-auth.md) | Client × role allow-list on IdentityHost: after password, before the authorization code. `adviser-portal` allows TenantAdmin, Adviser (SystemAdmin removed by identity-auth §4.2). A Customer with a correct password does **not** get a code. Uniform login failure. Customers hosted-login smoke expects failure on this client. |
 | B | [tenants](../features/tenants.md) + [ADR 0013](../adr/0013-roles-authorization-single-user-table.md) | `GET /tenants/by-code/{code}`, policy `tenants.read`. Own-tenant 200 for TenantAdmin / Adviser; other codes 404; Customer 403. |
 
 Reserved, not registered in Phase 1: client `customer-portal` (Customer) and a Back Office client (SystemAdmin only).

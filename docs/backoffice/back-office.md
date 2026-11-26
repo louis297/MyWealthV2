@@ -72,7 +72,7 @@ Accepted 2026-10-25. SystemAdmin still uses Scalar for the same verbs. The Back 
 | OIDC client | Confidential, `ClientId = back-office`, secret via Aspire parameter (not in git) |
 | Login | Redirect to hosted `/login` on `identity`. SystemAdmin omits `tenantCode` |
 | Session | Encrypted HttpOnly cookie on the Back Office host. Access + refresh live in the cookie; no server-side session store |
-| Identity cookie | Isolated. IdentityHost uses a per-client cookie scheme for `back-office`. Login on Adviser Portal does not authenticate Back Office, and the reverse. See identity-auth amendment 2026-10-27. |
+| Identity cookie | Isolated. IdentityHost uses a per-client cookie scheme for `back-office`. Login on Adviser Portal does not authenticate Back Office, and the reverse. See identity-auth §4.3. |
 | Resource calls | Typed `HttpClient` to `webapi` with Bearer access token |
 | CORS | None required on `webapi` (server-to-server) |
 

@@ -27,7 +27,7 @@ Page-by-page construction notes for the Adviser Portal **pages** cut. Not a back
 
 Landed `6aae5c7`. The browser talks only to `bff-adviser-portal`. The session cookie is `__Host-bff-adviser-portal`. API calls use base `/api` with `credentials: 'include'` and no `Authorization` header. Mutations and sign-out send `X-MyWealth-Request: 1`. Signed-out navigation goes to `GET /bff/login?returnUrl=`. Sign-out is `POST /bff/logout` with that header, then `GET /bff/logout/continue`. There is no SPA `/callback` and no token in `sessionStorage`. `sessionStorage` may hold the sign-out-in-progress flag only (`adviser-portal.signOutInProgress`). The notes below describe the earlier public-client shell. Do not implement from them. Cut record: [adviser-portal-bff-cut.md](adviser-portal-bff-cut.md).
 
-SystemAdmin has no Adviser Portal session since identity-auth amendment 2026-11-11. A leftover SystemAdmin session goes to `/forbidden`, like Customer. The SystemAdmin rows below are updated to match.
+SystemAdmin has no Adviser Portal session since identity-auth §4.2. A leftover SystemAdmin session goes to `/forbidden`, like Customer. The SystemAdmin rows below are updated to match.
 
 - Inventory, role gate, acceptance → [adviser-portal.md](adviser-portal.md)
 - Folder layout, naming, session, API client → [frontend-conventions.md](frontend-conventions.md)
@@ -196,7 +196,7 @@ Order:
 1. No access token → authorize (existing)
 2. Token present, no `me` yet → `GET /users/me`
 3. `role === customer` → must not happen after amendment A. If it does, `/forbidden`
-4. `role === systemAdmin` → must not happen after identity-auth amendment 2026-11-11. If it does, `/forbidden` (every route, including Profile and `/session`)
+4. `role === systemAdmin` → must not happen after identity-auth §4.2. If it does, `/forbidden` (every route, including Profile and `/session`)
 5. Adviser hits `/advisers*` → `/forbidden` (API is 403, not 404)
 6. Adviser opens another adviser’s `/customers/:id` → page shows the API 404
 
@@ -273,7 +273,7 @@ TenantAdmin edit may send `adviserId`. An Adviser PUT that includes `adviserId` 
 
 | API | Page |
 | --- | --- |
-| 400 `disabled` / `target=tenant` | Not expected from the portal: a person of a disabled firm gets 403 first (identity-auth amendment 2026-11-13) |
+| 400 `disabled` / `target=tenant` | Not expected from the portal: a person of a disabled firm gets 403 first (identity-auth §4.5) |
 | 400 `disabled` / `target=user` | Cannot attach to a disabled adviser |
 | Duplicate email | Field error |
 | Cross-tenant / not assigned / wrong collection | Detail 404 |

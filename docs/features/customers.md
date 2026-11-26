@@ -37,7 +37,7 @@ Landed in GitHub master 2026-09-14 (`b16d059`, hosted-login smoke after create).
 
 A TenantAdmin creates a Customer in **their** tenant (`name`, `email`, `password`, `adviserId`). An Adviser creating a Customer may only assign self (`adviserId` omitted = self; any other id → 400). `tenantId` comes from the current user, not the body. Same-transaction dual write Identity → Domain, lands in `Active`. Email is unique CI inside the tenant. Role / TenantId / Email cannot change. After create, a TenantAdmin may reassign `AdviserId` to another non-disabled Adviser in the same tenant.
 
-Every call while the current tenant is disabled → 403 (identity-auth amendment 2026-11-13). Target Adviser Disabled → 400 `disabled` / `target=user`. Cross-tenant, not-assigned, or wrong-collection ids → 404. SystemAdmin / Customer → 403. An Adviser reading another Adviser’s Customer → 404 (not 403; do not leak existence). Every list item includes `status`, `isActive`, and `adviserId`; `enabledOnly` matches currencies (`true` = `IsActive = 1`).
+Every call while the current tenant is disabled → 403 (identity-auth §4.5). Target Adviser Disabled → 400 `disabled` / `target=user`. Cross-tenant, not-assigned, or wrong-collection ids → 404. SystemAdmin / Customer → 403. An Adviser reading another Adviser’s Customer → 404 (not 403; do not leak existence). Every list item includes `status`, `isActive`, and `adviserId`; `enabledOnly` matches currencies (`true` = `IsActive = 1`).
 
 A Customer may complete authorization-server login (tests / reserved). There is no Customer Portal client. `/users/customers` stays 403 for that role. They use `/users/me` and `/currencies` only.
 
@@ -94,7 +94,7 @@ A Customer may complete authorization-server login (tests / reserved). There is 
 | R3 | `Name` required, 1–200, trim, preserve caller casing. |
 | R4 | `Email` required, trim, preserve casing, compare CI, must look like an email. Unique inside the tenant (collision with a TenantAdmin or Adviser is also 400). Repeatable across tenants. |
 | R5 | Create requires `password` (minimum 8). Lands `Active`, raises `UserActivated` + `UserCreated`. No password-less create. Create does **not** raise `CustomerAdviserReassigned`. |
-| R6 | Create does **not** take `tenantId`. Tenant = current user’s TenantId. Missing current tenant (should not happen) → 404. Current tenant `IsActive = false` → 403 on every verb, reads included (identity-auth amendment 2026-11-13). The handler keeps `TargetDisabledException("tenant", tenant.PublicId, "Tenant is disabled", "Cannot create a Customer while the tenant is disabled. Enable the tenant first.")` as a backstop; HTTP callers no longer reach it. |
+| R6 | Create does **not** take `tenantId`. Tenant = current user’s TenantId. Missing current tenant (should not happen) → 404. Current tenant `IsActive = false` → 403 on every verb, reads included (identity-auth §4.5). The handler keeps `TargetDisabledException("tenant", tenant.PublicId, "Tenant is disabled", "Cannot create a Customer while the tenant is disabled. Enable the tenant first.")` as a backstop; HTTP callers no longer reach it. |
 | R7 | Dual-write order matches tenant-admins / advisers: Identity first (`UserName` = person PublicId, `TenantId` projection), then `Users`. Same transaction. Responses never include the password. |
 | R8 | Role / TenantId / Email cannot change. PUT updates `name`. A TenantAdmin PUT may also update `adviserId`. Body includes `email` / `tenantId` / `role` / `password` → 400. An Adviser PUT that includes `adviserId` → 400. |
 | R9 | Status and `isActive` are not on PUT or create bodies. Disable / enable are `POST …/disable` and `POST …/enable`. |
@@ -268,7 +268,7 @@ disable / enable:
 
 ### 8.4 Errors
 
-Since identity-auth amendment 2026-11-13 an HTTP caller of a disabled tenant gets 403 first. The handler keeps this api-design §4.1 body as a backstop:
+Since identity-auth §4.5 an HTTP caller of a disabled tenant gets 403 first. The handler keeps this api-design §4.1 body as a backstop:
 
 ```json
 {
