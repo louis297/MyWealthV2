@@ -95,7 +95,7 @@ Why the attribute comes first: it is one change with no behaviour, like [leg-acc
 
 | ID | Rule |
 | --- | --- |
-| R1 | Unchanged from accounts R1–R6: 401 / 403 / 404, PublicId only, `/accounts` root, `tenantId` rules for TenantAdmin / Adviser / SystemAdmin, Customer and tenant state. Customer scope is unchanged: reads of own accounts only (accounts amendment 2026-11-02). |
+| R1 | Unchanged from accounts R1–R6: 401 / 403 / 404, PublicId only, `/accounts` root, `tenantId` rules for TenantAdmin / Adviser / SystemAdmin, Customer and tenant state. Customer scope is unchanged: reads of own accounts only (accounts R18). |
 | R2 | Every Account has a custody mode, `External` or `Custodial`. It is set on create and is immutable. Rename, close and reopen do not change it. |
 | R3 | `POST /accounts` requires `custodyMode`. Missing or `null` → 400 with `errors.CustodyMode`. There is no default. The value is the exact enum name, matched the same way as `type`: `external` is not `External`. |
 | R4 | Removed 2026-11-17 (custody-modes R2, R3): only `External` could be selected. `Custodial` can now be selected, as a `Brokerage` account only. Any value other than the two names → 400. Nothing is written. |

@@ -319,7 +319,7 @@ Do not ship `GET /tenants/{code}` without `by-code`. Do not open `tenants.manage
 
 ## 11. Locked in this spec
 
-Do not open a new ADR (0005 / 0007 / 0013 already cover isolation, PublicId, and policies). Amendment 2026-09-14 adds `tenants.read` + by-code.
+Do not open a new ADR (0005 / 0007 / 0013 already cover isolation, PublicId, and policies). `tenants.read` and by-code were added on 2026-09-14.
 
 | Item | Lock |
 | --- | --- |

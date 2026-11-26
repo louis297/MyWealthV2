@@ -211,7 +211,7 @@ Amends [corporate-actions.md](corporate-actions.md) R15–R21.
 
 ### 4.5 Going ex: the entitlements (C2)
 
-Amends [corporate-actions.md](corporate-actions.md) R22 and R24, and to its amendment of 2026-11-23 (orders).
+Amends [corporate-actions.md](corporate-actions.md) R22 and R24.
 
 | ID | Rule |
 | --- | --- |

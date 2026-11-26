@@ -24,7 +24,7 @@ What limits the damage:
 
 - `webapi` re-checks person and tenant status on every request, so the access tokens minted by that refresh get 403 on every `webapi` route ([identity-auth.md](../features/identity-auth.md) §4.5).
 - New hosted login and `/connect/authorize` check `LoginEligibility` on every request.
-- A password change also ends silent re-authorization through the identity cookie (amendment 2026-11-13, identity cookie checks the security stamp). The refresh token itself still waits for the outbox.
+- A password change also ends silent re-authorization through the identity cookie ([identity-auth.md](../features/identity-auth.md) §4.3). The refresh token itself still waits for the outbox.
 
 What stays open: a dead-lettered `UserPasswordChanged` leaves an old refresh token able to mint access tokens that `webapi` accepts, because the person is still `Active`.
 

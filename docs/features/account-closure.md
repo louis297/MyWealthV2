@@ -115,7 +115,7 @@ The rule that distinguishes this slice: a Custodial account closes only through 
 **Out**
 
 - Selling or moving holdings as part of the closure. The account must hold nothing (R6); selling waits for orders (roadmap O1) and moving shares out for in-kind transfer (roadmap T1)
-- A final advisory fee (future-plans §1 step 4). It adds its step to the closure in its own spec (§11 point 1). Interest to the closing date is the step of [interest-run.md](interest-run.md) R33 (amendment 2026-11-22)
+- A final advisory fee (future-plans §1 step 4). It adds its step to the closure in its own spec (§11 point 1). Interest to the closing date is the step of [interest-run.md](interest-run.md) R33
 - Closing every account of a Customer, or ending the Customer relationship (offboarding)
 - A closure statement or report for the Customer
 - A reason list for a closure (§11 point 11). The memo says why

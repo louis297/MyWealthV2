@@ -60,7 +60,7 @@ How to use this document:
 | --- | --- | --- |
 | Price as of a date | `IMarketData.TryGetPrice(instrumentId, asOf?)` returns the latest row with `AsOfDate` on or before the UTC date. It returns no date, and it has no age limit | instrument-prices R6, `InstrumentPriceStore` |
 | Price history | Rows exist only from the day the job first ran for an instrument. The EODHD response holds the full history of a symbol; `EodhdClient` keeps only the latest bar and reads its `close` | instrument-prices R5 and §11, Out: "Historical back-fill" |
-| Prices of simulated instruments | Stored under the platform's UTC date at each poll; the last poll of the day wins. History starts at the first poll | simulated-instruments, instrument-prices amendment 2026-11-22 |
+| Prices of simulated instruments | Stored under the platform's UTC date at each poll; the last poll of the day wins. History starts at the first poll | simulated-instruments, instrument-prices R1 and R5 |
 | Prices of NZX and Tokyo instruments | None from EODHD | [known-issues/eodhd-nz-jp-coverage.md](known-issues/eodhd-nz-jp-coverage.md) |
 | FX rate as of a date | `IFxRate` returns the latest row of the directed pair on or before the UTC date; `GetRateDetail` also returns the row's date. A missing pair throws | fx-rates R6, R7 |
 | FX rate history | Rows exist only from the day the job first ran. `FrankfurterClient` asks for the latest rates only | fx-rates Out: "Historical back-fill" |

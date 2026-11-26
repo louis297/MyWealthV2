@@ -128,10 +128,10 @@ The fifth role `SimulatorOperator` ([ADR 0013](adr/0013-roles-authorization-sing
 | `instruments.read` | ✓ | ✓ | ✓ | | [instruments](features/instruments.md) |
 | `instruments.create` | ✓ | ✓ | ✓ | | [instruments](features/instruments.md) |
 | `instruments.manage` | ✓ | ✓ | | | [instruments](features/instruments.md) |
-| `accounts.read` | ✓ | ✓ | ✓ | ✓ | [accounts](features/accounts.md); Customer: Customer Portal amendment 2026-11-02 |
+| `accounts.read` | ✓ | ✓ | ✓ | ✓ | [accounts](features/accounts.md); Customer: Customer Portal, 2026-11-02 |
 | `accounts.create` | ✓ | ✓ | ✓ | | [accounts](features/accounts.md) |
 | `accounts.manage` | ✓ | ✓ | ✓ | | [accounts](features/accounts.md) |
-| `transactions.read` | ✓ | ✓ | ✓ | ✓ | [posting](features/posting.md); Customer: Customer Portal amendment 2026-11-02 |
+| `transactions.read` | ✓ | ✓ | ✓ | ✓ | [posting](features/posting.md); Customer: Customer Portal, 2026-11-02 |
 | `transactions.create` | ✓ | ✓ | ✓ | | [posting](features/posting.md) |
 | `transactions.adjust` | | ✓ | | | [adjustments](features/adjustments.md) (accepted 2026-11-19); every `/adjustment-requests` route since [adjustment-review](features/adjustment-review.md) (accepted 2026-11-25) |
 | `statement-lines.manage` | | ✓ | | | [deposit-matching](features/deposit-matching.md) (accepted 2026-11-20) |
@@ -164,7 +164,7 @@ The fifth role `SimulatorOperator` ([ADR 0013](adr/0013-roles-authorization-sing
 | `portfolios.read` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `portfolios.manage` | ✓ | ✓ | ✓ | | [portfolios](features/portfolios.md) |
 | `reports.customer.read` | | ✓ | ✓ | ✓ | [reports](features/reports.md) |
-| `reports.customer.create` | | ✓ | ✓ | ✓ | [reports](features/reports.md); Customer: Customer Portal amendment 2026-11-02 |
+| `reports.customer.create` | | ✓ | ✓ | ✓ | [reports](features/reports.md); Customer: Customer Portal, 2026-11-02 |
 | `reports.book.read` | | ✓ | ✓ | | [reports](features/reports.md) |
 | `reports.book.create` | | ✓ | ✓ | | [reports](features/reports.md) |
 | `reports.tenant.read` | | ✓ | | | [reports](features/reports.md); scope `Tenant`: [bank-reconciliation](features/bank-reconciliation.md) (accepted 2026-11-21) |
@@ -234,7 +234,7 @@ List filters are separate: currencies and people collections use `enabledOnly` (
 
 Status of this section: `accepted` (2026-11-13). It was built with the portfolios change of 2026-11-13 ([features/portfolios.md](features/portfolios.md) §12). Landed 2026-11-13: every code in the registry below is a `ProblemException` subclass.
 
-**Why.** One HTTP status already carries several meanings. `webapi` returns 409 for a stale `rowVersion`, a reused `Idempotency-Key`, a changed FX rate, a report that is not ready, and a portfolio already assigned to the account. `POST /transactions/fx` alone can return two different 409s today, and only the first has a field to tell them apart (`errors.expectedRate`). The portfolios amendment 2026-11-13 adds a sixth. A client that branches on the status alone shows the wrong message as soon as one route can return two of them. A **problem code** names the meaning. The status stays the category.
+**Why.** One HTTP status already carries several meanings. `webapi` returns 409 for a stale `rowVersion`, a reused `Idempotency-Key`, a changed FX rate, a report that is not ready, and a portfolio already assigned to the account. `POST /transactions/fx` alone can return two different 409s today, and only the first has a field to tell them apart (`errors.expectedRate`). Portfolios §4.1 adds a sixth. A client that branches on the status alone shows the wrong message as soon as one route can return two of them. A **problem code** names the meaning. The status stays the category.
 
 | Id | Rule |
 | --- | --- |
@@ -392,7 +392,7 @@ Field rules belong in each Feature Spec. This section only locks the catalog and
 | `true` | Enabled rows only |
 | Any other value | 400 |
 
-Item: `{ code, name, decimalPlaces, isActive }`. Sorted by `code`. No “disabled-only” query. No pagination. No write API. No `GET /currencies/{code}`. Column/JSON amendment 2026-09-21: `IsEnabled` → `IsActive`.
+Item: `{ code, name, decimalPlaces, isActive }`. Sorted by `code`. No “disabled-only” query. No pagination. No write API. No `GET /currencies/{code}`. Column and JSON renamed 2026-09-21: `IsEnabled` → `IsActive`.
 
 Any authenticated caller (default Authorize; no `currencies.read`). Seed: NZD, AUD, USD, EUR, GBP, JPY.
 

@@ -82,7 +82,7 @@ The **smoke tenant** is a tenant used only by this suite. It stays enabled.
 
 **Development.** The Development seed creates the smoke tenant and its rows when both smoke passwords are configured (§5), and skips it with a log line when either is missing. It is idempotent on natural keys (TenantCode, email, account name). It does not reset an existing login's password; to change a local smoke password, recreate the local database. No TenantAdmin is seeded for the smoke tenant.
 
-Seeding the smoke tenant in Development is allowed by [tenants.md](features/tenants.md) R17 (amendment 2026-11-12).
+Seeding the smoke tenant in Development is allowed by [tenants.md](features/tenants.md) R17.
 
 ---
 
@@ -92,8 +92,8 @@ Seeding the smoke tenant in Development is allowed by [tenants.md](features/tena
 - The project is **not** in `MyWealthV2.slnx`, so `dotnet test MyWealthV2.slnx` in CI does not try to reach live hosts. The CI workflow builds it explicitly (`dotnet build tests/Smoke.Tests`) so it does not rot, and does not run it.
 - Browsers are installed with the Playwright script that the build writes to the output folder (`playwright.ps1 install --with-deps chromium`). Chromium only.
 - On failure the suite keeps a full-page screenshot per case under `playwright/` in the test work directory (`artifacts/bin/Smoke.Tests/<configuration>/playwright/`).
-- It records a Playwright trace (screenshots and snapshots) only when **both** portal URLs are loopback, and keeps it next to the screenshot when a case fails. A trace holds the typed password, the login form body and the session cookies. Against any other host, including production from a developer machine, no trace is recorded (amendment 2026-11-13).
-- Time limits: 30 seconds per navigation, per action and per `Expect` assertion, 2 minutes per case. The assertion limit is set explicitly; Playwright's own default is 5 seconds. Container start-up after deploy is covered by the health wait in [deployment.md](deployment.md) §9, but a healthy container can still answer its first sign-in slowly (the OIDC redirect through the BFF, the first identity page), so the suite does not rely on the 5-second default (amendment 2026-11-23).
+- It records a Playwright trace (screenshots and snapshots) only when **both** portal URLs are loopback, and keeps it next to the screenshot when a case fails. A trace holds the typed password, the login form body and the session cookies. Against any other host, including production from a developer machine, no trace is recorded.
+- Time limits: 30 seconds per navigation, per action and per `Expect` assertion, 2 minutes per case. The assertion limit is set explicitly; Playwright's own default is 5 seconds. Container start-up after deploy is covered by the health wait in [deployment.md](deployment.md) §9, but a healthy container can still answer its first sign-in slowly (the OIDC redirect through the BFF, the first identity page), so the suite does not rely on the 5-second default.
 
 ---
 
@@ -136,7 +136,7 @@ If a password is missing, the suite fails at start with a message naming the mis
 
 - Workflow `.github/workflows/smoke.yml`, triggered by `workflow_call` (the deploy workflow, [deployment.md](deployment.md) §9 step 4) and `workflow_dispatch` (by hand, runbook §12 step 9).
 - Job environment `production`. Steps: checkout → set up .NET → build `tests/Smoke.Tests` → install Chromium → `dotnet test tests/Smoke.Tests` → upload artifact `smoke-results` when the job fails.
-- `smoke-results` holds the failure screenshots (`*.png`) and `smoke-results.trx` only, kept 7 days. The upload path list names those files and excludes `*.trace.zip`, so a trace is not uploaded even if one is written. The repository is public: any signed-in GitHub user can download the artifact, and GitHub masks secrets in logs but not in artifacts (amendment 2026-11-13).
+- `smoke-results` holds the failure screenshots (`*.png`) and `smoke-results.trx` only, kept 7 days. The upload path list names those files and excludes `*.trace.zip`, so a trace is not uploaded even if one is written. The repository is public: any signed-in GitHub user can download the artifact, and GitHub masks secrets in logs but not in artifacts.
 - A failed run fails the deploy, and the deploy rolls back the image tag ([deployment.md](deployment.md) §9 step 5).
 
 ---
