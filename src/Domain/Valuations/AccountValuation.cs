@@ -26,8 +26,53 @@ public sealed record AccountValuation(
         IReadOnlyDictionary<string, int> decimalPlaces,
         IReadOnlyDictionary<int, StoredPrice> prices,
         IReadOnlyDictionary<string, StoredRate> rates,
-        IReadOnlyList<BasisChange> basisChanges) =>
-        new(position.Day, accountCurrency, position.Cash, [], 0m, 0m, false, 0);
+        IReadOnlyList<BasisChange> basisChanges)
+    {
+        var currency = Code(accountCurrency);
+        var lines = position.Lines
+            .Select(line => Value(line, currency, decimalPlaces, prices, rates))
+            .ToList();
+
+        // R16: the totals add the Valued lines only; a line that is not valued is never counted as 0.
+        var holdingsValue = lines.Where(line => line.Status == ValuationLineStatus.Valued).Sum(line => line.Value!.Value);
+        var unvalued = lines.Count(line => line.Status != ValuationLineStatus.Valued);
+        return new AccountValuation(
+            position.Day, currency, position.Cash, lines, holdingsValue, position.Cash + holdingsValue, unvalued == 0, unvalued);
+    }
+
+    private static ValuationLine Value(
+        PositionLine line,
+        string accountCurrency,
+        IReadOnlyDictionary<string, int> decimalPlaces,
+        IReadOnlyDictionary<int, StoredPrice> prices,
+        IReadOnlyDictionary<string, StoredRate> rates)
+    {
+        var quantity = line.LedgerQuantity;
+        var price = prices[line.InstrumentId];
+        var quote = Code(price.Currency);
+
+        // R15: the market value is rounded to the quote currency; the value is worked out from the rounded figure.
+        var marketValue = Round(quantity * price.Amount, Places(decimalPlaces, quote));
+        if (quote == accountCurrency)
+        {
+            return new ValuationLine(
+                line.InstrumentId, quantity, line.LedgerQuantity, ValuationLineStatus.Valued, price, marketValue, null, marketValue);
+        }
+
+        var rate = rates[quote];
+        var value = Round(marketValue * rate.Rate, Places(decimalPlaces, accountCurrency));
+        return new ValuationLine(
+            line.InstrumentId, quantity, line.LedgerQuantity, ValuationLineStatus.Valued, price, marketValue, rate, value);
+    }
+
+    private static decimal Round(decimal amount, int places) => decimal.Round(amount, places, MidpointRounding.AwayFromZero);
+
+    private static int Places(IReadOnlyDictionary<string, int> decimalPlaces, string currency) =>
+        decimalPlaces.TryGetValue(currency, out var places)
+            ? places
+            : throw new DomainException($"Currency {currency} has no decimal places.");
+
+    private static string Code(string currency) => currency.Trim().ToUpperInvariant();
 }
 
 /// <summary>
