@@ -7,14 +7,15 @@ public sealed class NetWorthDto
     public required IReadOnlyList<NetWorthCurrencyDto> Currencies { get; init; }
 
     /// <summary>Valuation-history R14: the <c>net</c> of each currency folded into the Tenant's reporting currency.</summary>
-    public FoldedTotalDto? Folded { get; init; }
+    public required FoldedTotalDto Folded { get; init; }
 
     public required NetWorthBreakdownsDto Breakdowns { get; init; }
 
-    public static NetWorthDto Empty(DateTimeOffset asOf) => new()
+    public static NetWorthDto Empty(DateTimeOffset asOf, string reportingCurrency) => new()
     {
         AsOf = asOf,
         Currencies = [],
+        Folded = new FoldedTotalDto(reportingCurrency, 0m, true, []),
         Breakdowns = new NetWorthBreakdownsDto
         {
             ByCustomer = [],

@@ -32,6 +32,8 @@ public class GetNetWorthQueryHandler(
     IApplicationDbContext db,
     ICurrentUser currentUser,
     IMarketData marketData,
+    IFxRate fxRates,
+    ICurrencyCatalog currencies,
     TimeProvider time) : IRequestHandler<GetNetWorthQuery, NetWorthDto>
 {
     public async Task<NetWorthDto> Handle(GetNetWorthQuery request, CancellationToken cancellationToken)
@@ -78,6 +80,6 @@ public class GetNetWorthQueryHandler(
         }
 
         return await NetWorthReader.ReadAsync(
-            db, marketData, time, tenantId, customerId, assignedAdviserId, cancellationToken);
+            db, marketData, fxRates, currencies, time, tenantId, customerId, assignedAdviserId, cancellationToken);
     }
 }

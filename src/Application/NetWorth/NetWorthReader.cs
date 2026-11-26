@@ -1,5 +1,6 @@
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Domain.Enums;
+using MyWealthV2.Domain.Valuations;
 
 namespace MyWealthV2.Application.NetWorth;
 
@@ -8,6 +9,8 @@ internal static class NetWorthReader
     public static async Task<NetWorthDto> ReadAsync(
         IApplicationDbContext db,
         IMarketData marketData,
+        IFxRate fxRates,
+        ICurrencyCatalog currencies,
         TimeProvider time,
         int tenantId,
         int? customerId,
@@ -24,9 +27,14 @@ internal static class NetWorthReader
             select new AccountRow(account.Id, account.Currency, account.Type, account.CustodyMode, customer.PublicId, customer.Name)
         ).ToListAsync(cancellationToken);
 
+        var now = time.GetUtcNow();
+        var reportingCurrency = (await db.Tenants.IgnoreQueryFilters().AsNoTracking()
+            .Where(tenant => tenant.Id == tenantId)
+            .Select(tenant => tenant.ReportingCurrency)
+            .SingleAsync(cancellationToken)).Trim();
         if (accounts.Count == 0)
         {
-            return NetWorthDto.Empty(time.GetUtcNow());
+            return NetWorthDto.Empty(now, reportingCurrency);
         }
 
         var accountIds = accounts.Select(account => account.Id).ToList();
@@ -52,11 +60,13 @@ internal static class NetWorthReader
         ).ToListAsync(cancellationToken);
 
         var priced = holdings.Select(holding => Price(holding, marketData)).ToList();
+        var totals = CurrenciesFor(accounts, priced, cashByAccount);
 
         return new NetWorthDto
         {
-            AsOf = time.GetUtcNow(),
-            Currencies = CurrenciesFor(accounts, priced, cashByAccount),
+            AsOf = now,
+            Currencies = totals,
+            Folded = await NetWorthFold.FoldAsync(fxRates, currencies, totals, reportingCurrency, LedgerDay.Of(now), cancellationToken),
             Breakdowns = new NetWorthBreakdownsDto
             {
                 ByCustomer = accounts
