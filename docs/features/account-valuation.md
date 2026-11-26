@@ -37,7 +37,15 @@ A **valuation** is a read that values one Account for one day: the cash and the 
 
 New: route `GET /accounts/{id}/valuation?date=`; Domain function `AccountValuation.Compute` with `LedgerDay`, `ValuationRules` and `ValuationLineStatus`; Application services `AccountPositions` and `ValueAccount` and the query `GetAccountValuation`. No script, table, permission, problem code, domain event, `TransactionType`, port, job or setting. No portal page and no simulator change.
 
-**Status is `accepted` (2026-11-26).** The eight points of §11 were confirmed as recommended.
+**Status is `accepted` (2026-11-26), landed 2026-11-26.** The eight points of §11 were confirmed as recommended.
+
+Notes from landing:
+
+- R10: the port method is `IFxRate.GetRateDetailAsync`. `ValueAccount` reads one rate per quote currency of the lines, and catches `FxRateNotFoundException`.
+- §5: `AccountValuation.Compute` takes the decimal places as a map of currency code to places, the price row of each Instrument (`StoredPrice`), the rate row of each quote currency (`StoredRate`) and the lines of the position (`PositionLine`). `BasisChange.Ratio` is a `CorporateActionRatio`, so the restated quantity of R18 is `CorporateActionRatio.Apply`, the code of corporate-actions R28.
+- §7: the two services are behind `IAccountPositions` and `IValueAccount`, registered in Infrastructure as `IAccountInterest` is. `AccountPositions.ReadAsync` takes the Account row, not its id.
+- R20: `date` binds as text and the validator parses it as `yyyy-MM-dd` (as market-data-history R21), so a bad date answers `errors.Date` rather than a binding error.
+- §10: the External account of the functional tests replays §1.1 through the API with three differences that change no figure: a `TransferIn` and an `OpeningHoldings` open it; the fee of T3 is a `TransferOut` at the same instant, because an External fee is entered in the quote currency; T5 is a hand `Split` booked on its ex-date, as a caller books one (R19 (b)). T4, a Reversal, is moved to its `bookedAt` in the database.
 
 ---
 
@@ -175,7 +183,7 @@ What the example shows:
 | ID | Rule |
 | --- | --- |
 | R9 | **Price.** `IMarketData.TryGetPriceDetail(instrument, d)`: the stored row with the latest `AsOfDate` on or before `d` (instrument-prices R6), with its date and source. It is the unadjusted close (market-data-history R7), in the Instrument's quote currency. An inactive Instrument is read like any other. |
-| R10 | **Rate.** Only when the Instrument's quote currency is not the Account's currency: `IFxRate.GetRateDetail(quote currency, Account currency, d)`, the stored row of that directed pair with the latest `AsOfDate` on or before `d`, with its date and source. The rate reads "Account currency per 1 unit of the quote currency", the direction of a sell fill (buy-sell R12). The inverse pair is not used. The same currency needs no rate. |
+| R10 | **Rate.** Only when the Instrument's quote currency is not the Account's currency: `IFxRate.GetRateDetailAsync(quote currency, Account currency, d)`, the stored row of that directed pair with the latest `AsOfDate` on or before `d`, with its date and source. The rate reads "Account currency per 1 unit of the quote currency", the direction of a sell fill (buy-sell R12). The inverse pair is not used. The same currency needs no rate. |
 | R11 | **Age limit.** A price or a rate is **fresh** for day `d` when `d` minus its `AsOfDate` is at most 4 calendar days (`ValuationRules.MaxAgeDays`), the limit of orders R10 and fx-conversions R10 (roadmap Q4). One limit for prices and rates. It covers a weekend with a holiday on each side. A longer closure of a market leaves its holdings not valued from the fifth day. |
 | R12 | **No source.** The read uses stored rows only and never calls a price or rate source (instrument-prices R9, fx-rates R10). |
 | R13 | **When a valuation can still change.** A row dated today or yesterday may be updated (market-data-history R5), and more Transactions may be booked today. So the valuation of today or of yesterday may differ on the next read. For a day two or more days back the rows are final: the valuation of a Custodial account changes only when a missing price or rate row is inserted later, or when a corporate action with an earlier ex-date is posted (R18). The response carries no "final" mark. Storing a valuation is roadmap V3. |
@@ -229,10 +237,11 @@ Policies: none added. `accounts.read` reads the route.
 | Type | Kind | Change |
 | --- | --- | --- |
 | `LedgerDay` | Static rule (new, `src/Domain/Valuations`) | `End(day)`: 00:00 UTC of the next day. `Of(instant)`: the UTC date. The one place that says which day a `bookedAt` belongs to (R2) |
-| `AccountPosition` | Value (new) | A day, the cash, and one `(instrument, ledger quantity)` per Instrument with a quantity other than 0 (R3, R4) |
+| `AccountPosition`, `PositionLine` | Value (new) | A day, the cash, and one `PositionLine` (instrument, ledger quantity) per Instrument with a quantity other than 0 (R3, R4) |
+| `StoredPrice`, `StoredRate` | Value (new) | The price row and the rate row a line reads, with their date and source (R9, R10) |
 | `ValuationRules` | Static (new) | `MaxAgeDays = 4`; `IsFresh(asOfDate, day)` (R11) |
 | `ValuationLineStatus` | Enum (new) | `Valued = 0`, `NoPrice = 1`, `StalePrice = 2`, `NoRate = 3`, `StaleRate = 4`, `PriceBeforeCorporateAction = 5`, `NegativeQuantity = 6` |
-| `BasisChange` | Value (new) | One entitlement posting of R18: Instrument, `ExDate`, `BookedAt`, kind, `RatioNew`, `RatioHeld`. `Factor` is corporate-actions R3 |
+| `BasisChange` | Value (new) | One entitlement posting of R18: Instrument, `ExDate`, `BookedAt`, kind, `RatioNew`, `RatioHeld`. `Ratio` is the `CorporateActionRatio` whose factor is that of corporate-actions R3 |
 | `AccountValuation` | Value (new) | The result: day, currency, cash, lines, `HoldingsValue`, `Total`, `Complete`, `UnvaluedCount`. `Compute(position, accountCurrency, decimalPlaces, prices, rates, basisChanges)` holds R11 and R14–R18. It reads no clock and no store |
 | `Account`, `Transaction`, `Holding`, `Instrument` | Existing | No change |
 
@@ -272,8 +281,8 @@ The position of a day is read from `Transactions` (`BookedAt`), `TransactionCash
 
 | Kind | Name | Change |
 | --- | --- | --- |
-| Service | `AccountPositions` (new) | `ReadAsync(accountId, day)` → `AccountPosition` (R3–R5), and the basis changes of the Account's lines (R18). It names the Account and its Tenant itself and does not depend on the tenant query filter, so that a `worker` run can call it later |
-| Service | `ValueAccount` (new) | `ForDayAsync(account, day)`: the position, `IMarketData.TryGetPriceDetail` per line, `IFxRate.GetRateDetail` per quote currency, `ICurrencyCatalog` for the decimal places, then `AccountValuation.Compute`. A `FxRateNotFoundException` is caught and passed on as "no rate"; no number takes its place (fx-rates R7). The one place a valuation is worked out; roadmap V3 calls it |
+| Service | `AccountPositions` (new) | `ReadAsync(account, day)` → `AccountPosition` (R3–R5), and the basis changes of the Account's lines (R18). It names the Account and its Tenant itself and does not depend on the tenant query filter, so that a `worker` run can call it later |
+| Service | `ValueAccount` (new) | `ForDayAsync(account, day)`: the position, `IMarketData.TryGetPriceDetail` per line, `IFxRate.GetRateDetailAsync` per quote currency, `ICurrencyCatalog` for the decimal places, then `AccountValuation.Compute`. A `FxRateNotFoundException` is caught and passed on as "no rate"; no number takes its place (fx-rates R7). The one place a valuation is worked out; roadmap V3 calls it |
 | Query | `GetAccountValuation` (new) | R1, R20–R22: finds the Account as `GetAccountHoldings` does, checks `date`, calls `ValueAccount`, maps the item |
 | Service | `AccountInterest` (existing) | Takes the end of a day from `LedgerDay`. Its query and its results do not change |
 
@@ -405,12 +414,13 @@ No change to `TestSeed`, `DevelopmentSmokeSeeder`, `webapi --seed-demo`, AppHost
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `LedgerDay`: 23:59:59.9999999 belongs to the day, 00:00:00 to the next; an instant with an offset is taken in UTC. `AccountValuation.Compute`, one case per day of §1.1 with the position, prices and rates of the tables: every line figure, `holdingsValue`, `total`, `complete`. Rounding by R15, with the fraction of that rule and a currency with 0 decimal places. Each status of R14, and their order when two apply. The age limit at 4 and at 5 days, for a price and for a rate. No line → `complete` `true`. R18: price new and quantity old restates (Thursday of §1.1: 50 → 100); a fraction is rounded down to 8 decimals; a consolidation and a bonus use their factors; price old and quantity new → `PriceBeforeCorporateAction`; both old and both new leave the quantity; two postings on one line in ex-date order; a posting of another Instrument changes nothing |
-| Application.FunctionalTests | Folder `Valuations/`. No Bearer → 401 not 302. An External account built through the API with the caller's `bookedAt`: the cash and the quantities of §1.1 day by day; a Transaction at 23:59:59 UTC is in the day and one at 00:00:00 is in the next; a `bookedAt` with an offset counts in its UTC day (T1); a Reversal counts from its own `bookedAt` (Wednesday, Thursday and Friday of §1.1); an Instrument sold to 0 is left out; a holding in another currency has `fx` and one in the Account's currency has `fx` `null`; the weekend uses Friday's price and each day's rate; `StalePrice`, `NoPrice`, `NoRate` and `StaleRate` each give `complete` `false` and a total without the line; a day before the first Transaction → cash 0, no holding, `complete` `true`; today is allowed; a Closed account is valued for a day it was Open; an entry with an earlier `bookedAt` changes the valuation of that past day; each 400 of R20. A Custodial account with an entitlement posting of a `Manual` corporate action, its dates moved in the database as the interest tests do: the ex-date is restated, and after "Apply now" with no new price the line is `PriceBeforeCorporateAction`. A Customer reads their own Account; a SystemAdmin reads an Account of any Tenant |
-| Application.FunctionalTests — isolation | Two-tenant fixture: a TenantAdmin, an Adviser and a Customer of Tenant A with the id of Tenant B's Account → 404. An Adviser with the Account of an unassigned Customer → 404. A Customer with another Customer's Account → 404 |
-| Application.FunctionalTests — interest | The existing `Interest/` tests stay green after `AccountInterest` moves to `LedgerDay` |
+| Domain.UnitTests | Folder `Valuations/`: `LedgerDayTests`, `AccountValuationTests` (§1.1 and R15), `AccountValuationStatusTests` (R11, R14), `AccountValuationBasisTests` (R18) |
+| Application.FunctionalTests | Folder `Valuations/`: `GetAccountValuationTests` (§1.1 on an External account, R2–R8, R20), `GetAccountValuationAccessTests` (R1 and the cross-tenant 404), `CustodialBasisTests` (R18 on a Custodial account) |
+| Application.FunctionalTests — interest | Folder `Interest/`: unchanged, green after `AccountInterest` moved to `LedgerDay` |
 
 No 403 case: every role that reaches `webapi` holds `accounts.read`. No Infrastructure.IntegrationTests: there is no script and no mapping.
 
@@ -464,21 +474,7 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
-
-The repository should build after each commit. Agents split each behaviour into red then green.
-
-1. `LedgerDay` (R2) + Domain unit tests. Refactor: `AccountInterest` takes the end of a day from it.
-2. `AccountValuation.Compute`: valued lines, amounts and totals (R9, R10, R15, R16) + Domain unit tests from §1.1.
-3. The age limit and the statuses of a line that is not valued (R11, R14, R16) + Domain unit tests.
-4. The same basis on a corporate action (R18, R19) + Domain unit tests.
-5. `AccountPositions`, `ValueAccount`, `GetAccountValuation` and `GET /accounts/{id}/valuation` (R1, R3–R8, R12, R20–R22) + functional and isolation tests.
-6. The basis changes of a Custodial account in `AccountPositions` (R18) + functional tests.
-7. Repo docs: mark this file landed; valuation roadmap §8 step 2.
-
-Do not put a table, a job, a series or a seeded history in these commits.
-
-### Changes to other docs
+## 12. Changes to other docs
 
 Made when this spec was accepted (2026-11-26):
 
