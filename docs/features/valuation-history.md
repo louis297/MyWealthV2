@@ -42,7 +42,17 @@ And three page changes: a chart and the folded total on the Adviser Portal Dashb
 
 New: route `GET /net-worth/funds-under-management`; field `folded` on `GET /net-worth` and `GET /users/customers/{id}/net-worth`; parameter `date` of the Adviser Balances Report; Domain function `FxFold.Compute` with `FoldLineStatus`; Application query `GetFundsUnderManagement`. No script, table, index, permission, problem code, domain event, `TransactionType`, port, job, setting or simulator change. The BFFs do not change: both already proxy `/net-worth` and `/accounts`.
 
-**Status is `accepted` (2026-11-26).** The twelve points of §11 were confirmed as recommended. Point 5 refines valuation-run R26, which was reworded.
+**Status is `accepted` (2026-11-26), landed 2026-11-26.** The twelve points of §11 were confirmed as recommended. Point 5 refines valuation-run R26, which was reworded.
+
+Notes from landing:
+
+- R6: the expected days of an account are one helper, `ValuationDays` (`src/Application/Valuations`), which the valuation run (valuation-run R3) and the series both use. A Closed account with no completed closure has no last day, as in the run.
+- R10: the rows of each pair are listed once over `from` minus 4 days to `to` (`IFxRate.ListRatesAsync`), and the latest row before that window is read once (`GetRateDetailAsync`), so a day before the first listed row is `StaleRate` with that row, not `NoRate`.
+- R12, §8.1: `total` and `value` are rounded to the decimal places of their currency in the response (the stored totals have four), and `fx.rate` has no trailing zeros.
+- R16, R20: the Adviser Balances binder binds in one of three modes: a request (checked against the last final day of its moment), a schedule (refuses `date`), and a stored snapshot (bound as stored, for the job, the download scope and a schedule's run). The snapshot writes `date` only when it was sent, so the snapshots of the report of now are unchanged. A `date` that is not a date answers `date must be a date as yyyy-MM-dd.`
+- R18: a price is shown with at least the decimal places of its quote currency and every place it was stored with (`95.20 (2026-03-11)`). A restated quantity is shown as `200 (ledger 100)`. The PDF of a past date has the columns Customer, Account, Type, Custody, Instrument, Quantity, Price, Balance, Market value and Status, and no "Include closed accounts" line.
+- §9: each portal has its own plain SVG `ValueChart` (`src/*/src/shared/components`). The Customer Portal has no currency catalog (bff-customer-portal R20), so its figures are shown as sent, grouped (`8,500`); the Adviser Portal pads them to the currency's places from `/currencies`.
+- §10: the worked example of §1.1 is built on the account-valuation world (A1) and a USD account B1 made Custodial in the database, as in valuation-run §10; the 10:00 read runs the job through Tuesday 10 and a manual run through Wednesday 11 that fails on B1.
 
 ---
 
@@ -401,15 +411,16 @@ Both portals draw the charts as plain SVG with no chart library (§11 point 9): 
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `Valuations/FxFoldTests`: §1.1 day by day; the same currency needs no rate; `NoRate`; `StaleRate` on the fifth day and `Folded` on the fourth; rounding `AwayFromZero`; the total leaves out a line that is not folded; lines sorted by currency |
-| Application.FunctionalTests | `NetWorth/FundsUnderManagementTests`: §1.1 as the TenantAdmin at 10:00 and at 14:00, as Adviser Ana and as Customer B; R3 defaults and every 400; R6 a Closed account is not expected after its closure day, a reopened one is; R8 days with no account; an External account is never counted |
-| Application.FunctionalTests | `NetWorth/FundsUnderManagementAccessTests`: no Bearer 401; SystemAdmin with and without `tenantId`; `tenantId` from a TenantAdmin 400; the two-tenant fixture: one firm's series never counts the other firm's accounts; an Adviser's series counts only assigned Customers; a Customer's only their own |
-| Application.FunctionalTests | `NetWorth/NetWorthFoldTests`: §1.1 `folded`; a currency with no rate; an old rate; no Open account; the breakdowns are unchanged |
-| Application.UnitTests | `Reports/AdviserBalancesRowsTests`: R17–R19 with valuation lines: not-valued lines listed and left out of the subtotals, `NoRate` lines counted, "Not valued yet", zero-cash accounts left out, no cost column |
-| Application.FunctionalTests | `Reports/`: the §1.1 report for a past date through the job; R16 and R20 refusals; an External account valued on read; the parameter snapshot keeps `date`; cross-tenant `adviserId` → 404 as today |
-| Adviser Portal, Customer Portal | D107–D110 and C45–C47: the calls and their query strings, the range choice, the hollow marker and its text, the folded line hidden with one currency, the date input and the disabled checkbox |
+| Domain.UnitTests | `Valuations/FxFoldTests` (R10, R11, §1.1) |
+| Application.UnitTests | `Reports/AdviserBalancesBinderTests` (R16, R20), `Reports/AdviserBalancesPastRowsTests` (R17–R19), `Reports/AdviserBalancesPastPdfTests` (R18, R19) |
+| Application.FunctionalTests | Folder `NetWorth/`: `FundsUnderManagementAccessTests` (R1, R4 and the cross-tenant isolation), `FundsUnderManagementRangeTests` (R3, R8), `FundsUnderManagementTests` (§1.1, R4–R8), `FundsUnderManagementFoldTests` (§1.1, §8.1, R9–R12), `NetWorthFoldTests` (R14, R15) |
+| Application.FunctionalTests | Folder `Reports/`: `AdviserBalancesDateTests` (R16, R20 and the cross-tenant 404), `AdviserBalancesPastDateTests` (§1.1 through the job, R17–R19) |
+| Adviser Portal | `DashboardPage.test.tsx` (D107, D108), `AccountDetailPage.test.tsx` (D109), `ReportsPage.test.tsx` (D110) |
+| Customer Portal | `portal.test.tsx` (C45–C47) |
 
 No Infrastructure.IntegrationTests: there is no script and no mapping. No Simulator.Tests.
 
@@ -471,21 +482,3 @@ Still open, not this slice:
 Made when this spec was accepted (2026-11-26):
 
 [net-worth.md](net-worth.md) (R6: the fold is `folded`, the arrays stay per currency; §2 Out and "Still open": the series and the fold point here; §8.1 `folded`; §9 charts point here), [custody-mode-grouping.md](custody-mode-grouping.md) (Out and "Still open": the history of funds under management is the series here; the fold of funds under management stays open), [valuation-run.md](valuation-run.md) (R26: the expected accounts of R6 here, and "no route reads it" becomes this route; §2 Out and "Still open": V4 points here), [account-valuation.md](account-valuation.md) (§2 Out and "Still open": V4 points here), [reports.md](reports.md) (R14 and §9.2: the optional `date`; §2 Out "Historical as-of snapshots" points here; §7.1 the `date` field; History row), [fx-rates.md](fx-rates.md) (Out: "Net-worth FX fold" points here; R7: a fold catches a missing pair as a valuation does), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (a section "Valuation history" with D107–D109; Out "Charts, historical comparison, FX fold" and "Still open: Daily snapshots and historical charts" point here), [adviser-portal-reports.md](../adviser-portal/adviser-portal-reports.md) (D110; Out "Historical as-of snapshots" points here), [customer-portal.md](../customer-portal/customer-portal.md) (a section "Valuation history" with C45–C47; Out and "Still open" charts point here), [bff-adviser-portal.md](bff-adviser-portal.md) and [bff-customer-portal.md](bff-customer-portal.md) (no change to the allow-list; a note that `/net-worth/funds-under-management` is under the existing prefix), [api-design.md](../api-design.md) (§6 the net-worth resource row; §7.18 the series; change log), [domain-model.md](../domain-model.md) (§8.22 `FxFold`), [architecture.md](../architecture.md) (none expected; checked on accept), [function-plan.md](../function-plan.md) (§5.4: the historical series), [glossary.md](../glossary.md) (the review terms become accepted; "Net worth" gains its folded total; "Funds under management" points at the series), [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §1 (no change: V4 is not a business roadmap step), and [valuation-roadmap.md](../valuation-roadmap.md) (§5 V4, §8; Q7 points here for the read half).
-
----
-
-## 13. Suggested commits
-
-Removed when the slice lands. The repository builds after each commit. Each behaviour is a red commit then a green one.
-
-1. Domain: `FxFold` with `FoldLine`, `FoldedTotal` and `FoldLineStatus` (§1.1 and R10, R11)
-2. `GET /net-worth/funds-under-management`: route, scope, defaults and refusals (R1, R3, R4, R8)
-3. The series sums, expected accounts and completeness (R5–R7, §1.1)
-4. The fold in the series (R9, R10, R12)
-5. `folded` on the two net-worth reads (R14, R15)
-6. Adviser Balances: the `date` parameter and its refusals (R16, R20)
-7. Adviser Balances: the past-date lines, subtotals and header (R17–R19)
-8. Adviser Portal: the Dashboard chart and folded total (D107, D108)
-9. Adviser Portal: the account page chart and the Adviser Balances date (D109, D110)
-10. Customer Portal: the Dashboard chart, folded total and account page chart (C45–C47)
-11. Docs: mark the spec landed
