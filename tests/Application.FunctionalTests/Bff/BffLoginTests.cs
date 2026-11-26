@@ -76,6 +76,13 @@ public class BffLoginTests
     [TestCase("//evil.example")]
     [TestCase("/\\evil")]
     [TestCase("/customers\\x")]
+    [TestCase("/\t/evil.example")]
+    [TestCase("/\n/evil.example")]
+    [TestCase("/\r/evil.example")]
+    [TestCase("/customers\u0000")]
+    [TestCase("/\u007f/evil.example")]
+    [TestCase("/\u0085/evil.example")]
+    [TestCase("/café")]
     public async Task BadReturnUrl_Is400(string returnUrl)
     {
         var response = await _client.GetAsync("/bff/login?returnUrl=" + Uri.EscapeDataString(returnUrl));

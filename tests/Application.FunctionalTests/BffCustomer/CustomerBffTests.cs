@@ -72,10 +72,20 @@ public class CustomerBffTests : TestBase
         response.Content.ReadAsStringAsync().Result.ShouldNotContain("access_token");
     }
 
-    [Test]
-    public async Task BadReturnUrl_Is400()
+    [TestCase("https://evil.example")]
+    [TestCase("//evil.example")]
+    [TestCase("/\\evil")]
+    [TestCase("/dashboard\\x")]
+    [TestCase("/\t/evil.example")]
+    [TestCase("/\n/evil.example")]
+    [TestCase("/\r/evil.example")]
+    [TestCase("/dashboard\u0000")]
+    [TestCase("/\u007f/evil.example")]
+    [TestCase("/\u0085/evil.example")]
+    [TestCase("/café")]
+    public async Task BadReturnUrl_Is400(string returnUrl)
     {
-        var response = await _bff.GetAsync("/bff/login?returnUrl=" + Uri.EscapeDataString("https://evil.example"));
+        var response = await _bff.GetAsync("/bff/login?returnUrl=" + Uri.EscapeDataString(returnUrl));
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
