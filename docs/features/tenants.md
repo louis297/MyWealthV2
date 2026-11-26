@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-13
-last_updated: 2026-11-26
+last_updated: 2026-11-27
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -102,7 +102,7 @@ This file states the rules as they are today. §12 lists what changed here, by d
 | R14 | No physical delete. FK `Users.TenantId` is RESTRICT. |
 | R15 | List query: `page` (1-based, default 1), `pageSize` (default 20, max 100), optional `isEnabled`, optional `search`. `search` matches Name or Code contains (CI) or `PublicId` exact. Sort: `name` ascending, then `code`. Disabled rows stay on the same list (filter if the caller asks). |
 | R16 | Tenants is a **platform** resource. It has no `TenantId` column. Dual-check isolation of *tenant-owned rows* starts as a reusable two-tenant fixture here and is asserted on later slices. This slice’s own gate is policy 403, not a 404-for-other-tenant pattern. |
-| R17 | Functional tests create their own tenants and never rely on seeded ones. Development may seed only the named fixture tenants `demo`, `demo2` (`TestSeed`) and `smoke` ([smoke-test.md](../smoke-test.md) §3, when both smoke passwords are configured). Outside Development nothing creates a tenant on start. The demo tenant `demo` may be created in any environment, production included, by the operator command `webapi --seed-demo` only ([demo-tenant-seed.md](demo-tenant-seed.md)): it writes the tenant row, its demo catalog and its two report grants, seeds no people and no ledger data, and never changes an existing tenant. `demo2` is Development only; in production the smoke tenant is created by hand. SystemAdmin seed stays identity-auth. |
+| R17 | Functional tests create their own tenants and never rely on seeded ones. Development may seed only the named fixture tenants `demo`, `demo2` (`TestSeed`) and `smoke` ([smoke-test.md](../smoke-test.md) §3, when both smoke passwords are configured). Outside Development nothing creates a tenant on start. The demo tenant `demo` may be created in any environment, production included, by the operator command `webapi --seed-demo` only ([demo-tenant-seed.md](demo-tenant-seed.md)): it writes the tenant row, its demo catalog and its report grants (demo-tenant-seed R8), seeds no people and no ledger data, and never changes an existing tenant. `demo2` is Development only; in production the smoke tenant is created by hand. SystemAdmin seed stays identity-auth. |
 
 Settings and sub-resources added by later specs. Disable and enable touch none of them:
 
@@ -356,3 +356,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-23 | [orders.md](orders.md) | R20: the broker connection |
 | 2026-11-24 | [in-kind-transfers.md](in-kind-transfers.md) | R21: safekeeping accounts |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
+| 2026-11-27 | [demo-tenant-seed.md](demo-tenant-seed.md) | R17: the demo seed's report grants are its R8 (three reports), not "two". No rule changed |

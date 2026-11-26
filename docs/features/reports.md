@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-10-12
-last_updated: 2026-11-26
+last_updated: 2026-11-27
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -25,7 +25,7 @@ related:
 
 # Reports
 
-Phase 3 domain. A catalog of reports plus execution infrastructure on `webapi` and the background `worker` (ADR 0017). Reports are not a single artefact. Each report declares its scope (`Customer` or `Book`), allowed triggers, and the parameters it requires. A shared pipeline handles grant checks, trigger checks, and enqueue; each report supplies its own parameter validation and scope rules.
+Phase 3 domain. A catalog of reports plus execution infrastructure on `webapi` and the background `worker` (ADR 0017). Reports are not a single artefact. Each report declares its scope (`Customer`, `Book` or `Tenant`), allowed triggers, and the parameters it requires. A shared pipeline handles grant checks, trigger checks, and enqueue; each report supplies its own parameter validation and scope rules.
 
 First phase ships two reports and both UI entry points:
 
@@ -40,14 +40,14 @@ Both support manual trigger and editable recurring schedules in the first phase.
 
 ## 1. Summary
 
-The platform owns a report catalog. Each report has an id, name, function description, scope (`Customer` or `Book`), and allowed trigger methods (manual / scheduled / event). Tenants are granted access via `TenantReports`. Schedules and executions must name a `ReportId`.
+The platform owns a report catalog. Each report has an id, name, function description, scope (`Customer`, `Book` or `Tenant`; `Tenant` from [bank-reconciliation.md](bank-reconciliation.md) R22), and allowed trigger methods (manual / scheduled / event). Tenants are granted access via `TenantReports`. Schedules and executions must name a `ReportId`.
 
 Policies are split by scope:
 
 - `reports.customer.read` / `reports.customer.create`
 - `reports.book.read` / `reports.book.create`
 
-Customer receives only `reports.customer.read`. TenantAdmin and Adviser receive all four. SystemAdmin receives none of them. Grant and revoke use `tenants.manage`.
+Customer receives `reports.customer.read` and `reports.customer.create`, the create for requesting their own report only (R5). TenantAdmin and Adviser receive all four; TenantAdmin also holds `reports.tenant.read` / `reports.tenant.create` (R6). SystemAdmin receives none of them. Grant and revoke use `tenants.manage`.
 
 A shared request pipeline checks the coarse policy, the tenant grant, and allowed triggers, then delegates parameter and scope validation to the specific report. The frontend sends `reportId` plus a free-form `parameters` object; it never sends a class or method name. A registry maps `ReportId` to an `IReportGenerator`. Generation runs on the worker via Hangfire. Results are stored and downloadable.
 
@@ -83,16 +83,16 @@ A shared request pipeline checks the coarse policy, the tenant grant, and allowe
 
 **Out**
 
-- Per-report policies finer than customer / book.
+- Per-report policies finer than the scope pairs (customer / book / tenant).
 - Historical as-of snapshots. The Adviser Balances Report for the end of a past day (`date`) is [valuation-history.md](valuation-history.md) R16–R20; a relative date in a schedule stays out.
 - FX fold.
 - Live vendor prices.
 - Email delivery of results.
-- Customer Portal (Customer uses Adviser Portal? No — Customer has no portal client yet; read policy is for a future client or for API completeness. First-phase UI is Adviser Portal only).
+- The Customer Portal pages. They are [customer-portal.md](../customer-portal/customer-portal.md); this spec owns only the routes and the Customer's policies (R5).
 - Concrete event bindings.
 - Fees, invitation, or other domains.
 
-Note: Customer has `reports.customer.read` but no first-phase UI. The policy exists so a later Customer Portal (or other client) can list and download without a policy change.
+Note: the Customer's client is the Customer Portal (client `customer-portal`). There a Customer lists and downloads the Customer-scoped executions that target them and requests one for themself (R5).
 
 ---
 
@@ -101,7 +101,7 @@ Note: Customer has `reports.customer.read` but no first-phase UI. The policy exi
 1. As an Adviser I open a Customer and see the Customer-scoped reports I can run for them; I can generate now or create a schedule.
 2. As an Adviser I open the Reports tab and see Book-scoped reports; I can generate now or create a schedule for my own book.
 3. As a TenantAdmin I can do the same, and on Book-scoped reports I can select a subordinate Adviser.
-4. As a Customer (API) I can list and download Customer-scoped executions that target me; I cannot create or schedule.
+4. As a Customer I can list and download Customer-scoped executions that target me, and request one for myself; I cannot schedule (R5).
 5. As a SystemAdmin I see every active catalog report for a tenant and enable or disable each one. A platform-inactive report is not on that list. Platform catalog configuration is the Back Office `/reports` page (`GET /reports/catalog`, `PUT /reports/{id}`). Scalar calls the same verbs.
 6. As any allowed caller I can change or disable a schedule; the next Hangfire run uses the new definition.
 7. As the system, when a registered event occurs, I can enqueue an execution for a report that allows it and that the tenant has been granted.
@@ -172,7 +172,7 @@ Script: `database/schema/0019_reports.sql`.
 
 Hangfire tables in schema `Hangfire`.
 
-Seed the two first-phase reports (by Code) in `0019_reports.sql`. Development / TestAppHost `TestSeed` grants both (`customer-transactions`, `adviser-balances`) to the demo tenant. Idempotent on `(TenantId, ReportId)`. Not a schema script. Not Production. New tenants are **not** auto-granted.
+Seed the two first-phase reports (by Code) in `0019_reports.sql`; `0045` adds `bank-reconciliation`. The demo tenant's grants are in §6.1. New tenants are **not** auto-granted.
 
 ### 6.1 Scope and AllowedTriggers columns
 
@@ -385,6 +385,8 @@ Each item is:
 
 `parameters` is the stored snapshot. `asOf` is included only when the execution has one. The list carries no file bytes, storage key, or error text. TenantAdmin sees the tenant. An Adviser sees Customer-scoped executions for assigned customers, and Book-scoped executions whose snapshot `adviserId` is that Adviser. A Customer sees Customer-scoped executions whose snapshot `customerId` is that Customer. A snapshot that is not a JSON object is left off the list. Another tenant's rows are left off the list.
 
+`GET /reports/executions/{id}` returns one item of the same shape, with the same visibility. The portals poll it after a request. A caller whose role lacks the read policy of the execution's report scope gets 403. An unknown id, another tenant's execution, a snapshot that is not a JSON object, or an execution outside the caller's visibility gets 404.
+
 Adviser may omit `adviserId` (defaults to self). TenantAdmin and SystemAdmin must supply `adviserId` or the generator returns 400. `asOf` is never accepted from the client; the server writes it when the job is created. Unknown or missing required parameters → 400 from that report’s `ValidateAndBind`.
 
 ### 8.2 Errors
@@ -510,8 +512,8 @@ No new ADR beyond [0017](../adr/0017-background-worker.md).
 | Catalog list | `GET /reports/catalog` (`tenants.manage`) returns every catalog row, including inactive. No `granted`. Not `GET /reports` |
 | Schedule / request | Must name ReportId; parameters are a free-form JSON object per report |
 | Generator | Registry: ReportId → IReportGenerator. Hangfire entry point is fixed (`Execute(executionId)`) |
-| Policies | `reports.customer.read/create`, `reports.book.read/create` |
-| Roles | Customer: `reports.customer.read` only. TenantAdmin and Adviser: all four. SystemAdmin: none of the four; catalog list, grant, and revoke use `tenants.manage` |
+| Policies | `reports.customer.read/create`, `reports.book.read/create`, `reports.tenant.read/create` |
+| Roles | Customer: `reports.customer.read` and `reports.customer.create` (request for self only, R5). TenantAdmin: all six. Adviser: the Customer and Book four. SystemAdmin: none; catalog list, grant, and revoke use `tenants.manage` |
 | First reports | Customer Transactions Report + Adviser Balances Report |
 | PDF | QuestPDF. No MD→PDF. No template files |
 | Result storage | Aspire-mounted volume shared by worker and webapi. `ResultStorageKey` stores relative key including file name: `{tenantPublicId}/{executionPublicId}.pdf` |
@@ -525,7 +527,6 @@ No new ADR beyond [0017](../adr/0017-background-worker.md).
 Still open:
 
 - Concrete events
-- Whether Customer will ever get `reports.customer.create`
 - Exact reversal mark in the PDF (type label vs also flag the original)
 - Hangfire Dashboard auth beyond Development
 - Overlapping runs of the same schedule (allowed for now)
@@ -550,3 +551,5 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-24 | [dividends.md](dividends.md) | §9.1: a `Dividend` row |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
 | 2026-11-26 | [valuation-history.md](valuation-history.md) | R14, §7.1, §9.2: the optional `date` of the Adviser Balances Report; Out: historical as-of snapshots point there |
+| 2026-11-27 | — | Intro, §1, §2: the `Tenant` scope, and the Customer Portal as the Customer's client. §6: the seed paragraph points at §6.1, which already names the three demo grants. §1, story 4, §12: the Customer's `reports.customer.create` (R5) and the Tenant policies (R6) stated where the old "read only" text remained; the open question on Customer create is closed. No rule changed |
+| 2026-11-27 | — | §8: the status codes and shape of `GET /reports/executions/{id}` written out next to the list. The route was in the §8 table but not built; it is now. No rule changed |

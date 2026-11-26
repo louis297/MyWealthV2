@@ -3,7 +3,7 @@ title: API design
 status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-26
+updated: 2026-11-27
 related:
   - README.md
   - glossary.md
@@ -32,8 +32,10 @@ Two processes, two HTTP surfaces. Do not add a custom `POST /auth/login` on `web
 
 ```text
 Browser
-  ├── redirect / callback / token / revocation / logout  →  identity (src/IdentityHost)
-  └── Bearer resource calls                              →  webapi (src/Web)
+  ├── authorize redirect / hosted login                  →  identity (src/IdentityHost)
+  └── same-origin calls with the session cookie          →  portal BFF
+        ├── token / refresh / revocation / logout        →  identity
+        └── Bearer resource calls                        →  webapi (src/Web)
 ```
 
 | Host | Aspire name | Role |
@@ -63,7 +65,7 @@ Minimal API, TypedResults, endpoints dispatch MediatR only. Paths are kebab-case
 | Concurrency | Writes to Tenant / User accept `rowVersion`; conflict → 409 |
 | Customer | May complete the authorization-server flow; management routes → 403 |
 | Authorization | Named policies on endpoints; `RolePermissions` mapped in code; assignment scope in the handler (ADR 0013) |
-| CORS | Loose in Development; tighten in production without blocking Phase 1 |
+| CORS | None. `webapi` registers no CORS policy: a portal's browser calls only its BFF, on the BFF's origin, and Scalar is served from the `webapi` origin ([features/bff-adviser-portal.md](features/bff-adviser-portal.md) R15, [architecture.md](architecture.md)) |
 | Docs | `[EndpointSummary]` / `[EndpointDescription]` on every action |
 | People paths | `/users` is a **namespace prefix**, not a parent resource. People collections hang under it. Do not nest advisers / customers under `/users/{id}`. Tenants, currencies, and ledger routes stay outside this prefix |
 | Fee paths | `/fees` is a namespace prefix for fee configuration and calculation, like `/users`; it is not a resource. Fee transactions stay under `/transactions` (§7.9) |
@@ -194,7 +196,7 @@ The fifth role `SimulatorOperator` ([ADR 0013](adr/0013-roles-authorization-sing
 | State conflict: stale `rowVersion`, reused `Idempotency-Key`, changed FX rate, … | 409 with a problem `code` (§4.2) | `webapi` |
 | Unhandled | 500 | Either host |
 
-Whether login failures distinguish Disabled from bad credentials is **still open** (§9). Until locked, treat them as a uniform failure and do not enumerate the reason. A disabled tenant or Disabled person at **hosted login** is not §4.1: that is a uniform failure on `identity`, not this JSON.
+Login failures do not distinguish Disabled from bad credentials: every failure at hosted login shows the same copy, `Invalid login.`, and does not enumerate the reason (identity-auth R3, §4.4; locked in §9). A disabled tenant or Disabled person at **hosted login** is not §4.1: that is a uniform failure on `identity`, not this JSON.
 
 ### 4.1 Target is disabled (shared error)
 
@@ -263,7 +265,8 @@ Status of this section: `accepted` (2026-11-13). It was built with the portfolio
 | `fee_schedule_in_effect` | 409 | The trade fee schedule row may already apply to a posted trade, so it cannot be updated or deleted. Add a new row instead. | — | [features/trade-fees.md](features/trade-fees.md) R11 |
 | `interest_schedule_in_effect` | 409 | The interest rate schedule row may already apply to an accrued day, so it cannot be updated or deleted. Add a new row instead. | — | [features/interest-run.md](features/interest-run.md) R13 |
 | `disabled` | 400 | §4.1 | `target`, `targetId` | §4.1 |
-| `missing_price`, `missing_fx`, `insufficient_cash`, `account_not_eligible`, `portfolio_inactive`, `concurrent_modification` | 400 | Rebalance failure | — | [features/portfolios.md](features/portfolios.md) §11 |
+| `missing_price`, `missing_fx`, `insufficient_cash`, `account_not_eligible`, `portfolio_inactive` | 400 | Rebalance failure | — | [features/portfolios.md](features/portfolios.md) §11 |
+| `concurrent_modification` | 400 | **Retired** (C3). Not returned: a stale `rowVersion` on rebalance confirm or cancel is 409 `stale_row_version`. The name is not reused | — | [features/portfolios.md](features/portfolios.md) §11 |
 | `stale_price`, `instrument_inactive`, `currency_mismatch`, `no_broker_connection` | 400 | A rebalance cannot be planned or cannot place orders: a price more than 4 days old, an inactive instrument, a target line quoted in another currency than the account's, or no configured broker connection | — | [features/rebalances.md](features/rebalances.md) R6, R8 |
 | `rebalance_in_progress` | 400 | A rebalance of the account is in progress, so no new proposal or assignment is made | — | [features/rebalances.md](features/rebalances.md) R4, R23 |
 | `migration_batch_not_valid` | 400 | A migration batch has validation issues, so it cannot be submitted or posted; the issues are on the batch item | — | [features/migration-batches.md](features/migration-batches.md) R17, R21 |
@@ -285,7 +288,7 @@ Protocol paths use **OpenIddict defaults. Do not remap.** Portals and `webapi` f
 | Authorize | `GET /connect/authorize` | Authorization code + PKCE. Unauthenticated callers hit hosted login |
 | Token | `POST /connect/token` | Exchange for access / refresh; also used to refresh. No password grant |
 | Revocation | `POST /connect/revocation` | Revoke refresh on logout (default name is revocation, not revoke) |
-| End session | `GET/POST /connect/logout` | Portal returns to registered `{portalOrigin}/`. IdentityHost passthrough requires the SignOut action in identity-auth R21 |
+| End session | `GET/POST /connect/logout` | The client's holder sends `post_logout_redirect_uri`, the client's registered post-logout URI: `{bffOrigin}/` for a portal, `{backOfficeOrigin}/` for Back Office (identity-auth §4.2). IdentityHost passthrough requires the SignOut action in identity-auth R21 |
 | Userinfo | `GET /connect/userinfo` | Library default; Phase 1 portal mainly uses access-token claims |
 | Hosted login | Password page on `identity` | email + password + tenantCode (SystemAdmin omits tenantCode). **Not** a `/connect` protocol endpoint. Razor Pages at `/login` |
 
@@ -632,7 +635,7 @@ Bank reconciliation (accepted, [features/bank-reconciliation.md](features/bank-r
 | GET | `/reports/executions/{id}` | by that execution’s report scope | 200 |
 | GET | `/reports/executions/{id}/download` | by that execution’s report scope | 200 `application/pdf` |
 
-Customer has `reports.customer.read` only. TenantAdmin and Adviser have all four. SystemAdmin has none of the four and cannot call `GET /reports`, request, schedule, or download. Bad parameters → 400. Unknown report, not granted, inactive catalog row, or out of scope → 404 on those firm routes. Policy fail → 403.
+Customer has `reports.customer.read` and `reports.customer.create`: `POST /reports/request` for their own Customer-scoped report only, and the schedule verbs stay 403 (reports R5). TenantAdmin and Adviser have the four Customer and Book policies; only TenantAdmin has the two Tenant policies (reports R6, §3.1). SystemAdmin has none of the six and cannot call `GET /reports`, request, schedule, or download. Bad parameters → 400. Unknown report, not granted, inactive catalog row, or out of scope → 404 on those firm routes. Policy fail → 403.
 
 `GET /reports/catalog` is `tenants.manage`. It returns every catalog row, ordered by code, including inactive rows, with no `granted`. Other roles → 403. It is not `GET /reports`.
 
@@ -892,3 +895,4 @@ One row per change. The text of each change is in git (`git log -p -- docs/api-d
 | 2026-11-26 | Account valuation (§6, §7.6): `GET /accounts/{id}/valuation?date=` with `accounts.read`. No new permission or problem code |
 | 2026-11-26 | Valuation run (§3.1, §6, §7.6, §7.18): `valuation-runs.read` and `valuation-runs.start`; `/valuation-runs`; `GET /accounts/{id}/valuations[/{date}]`; `valuedThrough` on the account item. No problem code |
 | 2026-11-26 | Valuation history (§6, §7.18): `GET /net-worth/funds-under-management`; `folded` on the net-worth reads; `date` of the Adviser Balances Report. No permission or problem code |
+| 2026-11-27 | Docs caught up with the code: §1 diagram shows the BFF between the browser and `webapi`; §2 CORS is none on `webapi`; §4 login failures are uniform (`Invalid login.`), no longer open; §7.8 the Customer's `reports.customer.create` and the Tenant pair; §4.2 `concurrent_modification` marked retired; §5 end session returns to `{bffOrigin}/` |

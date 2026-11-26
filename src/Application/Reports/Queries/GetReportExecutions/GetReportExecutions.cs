@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FluentValidation.Results;
 using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
@@ -64,12 +63,12 @@ public class GetReportExecutionsQueryHandler(IApplicationDbContext db, ICurrentU
         var items = new List<ReportExecutionDto>();
         foreach (var row in rows)
         {
-            if (!TryReadParameters(row.ParametersJson, out var parameters))
+            if (!ReportExecutionVisibility.TryReadParameters(row.ParametersJson, out var parameters))
             {
                 continue;
             }
 
-            if (!Visible(row.Scope, parameters, role, customers))
+            if (!ReportExecutionVisibility.IsVisible(row.Scope, parameters, role, currentUser, customers))
             {
                 continue;
             }
@@ -96,56 +95,6 @@ public class GetReportExecutionsQueryHandler(IApplicationDbContext db, ICurrentU
             PageSize = request.PageSize,
             TotalCount = items.Count
         };
-    }
-
-    private bool Visible(
-        string scope,
-        JsonElement parameters,
-        UserRole role,
-        IReadOnlyDictionary<Guid, int?> customers)
-    {
-        if (role == UserRole.TenantAdmin)
-        {
-            return true;
-        }
-
-        if (scope == "Book")
-        {
-            return role == UserRole.Adviser
-                && parameters.TryGetProperty("adviserId", out var adviserId)
-                && adviserId.TryGetGuid(out var id)
-                && id == currentUser.PublicId;
-        }
-
-        if (!parameters.TryGetProperty("customerId", out var customerId)
-            || !customerId.TryGetGuid(out var customerPublicId))
-        {
-            return false;
-        }
-
-        if (role == UserRole.Customer)
-        {
-            return customerPublicId == currentUser.PublicId;
-        }
-
-        return role == UserRole.Adviser
-            && customers.TryGetValue(customerPublicId, out var adviserPersonId)
-            && adviserPersonId == currentUser.Person?.Id;
-    }
-
-    private static bool TryReadParameters(string json, out JsonElement parameters)
-    {
-        try
-        {
-            parameters = JsonSerializer.Deserialize<JsonElement>(json);
-        }
-        catch (JsonException)
-        {
-            parameters = default;
-            return false;
-        }
-
-        return parameters.ValueKind == JsonValueKind.Object;
     }
 
     private static IReadOnlyList<string> ReadableScopes(UserRole role, string? scope)

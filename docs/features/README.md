@@ -3,7 +3,7 @@ title: Feature Specs
 status: draft
 language: en
 created: 2026-09-12
-updated: 2026-11-26
+updated: 2026-11-27
 related:
   - ../function-plan.md
   - ../api-design.md
@@ -126,7 +126,7 @@ One domain. Background execution lives in the general-purpose `worker` (ADR 0017
 
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |
-| [reports](reports.md) | accepted | Customer (`reports.customer.read` only); Adviser; TenantAdmin (all four report policies). SystemAdmin has none of the four. SystemAdmin lists the platform catalog with `GET /reports/catalog` and grants active reports with `tenants.manage` | Catalog with scope (`Customer` \| `Book`). TenantReports. Shared pipeline. Customer Transactions + Adviser Balances. PDF via code layout. Manual + scheduled both. Policies `reports.customer.*` / `reports.book.*`. | Two scopes force the catalog and policy split. |
+| [reports](reports.md) | accepted | Customer (`reports.customer.read`, and `reports.customer.create` for a request for self); Adviser (the Customer and Book policies); TenantAdmin (those four plus the Tenant pair). SystemAdmin has none of the report policies. SystemAdmin lists the platform catalog with `GET /reports/catalog` and grants active reports with `tenants.manage` | Catalog with scope (`Customer` \| `Book` \| `Tenant`). TenantReports. Shared pipeline. Customer Transactions + Adviser Balances. PDF via code layout. Manual + scheduled both. Policies `reports.customer.*` / `reports.book.*` / `reports.tenant.*`. | Two scopes force the catalog and policy split. |
 | [outbox](outbox.md) | accepted | Platform (no HTTP caller) | Transactional `OutboxMessages`. Worker delivers domain events via MediatR. Replaces immediate post-save dispatch. ADR 0018 accepted. Script `0020_outbox.sql`. | Cross-cutting delivery. Not a report and not a ledger slice. |
 | [fx-rates](fx-rates.md) | accepted (2026-11-02) | Platform (worker job; any Application caller of `IFxRate`) | Hourly Hangfire job pulls Frankfurter daily rates for active catalog currencies when today's source date is not already stored. Table `FxRates`. Script `0021_fx_rates.sql`. ADR 0019 accepted. HTTP read surface deferred. | Platform rate cache. Consumers (net-worth fold, instrument prices) are later. |
 | [instrument-prices](instrument-prices.md) | accepted (2026-11-02) | Platform (worker job; any Application caller of `IMarketData`) | Daily Hangfire job at 12:00 UTC pulls EODHD EOD prices for active instruments when today's source date is not already stored. Table `InstrumentPrices`. Script `0022_instrument_prices.sql`. No new ADR (follows ADR 0019). HTTP read surface deferred. | Platform price cache. `IMarketData` reads the table. |
@@ -219,6 +219,6 @@ Host start-up outside Development, for the VPS showcase in [deployment.md](../de
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |
 | [demo-tenant-seed](demo-tenant-seed.md) | accepted (2026-11-14; landed on master) | Operator (`webapi --seed-demo`; no HTTP caller) | Demo tenant `demo` with reporting `USD`, the 18-instrument demo catalog and both report grants, in any environment. Idempotent, never changes existing rows. No people, prices or FX. No script | Amends tenants R17. First part of future-plans §6 |
-| [production-hosting](production-hosting.md) | review | Platform (no HTTP caller) | OpenIddict certificates and explicit issuer on `identity`; Data Protection folder and application name per public host; forwarded headers from configured networks; no in-host HTTPS redirection; health endpoints on the health port; `--healthcheck` self-check | Cross-cutting host start-up. Not a resource slice |
+| [production-hosting](production-hosting.md) | accepted | Platform (no HTTP caller) | OpenIddict certificates and explicit issuer on `identity`; Data Protection folder and application name per public host; forwarded headers from configured networks; no in-host HTTPS redirection; health endpoints on the health port; `--healthcheck` self-check | Cross-cutting host start-up. Not a resource slice |
 
 Related amendments (2026-11-12, `review`): [bff-adviser-portal](bff-adviser-portal.md) and [bff-customer-portal](bff-customer-portal.md) serve the SPA build; [identity-auth](identity-auth.md) bootstrap SystemAdmin.
