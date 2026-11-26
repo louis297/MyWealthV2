@@ -1,4 +1,5 @@
 using MyWealthV2.Application.Accounts;
+using MyWealthV2.Application.Common.Exceptions;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.MarketData;
@@ -68,6 +69,7 @@ public class GetFundsUnderManagementQueryHandler(
     IApplicationDbContext db,
     ICurrentUser currentUser,
     ICurrencyCatalog currencies,
+    IFxRate fxRates,
     TimeProvider time) : IRequestHandler<GetFundsUnderManagementQuery, FundsUnderManagementDto>
 {
     public async Task<FundsUnderManagementDto> Handle(GetFundsUnderManagementQuery request, CancellationToken cancellationToken)
@@ -75,8 +77,7 @@ public class GetFundsUnderManagementQueryHandler(
         var tenant = await TenantAsync(request, cancellationToken);
         var tenantId = tenant.Id;
         var reportingCurrency = tenant.ReportingCurrency.Trim();
-        var decimalPlaces = currencies.TryGet(reportingCurrency)?.DecimalPlaces
-                            ?? throw new InvalidOperationException($"Currency {reportingCurrency} is not in the catalog.");
+        var decimalPlaces = Places(reportingCurrency);
         var (start, end) = FundsUnderManagementRange.Resolve(request.From, request.To, FundsUnderManagementRange.LastFinalDay(time));
 
         // R4: the Custodial accounts of the Customers in scope now, whatever their status.
@@ -120,7 +121,13 @@ public class GetFundsUnderManagementQueryHandler(
             }).ToListAsync(cancellationToken);
         var byDay = sums.ToLookup(row => row.Date);
 
-        var rates = new Dictionary<string, StoredRate>();
+        // R10: the rows of each other currency into the reporting currency, read once per pair.
+        var rateRows = new Dictionary<string, RateRows>();
+        foreach (var currency in sums.Select(row => row.Currency.Trim()).Where(code => code != reportingCurrency).Distinct())
+        {
+            rateRows[currency] = await RateRowsAsync(currency, reportingCurrency, start, end, cancellationToken);
+        }
+
         var days = new List<FundsUnderManagementDayDto>();
         for (var day = start; day <= end; day = day.AddDays(1))
         {
@@ -132,11 +139,20 @@ public class GetFundsUnderManagementQueryHandler(
             var totals = rows
                 .GroupBy(row => row.Currency.Trim())
                 .ToDictionary(group => group.Key, group => group.Sum(row => row.Total));
+            var rates = new Dictionary<string, StoredRate>();
+            foreach (var currency in totals.Keys.Where(rateRows.ContainsKey))
+            {
+                if (rateRows[currency].On(day) is { } rate)
+                {
+                    rates[currency] = rate;
+                }
+            }
+
             var folded = FxFold.Compute(totals, reportingCurrency, decimalPlaces, rates, day);
             days.Add(new FundsUnderManagementDayDto(
                 day,
-                folded.Lines.Select(FoldLineDto.From).ToList(),
-                folded.Total,
+                folded.Lines.Select(line => FoldLineDto.From(line, Places, reportingCurrency)).ToList(),
+                decimal.Round(folded.Total, decimalPlaces, MidpointRounding.AwayFromZero),
                 missing == 0 && incomplete == 0 && folded.Complete,
                 expected,
                 incomplete,
@@ -144,6 +160,47 @@ public class GetFundsUnderManagementQueryHandler(
         }
 
         return new FundsUnderManagementDto(reportingCurrency, start, end, days);
+    }
+
+    private int Places(string currency) =>
+        currencies.TryGet(currency)?.DecimalPlaces
+        ?? throw new InvalidOperationException($"Currency {currency} is not in the catalog.");
+
+    /// <summary>
+    /// The rows of the pair dated from the age limit before <paramref name="start"/> to <paramref name="end"/>, and the
+    /// latest row before them, so that a day before the first listed row still finds a row past the age limit
+    /// (<c>StaleRate</c>) rather than none (<c>NoRate</c>).
+    /// </summary>
+    private async Task<RateRows> RateRowsAsync(
+        string currency, string reportingCurrency, DateOnly start, DateOnly end, CancellationToken cancellationToken)
+    {
+        var windowStart = start.AddDays(-ValuationRules.MaxAgeDays);
+        var listed = await fxRates.ListRatesAsync(
+            currency, reportingCurrency, windowStart, end, 1, end.DayNumber - windowStart.DayNumber + 1, cancellationToken);
+        StoredRate? before = null;
+        try
+        {
+            var dayBefore = windowStart.AddDays(-1);
+            var reading = await fxRates.GetRateDetailAsync(
+                currency, reportingCurrency, new DateTimeOffset(dayBefore.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero), cancellationToken);
+            before = new StoredRate(reading.Rate, reading.AsOfDate, reading.Source.Trim());
+        }
+        catch (FxRateNotFoundException)
+        {
+            // R10: no row before the window; a day with no listed row is NoRate.
+        }
+
+        var rows = listed.Items
+            .Select(row => new StoredRate(row.Rate, row.AsOfDate, row.Source.Trim()))
+            .OrderBy(row => row.AsOfDate)
+            .ToList();
+        return new RateRows(rows, before);
+    }
+
+    /// <summary>The rows of one pair, oldest first, and the latest row before them.</summary>
+    private sealed record RateRows(IReadOnlyList<StoredRate> Rows, StoredRate? Before)
+    {
+        public StoredRate? On(DateOnly day) => Rows.LastOrDefault(row => row.AsOfDate <= day) ?? Before;
     }
 
     private async Task<Domain.Entities.Tenant> TenantAsync(GetFundsUnderManagementQuery request, CancellationToken cancellationToken)
