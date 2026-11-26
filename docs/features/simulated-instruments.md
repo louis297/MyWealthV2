@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-22
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -129,7 +129,7 @@ The rule that distinguishes this slice: the symbol's suffix decides where a pric
 | R2 | **Symbol suffix.** `SymbolSuffix` is a `.` followed by 2 to 10 letters or digits, compared without regard to case (for example `.SIM`). No two connections have the same suffix. |
 | R3 | **Start-up check.** A host whose configuration has a bad name, an unknown adapter, a missing or bad suffix, a suffix used twice, or (on `worker`) a missing `BaseUrl` or `ApiKey` or a `TimeoutSeconds` or `PollMinutes` outside its values fails at start-up, before it listens. The rule reads the configuration, not the environment name (ADR 0021 rule 3). |
 | R4 | **Which instruments a connection serves.** An Instrument of any Tenant is **served** by a connection when its `Symbol` ends with the connection's suffix. This is worked out from the symbol each time it is needed; no column stores it. Renaming an instrument's symbol (instruments R14) can therefore change who prices it, from the next run. An instrument served by no connection is priced by EODHD as today. |
-| R5 | **Connection list.** `GET /market-data-connections` (`tenants.manage`) → list envelope of `{ name, adapter, symbolSuffix, prices }`, sorted by name, every entry on page 1. `prices` is `{ lastSucceededAt, lastFailedAt, lastFailure }`, `null` until the first read was tried. `lastFailure` is one of `Unreachable`, `Timeout`, `Unauthorized`, `Unavailable`, `BadResponse`, or `null`; it never carries a message from the party. No URL, key or timeout. TenantAdmin, Adviser, Customer → 403. |
+| R5 | **Connection list.** `GET /market-data-connections` (`tenants.manage`) → list envelope of `{ name, adapter, symbolSuffix, prices }`, sorted by name, every entry on page 1. `prices` is `{ lastSucceededAt, lastFailedAt, lastFailure }`, `null` until the first read was tried. `lastFailure` is one of `Unreachable`, `Timeout`, `Unauthorized`, `Unavailable`, `BadResponse`, or `null`; it never carries a message from the party. No URL, key or timeout. TenantAdmin, Adviser, Customer → 403. The connection item also carries `corporateActions`, the state of the connection's corporate action feed (corporate-actions R38). |
 | R6 | **Instrument item.** The instrument item of `GET /instruments` and `GET /instruments/{id}` gains `marketDataConnection`: the name of the connection that serves it, or `null`. Every caller who can read the instrument sees it. No filter on it. |
 
 ### 4.2 Reading prices
@@ -139,12 +139,12 @@ Amendment to [instrument-prices.md](instrument-prices.md) R1, R3, R5, R14 and R1
 | ID | Rule |
 | --- | --- |
 | R7 | **One recurring job per connection.** `worker` registers `market-data-sync:{connection}` for each configured connection, on the new queue `market`, every `PollMinutes` of that connection (UTC; cron as deposit-matching R6). No automatic Hangfire retries; the schedule is the retry (ADR 0021 rule 15). A run that starts while another run of the same connection is still going ends at once and does nothing. A recurring job of a connection that is no longer configured is removed when the `worker` starts. |
-| R8 | **A run.** The job asks the port once for the current price of every instrument the party prices. A failed call stores no price, sets `lastFailedAt` and `lastFailure` on the connection's `Prices` feed, is logged with the connection and the failure, and is reported to Hangfire as failed. The prices already stored stay (instrument-prices R8). |
+| R8 | **A run.** The job asks the port once for the current price of every instrument the party prices. A failed call stores no price, sets `lastFailedAt` and `lastFailure` on the connection's `Prices` feed, is logged with the connection and the failure, and is reported to Hangfire as failed. The prices already stored stay (instrument-prices R8). `market-data-sync:{connection}` has three steps before its price read: pull the corporate action announcements, process them, and apply the corporate actions of the connection's instruments. When the announcement pull fails, the price read of that run is skipped and the run is reported as failed (corporate-actions R8). |
 | R9 | **Store.** For each item whose symbol ends with the connection's suffix, every **active** Instrument, in any Tenant, with that symbol and with `QuoteCurrency` equal to the item's currency gets one row in `InstrumentPrices`, upserted on `(InstrumentId, AsOfDate)`: the price, `Source` = `Simulator` (the adapter's name) and `FetchedAt`. All rows of a run and `lastSucceededAt` are written in one database transaction. |
 | R10 | **The platform's date.** `AsOfDate` of such a row is the platform's UTC date at the run, not the date the party sent. `IMarketData` reads the latest row on or before the platform's today (instrument-prices R6), and a simulator clock that runs ahead would date its prices in the platform's future, where no read finds them (ADR 0021 rule 11). So each run replaces today's row, and the first run of a new UTC day adds a row. The party's own date is not stored. |
 | R11 | **Items the platform skips.** An item whose symbol does not end with the suffix is ignored. An item with a symbol that is empty or longer than 32 characters, a currency that is not three letters, or a price that is not `> 0` or has more than 8 decimal places is skipped with a warning; the other items are stored. An item whose currency differs from an instrument's `QuoteCurrency` is skipped for that instrument with a warning, as the EODHD job does today. An active served instrument with no item keeps its last row, with a warning. |
 | R12 | **EODHD leaves served instruments alone.** `InstrumentPriceSyncJob` leaves out every instrument served by a connection: from the instruments it fetches, and from its test whether every active instrument has today's date (instrument-prices R14). No EODHD call is spent on a simulated symbol. |
-| R13 | **Everything else is unchanged.** `IMarketData`, Buy / Sell, net worth, rebalance and reports read `InstrumentPrices` as today. A served instrument can be held on an External and on a Custodial account. Inactive instruments are not updated (instrument-prices R3). No cursor and no inbound table: a price read is a snapshot that replaces the last one, the pattern of the EODHD and Frankfurter reads (ADR 0021, Context). |
+| R13 | **Everything else is unchanged.** `IMarketData`, Buy / Sell, net worth, rebalance and reports read `InstrumentPrices` as today. A served instrument can be held on an External and on a Custodial account. Inactive instruments are not updated (instrument-prices R3). No cursor and no inbound table: a price read is a snapshot that replaces the last one, the pattern of the EODHD and Frankfurter reads (ADR 0021, Context). An order's reference price for a served instrument is the latest price the platform stored from the connection; the fill is then priced by the simulator, so the two can differ by the price's move since the last read. |
 
 ### 4.3 The simulator market: instruments and prices (S4)
 
@@ -156,7 +156,7 @@ Amendment to [simulator.md](simulator.md). The party routes add under `/party/ma
 | R15 | **Simulated instrument.** Symbol (5–32 characters of letters, digits, `.` and `-`, stored upper case, ending in `.SIM`, unique), name (1–200), currency (three letters, upper case; the simulator holds no currency catalog), price (`> 0`, at most 4 decimal places) and `dailyMovePercent` (0 to 20, at most 2 decimal places, default 2). The suffix `.SIM` is fixed in the simulator, so a simulated symbol never looks like a real ticker. |
 | R16 | **Add an instrument.** `POST /control/market/instruments` `{ symbol, name, currency, price, dailyMovePercent? }` → 201 with the instrument. A symbol that already exists → 400 `errors.Symbol`. The price is the price of the current simulator day. Log action `MarketInstrumentAdded`. Nothing but `dailyMovePercent` and the price can change later, and an instrument is never removed except by a reset. |
 | R17 | **Price path.** An instrument has exactly one price per **simulator day**, the UTC date of simulator now. The price of day `d` is `Max(0.0001, Round(price(d − 1) × (1 + move), 4))`, rounded half away from zero, with `move = dailyMovePercent / 100 × (2u − 1)` and `u` the first value in `[0, 1)` of `SeededRandom.For(seed, "market-price:{symbol}", n)`, `n` being the day number of `d` counted from 2000-01-01 (simulator R26). Same seed, same instruments and same clock steps give the same prices. With `dailyMovePercent` `0` the price never moves by itself. |
-| R18 | **Bringing the market up to date.** Before any market route answers, control or party, the simulator works out and stores the price of every day from each instrument's last priced day up to the current simulator day, in day order, under a lock on the instrument row, so two requests at once step a day once. A clock advance of 366 days (simulator R22) therefore stores at most 366 prices per instrument on the next request. |
+| R18 | **Bringing the market up to date.** Before any market route answers, control or party, the simulator works out and stores the price of every day from each instrument's last priced day up to the current simulator day, in day order, under a lock on the instrument row, so two requests at once step a day once. A clock advance of 366 days (simulator R22) therefore stores at most 366 prices per instrument on the next request. When the market is brought up to date and steps to a day on or after the `exDate` of an `Announced` corporate action of the instrument, the price of the day before is rebased by the action's ratio before that day's move (corporate-actions R42). The simulator broker fills an order for a simulated instrument at the market's price of the current simulator day, with a seeded slippage, and the market is brought up to date before any broker route answers (orders R52, R56). |
 | R19 | **Set a price.** `POST /control/market/instruments/{symbol}/price` `{ price }` → 200 with the instrument. It replaces the price of the current simulator day; the next day steps from it. Unknown symbol → 404. Log action `MarketPriceSet`. `POST /control/market/instruments/{symbol}/daily-move` `{ dailyMovePercent }` → 200; it applies from the next day. Log action `MarketDailyMoveSet`. |
 | R20 | **Standing instruments.** Configuration `Simulator:Market:StandingInstruments` lists instruments (`Symbol`, `Name`, `Currency`, `Price`, optional `DailyMovePercent`) that the simulator adds when the world is created and after every reset; one that already exists is left as it is. A bad entry stops the host before it listens. Development lists `ACME.SIM` (USD, 100.00, "Acme Simulated Holdings") and `KIWI.SIM` (NZD, 5.00, "Kiwi Simulated Fund"), the symbols `TestSeed` adds to the demo catalog (§9.1). |
 | R21 | **Price route.** Party port: `GET /party/market/prices` → 200 `{ asOf, items }`. `asOf` is simulator now; `items` holds one entry per instrument, sorted by symbol: `{ "symbol", "currency", "price", "date" }`, `price` a JSON number and `date` the simulator day. No paging: the simulator holds few instruments. The key (simulator R30) and the outage (simulator R27) apply as to every party route. |
@@ -175,6 +175,8 @@ Policies: none added. `tenants.manage` reads `GET /market-data-connections`.
 ---
 
 ## 5. Domain
+
+`MarketDataFeedKind` also has `CorporateActions = 1`, a feed with a cursor that `MarketDataFeed` keeps, and `MarketDataFailure` also has `InvalidItem = 5` ([corporate-actions.md](corporate-actions.md)).
 
 | Type | Kind | Change |
 | --- | --- | --- |
@@ -350,15 +352,14 @@ Page contract: [back-office.md](../backoffice/back-office.md) (BO22, BO23) and [
 
 ## 10. Tests
 
-| Project | Assert |
-| --- | --- |
-| Domain.UnitTests | `MarketDataConnection.Serves`: `ACME.SIM` and `acme.sim` yes, `ACME`, `SIM` and `ACME.SIMX` no. `MarketDataConnections.For`: the one connection or none; two connections with the same suffix are refused. `MarketDataFeed.Succeeded` / `Failed` keep the other time |
-| Application.FunctionalTests | With a fake `IMarketPrices` and a configured connection on the test host. A run stores one row per active served instrument dated the platform's today, whatever `date` the item carries; a second run the same day updates it; a run on the next day adds a row. The same symbol in two Tenants gets the price in both. An inactive instrument, an instrument with another quote currency, and an item without the suffix get none. A bad item is skipped and the others stored. A failed call stores nothing, keeps the old row and sets `lastFailure`. `Buy` of a served instrument on a Custodial account uses the stored price. `GET /market-data-connections`: SystemAdmin sees the connection and its feed state; TenantAdmin, Adviser, Customer → 403; no Bearer → 401. The instrument item carries `marketDataConnection`; renaming the symbol to one without the suffix makes it `null` |
-| Infrastructure.IntegrationTests | `0049`: a second row for the same `(Connection, Kind)` violates; `Kind = 1` and `LastFailure = 5` violate. EF round-trip. Start-up check: each bad entry of R3 stops the host; none configured starts. `InstrumentPriceSyncJob` with a fake EODHD source (next to the job's existing tests) is never asked for a served symbol and still skips the call when every other instrument has today's date. `SimulatorMarketPrices` against canned responses: a good body; 401, 503, a timeout, no connection, a body with a text price → the failures of R25. `MarketDataSyncJob` on a worker host: one job per connection, a job of a removed connection is deleted, a second run at once does nothing |
-| Simulator.Tests | `0008` applies. Add an instrument; a duplicate, a symbol without `.SIM`, a bad price → 400. The price of day `d + 1` follows R17 for a known seed; the same seed and steps give the same path after a reset; `dailyMovePercent` 0 keeps the price; an advance of three days stores three prices on the next read; two reads at once store each day once. Set a price replaces today's and the next day steps from it. Standing instruments exist after start and after a reset. `GET /party/market/prices`: items sorted by symbol; 401 without the key; 503 in an outage; 404 on the control port. The control log rows |
-| Back Office | BO22, BO23 |
+The tests are the executable form of §4. Where they live:
 
-No two-tenant isolation test on prices themselves (platform data, instrument-prices §10); the catalog's isolation tests are unchanged.
+| Project | Where |
+| --- | --- |
+| Domain.UnitTests | Folder `MarketData/`; `Entities/MarketDataFeedTests.cs` |
+| Application.FunctionalTests | Folder `MarketData/` |
+| Infrastructure.IntegrationTests | Folder `MarketData/`; `AppliedSchema/MarketDataFeedsSchemaTests.cs`, `MarketDataSyncJobTests.cs`, `MarketDataReadTests.cs` |
+| Simulator.Tests | The simulator market |
 
 ---
 
@@ -406,44 +407,18 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
-
-The repository should build after each commit. Agents split each behaviour into red then green.
-
-1. `MarketDataConnection`, `MarketDataConnections`, the options and the start-up check (R1–R4) + Domain unit tests and the options integration tests.
-2. Script `0049`, `MarketDataFeed`, port `IMarketPrices`, `SyncMarketPrices` (R8–R11, R13) + functional tests with the fake port and the `0049` integration tests.
-3. `InstrumentPriceSyncJob` leaves out served instruments (R12) + functional tests.
-4. `SimulatorMarketPrices` and `MarketDataSyncJob` (R7, R25) + integration tests.
-5. `GET /market-data-connections` and `marketDataConnection` on the instrument item (R5, R6) + functional tests.
-6. Simulator: script `0008`, instruments, the price path, set a price, standing instruments, reset (R14–R20, R22–R24) + `Simulator.Tests`.
-7. Simulator: `GET /party/market/prices` (R21) + `Simulator.Tests`.
-8. `TestSeed`, AppHost and deploy entries (§9.1).
-9. Back Office BO22, BO23 + tests.
-10. Repo docs: mark this file landed; roadmap §13 step 10a.
-
-Do not put corporate actions, orders or a calendar in these commits.
-
-### Docs amended when this spec was accepted
+## 12. Docs changed when this spec was accepted
 
 [instrument-prices.md](instrument-prices.md) (R1, R3, R5, R14, R15: served instruments are priced by their connection under the platform's date; the EODHD job leaves them out), [instruments.md](instruments.md) (`marketDataConnection` on the item), [simulator.md](simulator.md) (the market party, script `0008`, the new control and party routes and log actions), [deposit-matching.md](deposit-matching.md) (a note that market data connections follow the shape of bank connections), [back-office.md](../backoffice/back-office.md) (BO22, BO23), [back-office-instruments.md](../backoffice/back-office-instruments.md) (the connection line), [api-design.md](../api-design.md) (§6 resource row, §7.5 note, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (port `IMarketPrices`, the job and queue `market`), [deployment.md](../deployment.md) (the connection keys and the standing instruments), [glossary.md](../glossary.md) (the review terms become accepted), [function-plan.md](../function-plan.md) §5 (the roadmap step), [features/README.md](README.md) row status, and the roadmap §11 S4, §12 D11, §13 status and §14.
 
 ---
 
-## Amendment 2026-11-22 (corporate actions) — accepted
+## 13. History
 
-Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md). Rules R8, R38 and R42 live there; this section records what changes here.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/simulated-instruments.md`).
 
-- R7, R8: `market-data-sync:{connection}` gains three steps before its price read: pull the corporate action announcements, process them, and apply the corporate actions of the connection's instruments. When the announcement pull fails, the price read of that run is skipped and the run is reported as failed (corporate-actions R8).
-- §5: `MarketDataFeedKind` gains `CorporateActions = 1`, a feed with a cursor; `MarketDataFailure` gains `InvalidItem = 5`. `MarketDataFeed` keeps the cursor of the `CorporateActions` feed.
-- R5: the connection item gains `corporateActions` (corporate-actions R38).
-- R17, R18: when the market is brought up to date and steps to a day on or after the `exDate` of an `Announced` corporate action of the instrument, the price of the day before is rebased by the action's ratio before that day's move (corporate-actions R42).
-
----
-
-## Amendment 2026-11-23 (orders and settlement) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R52, R56 and R62 live there; this section records what changes here.
-
-- R17, R18: the simulator broker fills an order for a simulated instrument at the market's price of the current simulator day, with a seeded slippage. The market is brought up to date before any broker route answers (orders R52, R56).
-- R13: an order's reference price for a served instrument is the latest price the platform stored from the connection; the fill is then priced by the simulator, so the two can differ by the price's move since the last read.
-- No rule of this file changes.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-22 | [corporate-actions.md](corporate-actions.md) | R5, R8, R18, §5: the corporate action feed of a connection |
+| 2026-11-23 | [orders.md](orders.md) | R13, R18: the price of a fill on a simulated instrument |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
