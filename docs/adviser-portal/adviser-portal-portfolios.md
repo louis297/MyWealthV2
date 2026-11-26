@@ -25,9 +25,7 @@ Phase 2 portal cut for model portfolios. Consumes the landed portfolios feature 
 
 **Status is `accepted`.**
 
-**Amendment 2026-11-13 (Shared portfolio message, accepted, landed):** see the amendment at the end of this file. Adds P12.
-
-**Amendment 2026-11-17 (custody modes, accepted, landed):** see the amendment at the end of this file. Adds P13, which replaces the account test in P5 ([custody-modes](../features/custody-modes.md)).
+This file states the page contract as it is today. "History" at the end lists what changed here, by date.
 
 Backend prerequisites (landed):
 
@@ -37,7 +35,7 @@ Backend prerequisites (landed):
 - Policies: `portfolios.read` / `portfolios.manage`; assignment and rebalance reuse `transactions.create` + account visibility.
 - Script `0023_portfolios.sql`. Full Rebalance semantics. Assigned-account trade lock (R18).
 
-Session remains the BFF cookie. All API calls go through `/api`. BFF prefix allow-list must add `/portfolios` (amendment to `bff-adviser-portal.md` when this cut is accepted).
+Session remains the BFF cookie. All API calls go through `/api`. The BFF proxies `/portfolios` and `/rebalances` ([bff-adviser-portal.md](../features/bff-adviser-portal.md) §8.3).
 
 ---
 
