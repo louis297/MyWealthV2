@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 related:
   - fx-conversions.md
   - buy-sell.md
@@ -25,9 +25,12 @@ Amendment to [buy-sell.md](buy-sell.md), [holdings.md](holdings.md) and [portfol
 
 Depends on [fx-conversions.md](fx-conversions.md): the table, the item `fx` object and the staleness limit come from there. Accept and land that spec first.
 
-**Amendment 2026-11-18 (External caller numbers, accepted, landed):** [external-caller-numbers.md](external-caller-numbers.md) R23. Every rule of this draft applies to Custodial accounts only. On an External account a `Buy` or `Sell` in another currency is allowed with the caller's `fxRate` and stores an FX detail with source `Caller`; `StockIn` and `OpeningHoldings` keep today's behaviour; R8 (staleness) and R9 (cash rounding) do not apply there. Rework this draft for Custodial accounts before it goes to review.
+**To rework before review.** This draft was written before two accepted specs changed its ground, and its rules have not been rewritten:
 
-**Amendment 2026-11-23 (orders and settlement, accepted):** [orders.md](orders.md) R9, R34, R48. On a Custodial account a hand `Buy` or `Sell` no longer exists, so R2 and R3 of this draft have no hand trade left to rule on there. Orders decide the same points: a buy order must be in the Account's currency (roadmap D20), and a sell order in another currency is allowed and converted at the reference rate when its fill is posted. What is left of this draft for Custodial accounts is the rebalance (the FX detail, the staleness limit, cash rounding); it goes with roadmap O3. Rework this draft before it goes to review.
+- On an External account a `Buy` or `Sell` in another currency is allowed with the caller's `fxRate` and stores an FX detail with source `Caller`; `StockIn` and `OpeningHoldings` keep their behaviour; R8 (staleness) and R9 (cash rounding) do not apply there ([external-caller-numbers.md](external-caller-numbers.md) R23). Every rule of this draft therefore applies to Custodial accounts only.
+- On a Custodial account a hand `Buy` or `Sell` no longer exists, so R2 and R3 have no hand trade left to rule on. Orders decide the same points: a buy order must be in the Account's currency, and a sell order in another currency is allowed and converted at the reference rate when its fill is posted ([orders.md](orders.md) R9, R34, R48).
+
+What is left of this draft is the cash rounding of a converted trade (R9) and the FX detail and staleness limit of a fill across currencies.
 
 ---
 
