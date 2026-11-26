@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-14
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -50,7 +50,7 @@ The worker fetches the latest EOD prices for instruments that are active in any 
 
 - Real-time or intraday prices.
 - Per-tenant price overrides.
-- Historical back-fill beyond what the job naturally accumulates.
+- A back-fill before the history floor date ([market-data-history.md](market-data-history.md)).
 - A second rate source or failover provider.
 - HTTP endpoint for prices (deferred; a read surface is expected later for Scalar / ops, not a permanent exclusion).
 - Instrument reference data (ISIN, exchange, kind) — stays out of the catalog.
@@ -70,21 +70,21 @@ The worker fetches the latest EOD prices for instruments that are active in any 
 
 | ID | Rule |
 | --- | --- |
-| R1 | Source is EODHD (`https://eodhd.com/api`). Free plan: 20 API calls/day, 20/min. API key via Aspire parameter, not in git. Use the End-of-Day endpoint. Symbols use `SYMBOL.EXCHANGE` form (e.g. `AIA.NZ`, `AAPL.US`). |
+| R1 | Source is EODHD (`https://eodhd.com/api`). Free plan: 20 API calls/day, 20/min. API key via Aspire parameter, not in git. Use the End-of-Day endpoint. Symbols use `SYMBOL.EXCHANGE` form (e.g. `AIA.NZ`, `AAPL.US`). EODHD is the source of every instrument that no market data connection serves. An instrument whose symbol ends with the symbol suffix of a configured market data connection (for example `.SIM`) is **served** by that connection and gets its prices from it, through the port `IMarketPrices` and the `worker` job `market-data-sync:{connection}` (queue `market`, every `PollMinutes` of the connection) (simulated-instruments R4, R7–R13). `Price` is the unadjusted `close` of the EODHD bar; `adjusted_close` is never read, and a bar without a date or a `close`, or with a `close` that is not `> 0`, is skipped. With `MarketDataHistory:FloorDate` set on `worker`, the daily call per symbol asks with `from` = the later of the floor date and today minus `Eodhd:HistoryDays` (default 360), and the job stores every bar of the answer on or after that date; without the setting it asks for the latest bar (market-data-history R1–R11). The rows of one symbol group are stored in one transaction; a failure at one symbol leaves the symbols already stored in place. |
 | R2 | Job runs **daily at 12:00 UTC** via Hangfire recurring job (`0 12 * * *`). Business logic lives in Application; the worker only hosts it. |
 | R3 | Store one price per instrument per as-of date for instruments that are **active** in at least one tenant. Job reads the union of active `Instruments` on every run. Inactive instruments are not fetched; existing rows stay. |
 | R4 | Price is in the instrument’s `QuoteCurrency`. Do not convert on write. Callers that need another currency use `IFxRate`. |
-| R5 | Upsert key is `(InstrumentId, AsOfDate)`. `AsOfDate` is the date the source returns (previous working day on weekends / holidays). On each successful run, if the `AsOfDate` already exists for the instrument, update `Price` and `FetchedAt`; if it is a new date, insert. |
-| R6 | `IMarketData.TryGetPrice(instrumentId, asOf?)` returns the latest row with `AsOfDate` ≤ the UTC date of `asOf` (or today's UTC date if omitted). No row at all for that instrument → empty (`null`). Never invent 0. |
+| R5 | Upsert key is `(InstrumentId, AsOfDate)`. `AsOfDate` is the date the source returns (previous working day on weekends / holidays). On each successful run, if the `AsOfDate` already exists for the instrument, update `Price` and `FetchedAt`; if it is a new date, insert. A row written from a connection has `AsOfDate` = the platform's UTC date at the run, never the date the party sent, so a simulator clock that runs ahead cannot date a price in the platform's future (ADR 0021 rule 11); each run of the day replaces today's row, and `Source` is the adapter name (`Simulator`). A row whose `AsOfDate` is two or more days before the platform's UTC date is **final**: it is never updated or deleted, and a missing one may still be inserted. A row dated today or yesterday is updated as above. This holds for `instrument-price-sync` and for `market-data-sync:{connection}`; `TestSeed` and `webapi --seed-demo` are not bound by it. |
+| R6 | `IMarketData.TryGetPrice(instrumentId, asOf?)` returns the latest row with `AsOfDate` ≤ the UTC date of `asOf` (or today's UTC date if omitted). No row at all for that instrument → empty (`null`). Never invent 0. `IMarketData.TryGetPriceDetail(instrumentId, asOf)` returns the same row with its `AsOfDate` and `Source`. `IMarketData.ListPricesAsync` lists the stored rows of one instrument, newest first. |
 | R7 | Prices are platform data. No `TenantId` on the price row. The same symbol in two tenants shares the same price (instrument rows are tenant-scoped; price is looked up by `InstrumentId`, so each tenant’s instrument has its own price rows even if the symbol matches). |
 | R8 | On fetch failure the job logs and leaves the previous rows in place. It does not delete. |
 | R9 | Read path never calls the external source. Only the job does. |
 | R10 | Price precision is `decimal(18,8)`. |
 | R11 | No in-memory cache (`IMemoryCache`) in this slice. The table is the source of truth. |
-| R12 | No HTTP read endpoint in this slice. A read surface (e.g. `GET /instrument-prices`) is expected later for Scalar / ops; design it when a consumer needs it. Do not treat the absence as a permanent decision. |
+| R12 | **Read route.** `GET /instruments/{id}/prices` (`instruments.read`) lists the stored prices of an instrument the caller may read, newest first, with `from`, `to` and paging (market-data-history R19, R21–R23). The read path never calls a party. |
 | R13 | Index on `FetchedAt` for “latest successful sync” observability. Index on `(InstrumentId, AsOfDate)` for the as-of lookup. |
-| R14 | The job always runs. It calls the source only when some active instrument has no row whose `AsOfDate` is today’s UTC date. Once every active instrument has today’s source date, later runs that UTC day do not call the source. A run that stored an older source date still calls again later the same UTC day. On weekends and holidays the source date is not today, so the job still calls and upserts that `AsOfDate`. |
-| R15 | Same symbol across tenants is fetched once per run (by symbol + quote currency) and the price is written to every matching active `InstrumentId`. |
+| R14 | The job always runs. It calls the source only when some active instrument has no row whose `AsOfDate` is today’s UTC date. Once every active instrument has today’s source date, later runs that UTC day do not call the source. A run that stored an older source date still calls again later the same UTC day. On weekends and holidays the source date is not today, so the job still calls and upserts that `AsOfDate`. The job leaves out every served instrument: from the instruments it fetches and from its test whether every active instrument has today's date. No EODHD call is spent on a served symbol. |
+| R15 | Same symbol across tenants is fetched once per run (by symbol + quote currency) and the price is written to every matching active `InstrumentId`. A connection's run also writes one price to every active instrument, in any Tenant, with the item's symbol and with `QuoteCurrency` equal to the item's currency. |
 
 ---
 
@@ -162,13 +162,15 @@ None in this slice. Pages live in docs/adviser-portal/ when a consumer needs to 
 
 ## 10. Tests
 
-| Project | Assert |
-| --- | --- |
-| Application.UnitTests | As-of selection; missing price returns empty; same-day upsert updates price + FetchedAt |
-| Infrastructure.IntegrationTests | Script applies; FK rejects unknown instrument; upsert by key |
-| Worker / job | Fetch failure leaves previous rows; successful fetch writes expected instruments; skip call once today’s date is stored for all active instruments |
+The tests are the executable form of §4. Where they live:
 
-No cross-tenant tests on the price table itself (platform data). Isolation remains on the instrument catalog.
+| Project | Where |
+| --- | --- |
+| Application.UnitTests | Folder `MarketData/` |
+| Application.FunctionalTests | `Instruments/GetInstrumentPricesTests.cs`; folder `MarketData/` |
+| Infrastructure.IntegrationTests | Folder `MarketData/`; `AppliedSchema/InstrumentPrice*Tests.cs`, `MarketData*Tests.cs` |
+
+No cross-tenant tests on the table (platform data).
 
 ---
 
@@ -182,7 +184,7 @@ Follows ADR 0019 pattern. No new ADR.
 | Caller | Worker job only for writes; any Application caller for `IMarketData` |
 | Scope | Platform prices for active instruments (union across tenants); daily EOD; local read |
 | Schedule | Daily at 12:00 UTC (`0 12 * * *`). Skip external call once every active instrument has today’s source date (R14). |
-| Source | EODHD free plan (20 calls/day, 20/min). Key via Aspire parameter. EOD endpoint. One call returns full history for one symbol. |
+| Source | EODHD free plan (20 calls/day, 20/min). Key via Aspire parameter. EOD endpoint. One call per symbol, with `from`; the job stores every bar from that date. |
 | Columns | Keep both `AsOfDate` (source date) and `FetchedAt` (when we wrote). On same `AsOfDate`, update `Price` + `FetchedAt`. |
 | Cache | No `IMemoryCache` this slice |
 | HTTP | Deferred. A read surface is expected later for Scalar / ops. Not in this slice; not a permanent exclusion. |
@@ -236,51 +238,14 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
+## 12. History
 
-1. Failing tests for `IMarketData` as-of selection and missing → empty.
-2. Script `0022_instrument_prices.sql` + EF mapping + integration test.
-3. `InstrumentPriceSyncJob` + source client (or stub) + skip-if-today-stored.
-4. Wire `IMarketData` to the table (composition root used by the worker and webapi).
-5. TestSeed fake prices for VTI / AIA.
-6. Docs: this file to accepted, database-design, architecture, function-plan, domain-model port note.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/instrument-prices.md`).
 
----
-
-## Change summary
-
-2026-11-02 — Accepted. Local EOD price cache for active instruments, same pattern as FX rates. `IMarketData` reads the table. Source is Twelve Data free Basic. Job is hourly with skip-if-today-stored. Demo catalog expanded to several instruments per seed currency.
-
-2026-11-02 — Landed. Script `0022_instrument_prices.sql`. Twelve Data `GET /eod`, hourly Hangfire job `instrument-price-sync`, `IMarketData` reads `InstrumentPrices`. TestSeed writes the fake catalog prices.
-
-2026-11-08 — Source switched from Twelve Data to EODHD. Free plan provides global EOD coverage (US free tier on Twelve Data was insufficient for NZ/AU/UK/EU/JP seeds). Endpoint `GET /api/eod/{SYMBOL.EXCHANGE}`. Source column value `'EODHD'`. Aspire parameter `eodhd-api-key` (`Eodhd__ApiKey`). One call = one symbol full history; the job stores the latest bar. Seed symbols use the locked `SYMBOL.EXCHANGE` map. Landed.
-
-2026-11-08 — Schedule changed from hourly (`0 * * * *`) to daily at 12:00 UTC (`0 12 * * *`). Skip-if-today-stored (R14) is unchanged.
-
-## Amendment 2026-11-14 (UTC instants)
-
-Accepted with [utc-instants](../fixes/utc-instants.md). R6 reads the UTC date of `asOf`, not the date in its own offset.
-
-## Amendment 2026-11-22 (instruments served by a market data connection) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [simulated-instruments.md](simulated-instruments.md). Rules R4, R7–R13 live there; this section records what changes here.
-
-- **R1.** EODHD is the source of every instrument that no market data connection serves. An instrument whose symbol ends with the symbol suffix of a configured market data connection (for example `.SIM`) is **served** by that connection and gets its prices from it, through the port `IMarketPrices` and the `worker` job `market-data-sync:{connection}` (queue `market`, every `PollMinutes` of the connection). EODHD stays as it is: one job, one key, the symbol table in `EodhdSymbols`.
-- **R3.** Unchanged for both sources: only active instruments are updated, and the rows of an inactive one stay.
-- **R5.** A row written from a connection has `AsOfDate` = the platform's UTC date at the run, never the date the party sent, so a simulator clock that runs ahead cannot date a price in the platform's future (ADR 0021 rule 11). Each run of the day replaces today's row; the first run of a new UTC day adds one. `Source` is the adapter name (`Simulator`).
-- **R14.** `InstrumentPriceSyncJob` leaves out every served instrument: from the instruments it fetches and from its test whether every active instrument has today's date. No EODHD call is spent on a served symbol.
-- **R15.** A connection's run also writes one price to every active instrument, in any Tenant, with the item's symbol and with `QuoteCurrency` equal to the item's currency.
-- R6, R8, R9 and R12 are unchanged: `IMarketData` reads the table as before, a failed read keeps the old rows, the read path never calls a party, and there is still no price read route on `webapi`.
-
-## Amendment 2026-11-25 (market data history) — accepted
-
-Status of this amendment: `accepted` (2026-11-25), together with [market-data-history.md](market-data-history.md). Rules R1–R11, R17–R19 and R21–R23 live there; this section records what changes here.
-
-- **§2 Out, "Historical back-fill".** Replaced. With `MarketDataHistory:FloorDate` set on `worker`, the daily call per symbol asks EODHD with `from` = the later of the floor date and today minus `Eodhd:HistoryDays` (default 360), and the job stores every bar of the answer on or after that date. It is still one call per symbol. Without the setting the job asks for the latest bar, as before.
-- **R5.** A row whose `AsOfDate` is two or more days before the platform's UTC date is **final**: it is never updated or deleted, and a missing one may still be inserted. A row dated today or yesterday is updated as R5 said. This holds for `instrument-price-sync` and for `market-data-sync:{connection}`. `TestSeed` and `webapi --seed-demo` are not bound by it.
-- **`Price`** is the unadjusted `close` of the EODHD bar. `adjusted_close` is never read. A bar without a date or a `close`, or with a `close` that is not `> 0`, is skipped.
-- **The rows of one symbol group** are stored in one transaction; a failure at one symbol leaves the symbols already stored in place.
-- **R6.** `IMarketData.TryGetPriceDetail(instrumentId, asOf)` returns the row `TryGetPrice` reads, with its `AsOfDate` and `Source`. `IMarketData.ListPricesAsync` lists the stored rows of one instrument, newest first.
-- **R12.** Replaced. `GET /instruments/{id}/prices` (`instruments.read`) lists the stored prices of an instrument the caller may read, newest first, with `from`, `to` and paging.
-- **R14.** Unchanged: the job calls the source only when some active instrument has no row for today.
-- **§11.** "One call returns full history for one symbol. The job takes the latest bar" now reads: one call per symbol with `from`; the job stores every bar from that date.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-08 | — | Source switched from Twelve Data to EODHD; the job runs daily at 12:00 UTC |
+| 2026-11-14 | [utc-instants](../fixes/utc-instants.md) | R6: the UTC date of `asOf` |
+| 2026-11-22 | [simulated-instruments.md](simulated-instruments.md) | R1, R5, R14, R15: instruments served by a market data connection |
+| 2026-11-25 | [market-data-history.md](market-data-history.md) | R1, R5, R6, R12, §11: history from the floor date, final rows, the price read route |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
