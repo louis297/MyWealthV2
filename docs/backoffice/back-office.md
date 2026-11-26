@@ -4,7 +4,7 @@ status: accepted
 phase: 1
 language: en
 created: 2026-10-24
-updated: 2026-11-23
+updated: 2026-11-26
 related:
   - README.md
   - ../function-plan.md
@@ -187,24 +187,17 @@ Tenant instrument catalog for a chosen tenant. Full field bindings and acceptanc
 
 ---
 
-## Tests
+### Refresh exchange moves to Shared
 
-Back Office tests assert routes, role gate, and that the UI client sends the shapes expected by the existing Feature Specs. Do not re-prove backend isolation or dual-write here.
+Field rules: [bff-adviser-portal.md](../features/bff-adviser-portal.md). The rules are RF1–RF8 of its §4.1.
 
----
-
-## Amendment 2026-11-13 (refresh exchange moves to Shared) — accepted
-
-Status of this amendment: `accepted` (2026-11-13). It is a build contract. Landed 2026-11-13 (`RotatedRefreshToken_PresentedThirtyMinutesLater_CallsTheTokenEndpoint`). The rest of this file stays accepted. The owner is [bff-adviser-portal.md](../features/bff-adviser-portal.md), amendment 2026-11-13 (refresh single-flight).
-
-- The exchange part of `BackOfficeTokenRefresh` (concurrent grants joined, rotated refresh tokens remembered, chain follow) moves to `src/Shared` `RefreshTokenExchange`, so both BFFs use the same code. Back Office keeps `ValidatePrincipalAsync` and `CookieAccessTokens`. Behaviour is unchanged, and `BackOfficeRefreshTests` stay green.
-- New: a remembered rotation is dropped 30 minutes after it is written (RF6). Today the map never drops an entry. One added test: a rotated refresh token presented 30 minutes after the rotation calls the token endpoint.
+Back Office refreshes its tokens through the shared `RefreshTokenExchange` (`src/Shared`), the same code both BFFs use: concurrent grants are joined, a rotated refresh token is remembered for 30 minutes, and the chain is followed. Back Office keeps `ValidatePrincipalAsync` and `CookieAccessTokens`. Tests: `BackOfficeRefreshTests`.
 
 ---
 
-## Amendment 2026-11-18 (allowed custody modes) — accepted, landed
+### Allowed custody modes
 
-Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody-modes.md](../features/tenant-custody-modes.md). No new route.
+Field rules: [tenant-custody-modes.md](../features/tenant-custody-modes.md). No new route.
 
 - `/tenants/new`: a required "Custody modes" group with two checkboxes, "External accounts" and "Custodial accounts", both checked when the form opens. `POST /tenants` carries the checked values as `allowedCustodyModes`.
 - `/tenants/{id}`: shows the allowed custody modes next to the reporting currency. The edit form has the same two checkboxes, set from the item, and every `PUT /tenants/{id}` carries `allowedCustodyModes` with name, reporting currency and `rowVersion`. Under the group: "Changing this affects only new accounts."
@@ -218,9 +211,9 @@ Status of this amendment: `accepted` (2026-11-18), together with [tenant-custody
 
 ---
 
-## Amendment 2026-11-20 (client money accounts) — accepted
+### Client money accounts
 
-Status of this amendment: `accepted` (2026-11-20), together with [client-money-accounts.md](../features/client-money-accounts.md). Field rules live there.
+Field rules: [client-money-accounts.md](../features/client-money-accounts.md).
 
 - `/tenants/{id}/config` gains a "Client money accounts" section under the report grants. Calls: `GET /tenants/{tenantId}/client-money-accounts`, `POST /tenants/{tenantId}/client-money-accounts`, `POST …/{id}/disable` and `POST …/{id}/enable` with `rowVersion`, and `GET /currencies?enabledOnly=true` for the currency picker. All use `tenants.manage`.
 - No edit action: a client money account has no PUT.
@@ -232,9 +225,9 @@ Status of this amendment: `accepted` (2026-11-20), together with [client-money-a
 
 ---
 
-## Amendment 2026-11-20 (bank connection and feed status) — accepted
+### Bank connection and feed status
 
-Status of this amendment: `accepted` (2026-11-20), together with [deposit-matching.md](../features/deposit-matching.md). Field rules live there.
+Field rules: [deposit-matching.md](../features/deposit-matching.md).
 
 - The client money accounts section (BO16) shows each row's bank connection and the state of its statement feed, and the add form names the connection. New call: `GET /bank-connections` (`tenants.manage`). The create call sends `bankConnection`.
 
@@ -245,9 +238,9 @@ Status of this amendment: `accepted` (2026-11-20), together with [deposit-matchi
 
 ---
 
-## Amendment 2026-11-22 (interest runs) — accepted
+### Interest runs
 
-Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](../features/interest-run.md). Field rules live there. The tenant configuration page gains the Tenant's interest runs and the manual trigger of roadmap D18. Calls: `GET /interest/runs?tenantId=` (`interest-runs.read`) and `POST /interest/runs` (`interest-runs.start`). No interest rate page: a SystemAdmin has no interest rate permission.
+Field rules: [interest-run.md](../features/interest-run.md). The tenant configuration page gains the Tenant's interest runs and the manual trigger of roadmap D18. Calls: `GET /interest/runs?tenantId=` (`interest-runs.read`) and `POST /interest/runs` (`interest-runs.start`). No interest rate page: a SystemAdmin has no interest rate permission.
 
 | ID | Behaviour |
 | --- | --- |
@@ -256,9 +249,9 @@ Status of this amendment: `accepted` (2026-11-22), together with [interest-run.m
 
 ---
 
-## Amendment 2026-11-22 (simulated instruments) — accepted
+### Simulated instruments
 
-Status of this amendment: `accepted` (2026-11-22), together with [simulated-instruments.md](../features/simulated-instruments.md). Field rules live there. The Instruments pages show which instruments a market data connection prices, and a new page lists the connections. New call: `GET /market-data-connections` (`tenants.manage`). The instrument item carries `marketDataConnection`.
+Field rules: [simulated-instruments.md](../features/simulated-instruments.md). The Instruments pages show which instruments a market data connection prices, and a new page lists the connections. New call: `GET /market-data-connections` (`tenants.manage`). The instrument item carries `marketDataConnection`.
 
 | ID | Behaviour |
 | --- | --- |
@@ -267,9 +260,9 @@ Status of this amendment: `accepted` (2026-11-22), together with [simulated-inst
 
 ---
 
-## Amendment 2026-11-22 (corporate actions) — accepted
+### Corporate actions
 
-Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](../features/corporate-actions.md). Field rules live there. The Market data page shows the state of each connection's corporate action feed and the newest announcements. New call: `GET /corporate-action-announcements` (`tenants.manage`). The connection item carries `corporateActions`.
+Field rules: [corporate-actions.md](../features/corporate-actions.md). The Market data page shows the state of each connection's corporate action feed and the newest announcements. New call: `GET /corporate-action-announcements` (`tenants.manage`). The connection item carries `corporateActions`.
 
 | ID | Behaviour |
 | --- | --- |
@@ -278,15 +271,53 @@ Status of this amendment: `accepted` (2026-11-22), together with [corporate-acti
 
 ---
 
-## Amendment 2026-11-23 (orders and settlement) — accepted
+### Orders and settlement
 
-Status of this amendment: `accepted` (2026-11-23), together with [orders.md](../features/orders.md). Field rules live there. The Tenant forms set the firm's broker connection, and a new Broker page shows each connection's execution report feed and the newest reports. New calls: `GET /broker-connections` and `GET /execution-reports` (`tenants.manage`). The tenant item carries `brokerConnection`.
+Field rules: [orders.md](../features/orders.md). The Tenant forms set the firm's broker connection, and a new Broker page shows each connection's execution report feed and the newest reports. New calls: `GET /broker-connections` and `GET /execution-reports` (`tenants.manage`). The tenant item carries `brokerConnection`.
 
 | ID | Behaviour |
 | --- | --- |
 | BO26 | The Tenant create and edit forms gain "Broker connection": a select of `GET /broker-connections` names, with "None" only on create. The Tenant page shows it. An unknown name's 400 is shown at the field. |
 | BO27 | A "Broker" page lists `GET /broker-connections`: Name, Adapter and "Reports" with the three states of the Prices column of BO23 (never read, last success, failing since with the failure label; InvalidItem "The party sent a record that cannot be read"). |
 | BO28 | Under the connections, the newest twenty reports from `GET /execution-reports`: Received, Connection, Kind ("Unknown" for `null`), Client order id, Quantity, Price, Status and Reason (UnsupportedKind "Kind not supported", UnknownOrder "No such order", UnknownFill "No such fill", Overfill "More than the order", Repeated "Already known"). A status filter (default All). A row skipped as `UnknownOrder`, `UnknownFill` or `Overfill` is shown in red: it needs a person. |
+
+---
+
+### Trade settlement and broken trades
+
+Field rules: [trade-settlement](../features/trade-settlement.md).
+
+| ID | Behaviour |
+| --- | --- |
+| BO29 | Back Office Broker page (BO27, BO28): the connection row shows "Settles in USD, NZD" from `settlementCurrencies`; the report list shows kinds `Broken` and `Settlement` with the settlement id, and the reason labels FillSettled "The trade has already settled", FillBroken "The trade was cancelled", UnknownSettlement "No trades for this settlement". `FillSettled` and `UnknownSettlement` rows are red. |
+
+---
+
+### In-kind transfers
+
+Field rules: [in-kind-transfers](../features/in-kind-transfers.md). Field rules live there (R2–R7). Calls: `/tenants/{tenantId}/safekeeping-accounts` and `GET /custodian-connections`, both `tenants.manage`.
+
+| ID | Behaviour |
+| --- | --- |
+| BO30 | The Tenant page gains a "Safekeeping accounts" section from `GET /tenants/{tenantId}/safekeeping-accounts`: Currency, Custodian, Account name, Account number, Connection, Active, and the feed with the three states of the Prices column of BO23 (never read, last success, failing since with the failure label) and "Positions as at". "Add" opens a form with the R3 fields and a select of `GET /custodian-connections` names. Disable and Enable act with `rowVersion`. A 400 (a second active account in the currency, a number in use) is shown at its field. |
+| BO31 | A "Custodian" page lists `GET /custodian-connections`: Name and Adapter. |
+| BO32 | The failure labels add UnknownAccount "The custodian does not know this account". |
+
+---
+
+### Dividends
+
+Field rules: [dividends](../features/dividends.md). Field rules live there (R10). Calls: the existing `GET /corporate-action-announcements`.
+
+| ID | Behaviour |
+| --- | --- |
+| BO33 | The announcements list (BO25) shows Kind "Dividend" and, in the Ratio column, "<amountPerShare> <currency> per share", with "plan <reinvestmentPrice>" when there is one. |
+
+---
+
+## Tests
+
+Back Office tests assert routes, role gate, and that the UI client sends the shapes expected by the existing Feature Specs. Do not re-prove backend isolation or dual-write here.
 
 ---
 
@@ -301,32 +332,21 @@ These stay out until their own page slices are written.
 
 ---
 
-## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
+## History
 
-Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement](../features/trade-settlement.md). Field rules live there.
+What changed in this file after it was accepted. Each row is a section above. The text of each change is in git (`git log -p -- docs/backoffice/back-office.md`).
 
-| ID | Behaviour |
-| --- | --- |
-| BO29 | Back Office Broker page (BO27, BO28): the connection row shows "Settles in USD, NZD" from `settlementCurrencies`; the report list shows kinds `Broken` and `Settlement` with the settlement id, and the reason labels FillSettled "The trade has already settled", FillBroken "The trade was cancelled", UnknownSettlement "No trades for this settlement". `FillSettled` and `UnknownSettlement` rows are red. |
-
----
-
-## Amendment 2026-11-24 (in-kind transfers) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers](../features/in-kind-transfers.md). Field rules live there (R2–R7). Calls: `/tenants/{tenantId}/safekeeping-accounts` and `GET /custodian-connections`, both `tenants.manage`.
-
-| ID | Behaviour |
-| --- | --- |
-| BO30 | The Tenant page gains a "Safekeeping accounts" section from `GET /tenants/{tenantId}/safekeeping-accounts`: Currency, Custodian, Account name, Account number, Connection, Active, and the feed with the three states of the Prices column of BO23 (never read, last success, failing since with the failure label) and "Positions as at". "Add" opens a form with the R3 fields and a select of `GET /custodian-connections` names. Disable and Enable act with `rowVersion`. A 400 (a second active account in the currency, a number in use) is shown at its field. |
-| BO31 | A "Custodian" page lists `GET /custodian-connections`: Name and Adapter. |
-| BO32 | The failure labels add UnknownAccount "The custodian does not know this account". |
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends](../features/dividends.md). Field rules live there (R10). Calls: the existing `GET /corporate-action-announcements`.
-
-| ID | Behaviour |
-| --- | --- |
-| BO33 | The announcements list (BO25) shows Kind "Dividend" and, in the Ratio column, "<amountPerShare> <currency> per share", with "plan <reinvestmentPrice>" when there is one. |
+| Date | With | Section |
+| --- | --- | --- |
+| 2026-11-13 | [bff-adviser-portal.md](../features/bff-adviser-portal.md) | Refresh exchange moves to Shared |
+| 2026-11-18 | [tenant-custody-modes.md](../features/tenant-custody-modes.md) | Allowed custody modes |
+| 2026-11-20 | [client-money-accounts.md](../features/client-money-accounts.md) | Client money accounts |
+| 2026-11-20 | [deposit-matching.md](../features/deposit-matching.md) | Bank connection and feed status |
+| 2026-11-22 | [interest-run.md](../features/interest-run.md) | Interest runs |
+| 2026-11-22 | [simulated-instruments.md](../features/simulated-instruments.md) | Simulated instruments |
+| 2026-11-22 | [corporate-actions.md](../features/corporate-actions.md) | Corporate actions |
+| 2026-11-23 | [orders.md](../features/orders.md) | Orders and settlement |
+| 2026-11-23 | [trade-settlement](../features/trade-settlement.md) | Trade settlement and broken trades |
+| 2026-11-24 | [in-kind-transfers](../features/in-kind-transfers.md) | In-kind transfers |
+| 2026-11-24 | [dividends](../features/dividends.md) | Dividends |
+| 2026-11-26 | — | The amendments became the sections above. No behaviour changed |
