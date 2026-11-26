@@ -146,15 +146,16 @@ public class TestSeedAccountsTests
             .ShouldBe(new DateTimeOffset(2026, 1, 20, 11, 0, 0, nzdt));
 
         var legs = await db.TransactionCashLegs.Where(row => row.AccountId == account.Id).ToListAsync();
-        legs.Count.ShouldBe(3);
+        // Valuation run §9.1 adds a Sell of 10 VTI and a TransferIn of 5,000.00 (TestSeedValuationTests).
+        legs.Count.ShouldBe(5);
         legs.ShouldAllBe(row => row.Role != CashLegRole.Fee);
-        legs.Sum(row => row.Amount).ShouldBe(6400m);
+        legs.Sum(row => row.Amount).ShouldBe(13925m);
 
         var holdings = await db.Holdings.Where(row => row.AccountId == account.Id).ToListAsync();
         holdings.Count.ShouldBe(2);
         var vtiHolding = holdings.Single(row => row.InstrumentId == vti.Id);
-        vtiHolding.Quantity.ShouldBe(40m);
-        vtiHolding.CostAmount.ShouldBe(10000m);
+        vtiHolding.Quantity.ShouldBe(30m);
+        vtiHolding.CostAmount.ShouldBe(7500m);
         var aaplHolding = holdings.Single(row => row.InstrumentId == aapl.Id);
         aaplHolding.Quantity.ShouldBe(20m);
         aaplHolding.CostAmount.ShouldBe(3600m);
@@ -188,6 +189,8 @@ public class TestSeedAccountsTests
             "TestSeed-DemoCustodial-BuyAapl",
             "TestSeed-DemoCustodial-BuyVti",
             "TestSeed-DemoCustodial-Funding",
+            "TestSeed-DemoCustodial-SellVti",
+            "TestSeed-DemoCustodial-TransferIn",
             "TestSeed-DemoEverydayBank-OpeningTransfer"
         });
         first.ShouldAllBe(row => row.Source.Kind == TransactionSourceKind.Seed && row.Source.PublicId == null);

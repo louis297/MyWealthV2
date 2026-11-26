@@ -148,6 +148,8 @@ The fifth role `SimulatorOperator` ([ADR 0013](adr/0013-roles-authorization-sing
 | `interest-rates.manage` | | ✓ | | | [interest-run](features/interest-run.md) (accepted 2026-11-22) |
 | `interest-runs.read` | ✓ | ✓ | | | [interest-run](features/interest-run.md) (accepted 2026-11-22) |
 | `interest-runs.start` | ✓ | | | | [interest-run](features/interest-run.md) (accepted 2026-11-22) |
+| `valuation-runs.read` | ✓ | ✓ | | | [valuation-run](features/valuation-run.md) (accepted 2026-11-26) |
+| `valuation-runs.start` | ✓ | | | | [valuation-run](features/valuation-run.md) (accepted 2026-11-26) |
 | `corporate-actions.read` | | ✓ | ✓ | | [corporate-actions](features/corporate-actions.md) (accepted 2026-11-22) |
 | `corporate-actions.manage` | | ✓ | | | [corporate-actions](features/corporate-actions.md) (accepted 2026-11-22) |
 | `orders.read` | | ✓ | ✓ | ✓ | [orders](features/orders.md) (accepted 2026-11-23) |
@@ -342,12 +344,13 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Withdrawals | `/withdrawals` | list / get / create (`Idempotency-Key`); approve / reject / cancel. See features/withdrawals.md | `withdrawals.read` / `.request` / `.approve` |
 | Bank reconciliations | `/bank-reconciliations` | overview / list / get / create (run now). No PUT or DELETE: a run never changes. See features/bank-reconciliation.md | `bank-reconciliations.manage` |
 | Instruments | `/instruments` | list / get / create / update / disable / enable; `GET …/prices` (features/market-data-history.md) | `instruments.read` / `instruments.create` / `instruments.manage` |
-| Accounts | `/accounts` | list / get / create / update / close / reopen; `GET …/cash-balance`; `GET …/deposit-instructions` (features/client-money-accounts.md); sub-resource `…/closures`: request (`Idempotency-Key`) / list / get (features/account-closure.md); `GET …/interest-accruals` (features/interest-run.md); `GET …/valuation?date=` (features/account-valuation.md) | `accounts.read` / `accounts.create` / `accounts.manage`; closures `account-closures.read` / `.request` |
+| Accounts | `/accounts` | list / get / create / update / close / reopen; `GET …/cash-balance`; `GET …/deposit-instructions` (features/client-money-accounts.md); sub-resource `…/closures`: request (`Idempotency-Key`) / list / get (features/account-closure.md); `GET …/interest-accruals` (features/interest-run.md); `GET …/valuation?date=` (features/account-valuation.md); `GET …/valuations`, `GET …/valuations/{date}` (features/valuation-run.md) | `accounts.read` / `accounts.create` / `accounts.manage`; closures `account-closures.read` / `.request` |
 | Transactions | `/transactions` | list / get / create / reverse | `transactions.read` / `transactions.create` |
 | Net worth | `/net-worth`, `/users/customers/{id}/net-worth` | GET. See features/net-worth.md; `breakdowns.byCustodyMode` in features/custody-mode-grouping.md | `accounts.read` |
 | Portfolios | `/portfolios`, `/accounts/{id}/portfolio`, `/accounts/{id}/rebalance` | list / get / create / update / disable; assign / unassign / rebalance. See features/portfolios.md | `portfolios.read` / `portfolios.manage` + `transactions.create` |
 | Fees | `/fees/trade-schedules` (namespace `/fees`) | list / get / create / update / delete. See features/trade-fees.md | `fees.read` / `fees.manage` |
 | Interest | `/interest/rate-schedules`, `/interest/runs` (namespace `/interest`) | rate schedules: list / get / create / update / delete; runs: list / get / create (start a run). See features/interest-run.md | `interest-rates.read` / `.manage`; `interest-runs.read` / `.start` |
+| Valuation runs | `/valuation-runs` | list / get / create (start a run through a date). No PUT or DELETE: a run never changes. See features/valuation-run.md | `valuation-runs.read` / `.start` |
 | Corporate actions | `/corporate-actions` | list / get / create / update; cancel / apply; entitlements. See features/corporate-actions.md | `corporate-actions.read` / `corporate-actions.manage` |
 | Orders | `/orders` | list / get / create (`Idempotency-Key`) / preview; cancel; resolve the break of a fill (`transactions.adjust`). No PUT: an order never changes. See features/orders.md and features/trade-settlement.md | `orders.read` / `orders.place` |
 | Trade settlements | `/trade-settlements` | list / get; pay again / set aside. No create: the `worker` creates them from the broker's `Settlement` report. See features/trade-settlement.md | `trade-settlements.manage` |
@@ -507,6 +510,8 @@ Field rules: [features/accounts.md](features/accounts.md).
 | GET | `/accounts/{id}/deposit-instructions` | `accounts.read` | 200 `{ accountId, currency, reference, bankName, accountName, accountNumber }` |
 | GET | `/accounts/{accountId}/interest-accruals` | `accounts.read` | 200 envelope, newest first (filters `from`, `to`, `transactionId`, `posted`) |
 | GET | `/accounts/{id}/valuation?date=` | `accounts.read` | 200 item |
+| GET | `/accounts/{id}/valuations` | `accounts.read` | 200 envelope, newest day first (filters `from`, `to`, `complete`) |
+| GET | `/accounts/{id}/valuations/{date}` | `accounts.read` | 200 item (the stored valuation of the day) |
 | PUT | `/accounts/{accountId}/dividend-reinvestment` | `accounts.manage` | 204 |
 | POST | `/accounts/{accountId}/closures` | `account-closures.request` | 201 `{ id }` (`Idempotency-Key`) |
 | GET | `/accounts/{accountId}/closures`, `…/{id}` | `account-closures.read` | 200 |
@@ -540,6 +545,7 @@ Rules:
 - **Deposit instructions.** 404 for an External or Closed account, or when the currency has no active client money account.
 - **Holdings.** The item of `GET /accounts/{id}/holdings` carries `reservedQuantity`, `availableQuantity`, `unsettledQuantity` and `transferableQuantity` ([features/orders.md](features/orders.md) R40, R41; [features/in-kind-transfers.md](features/in-kind-transfers.md) R43–R45).
 - **Valuation.** `GET /accounts/{id}/valuation?date=yyyy-MM-dd` values the Account for one UTC day: `{ accountId, date, currency, cash, holdings, holdingsValue, total, complete, unvaluedCount }`. `date` is required and not after today (else 400 `errors.Date`). A holding that cannot be valued has a status and no value, and the valuation is incomplete; it is never an error. A read only, no `Idempotency-Key`. Field rules: [features/account-valuation.md](features/account-valuation.md).
+- **Stored valuations.** `GET /accounts/{id}/valuations` and `GET /accounts/{id}/valuations/{date}` read what the valuation run stored for a Custodial account (§7.18). The account item carries `valuedThrough`, the last day stored (`null` before the first and on an External account).
 - **Portfolio.** `POST /accounts/{id}/portfolio` and `POST /accounts/{id}/rebalance` require a Custodial account, else 400 `account_not_eligible`. Both answer 200 `{ status, rebalanceId }` with `status` `Proposed` or `NoChange`; a failed plan is 400 with its problem code. `GET /accounts/{id}/portfolio` carries `rebalance` (`{ id, status, failure, proposedAt, endedAt }`) ([features/rebalances.md](features/rebalances.md) R10, R25).
 
 ### 7.7 Transactions
@@ -807,6 +813,23 @@ Resource `/statement-lines` (`statement-lines.manage`, TenantAdmin only). Field 
 - `request-return` also creates the return payment the bank sends; `reopen` of a `ReturnRequested` line is refused (400 `errors.Status`) once the bank was asked. `ignore` (from `Unmatched`) and `reopen` (from `Ignored`) apply to debit lines too. A recalled deposit is reversed by the flow, with source `BankFeed` ([features/bank-returns.md](features/bank-returns.md)).
 - The item carries `kind`, `relatedLineId`, `withdrawalId`, `returnReason`, `tradeSettlementId`, `migrationBatchId` and `returnPayment: { status, attempts, lastFailure }` (`null` without a return payment). `match.accountId`, `match.customerId` and `match.transactionId` are `null` on a match with no Transaction. The statuses, unmatched reasons and match methods are listed in [domain-model.md](domain-model.md) §8.9.
 
+### 7.18 Valuations
+
+Field rules: [features/valuation-run.md](features/valuation-run.md).
+
+| Method | Route | Policy | Success |
+| --- | --- | --- | --- |
+| GET | `/accounts/{id}/valuations` | `accounts.read` | 200 envelope of `{ date, currency, cash, holdingsValue, total, complete, unvaluedCount }`, newest day first |
+| GET | `/accounts/{id}/valuations/{date}` | `accounts.read` | 200 item: the item of §7.6 valuation plus `runId` and `valuedAt` |
+| GET | `/valuation-runs` | `valuation-runs.read` | 200 envelope (SystemAdmin must send `tenantId`; filters `trigger`, `from`, `to`) |
+| GET | `/valuation-runs/{id}` | `valuation-runs.read` | 200 item |
+| POST | `/valuation-runs` | `valuation-runs.start` | 201 `{ id }` (`{ tenantId, throughDate }`; runs at once) |
+
+- A stored valuation is written only by the valuation run and never changes; no route writes or deletes one.
+- `from` and `to` (`yyyy-MM-dd`, inclusive) on the account series filter the day; on the runs they filter the through date. Not a date, or `from` after `to` → 400 `errors.From` / `errors.To`. `{date}` not a date → 400 `errors.Date`; a day not stored → 404. An External account, or one not valued yet, answers an empty page.
+- `throughDate` missing, not a date, or after the last final day (today minus two days, UTC) → 400 `errors.ThroughDate`; there is no option for a later date. An unknown `trigger` → 400 `errors.Trigger`. A TenantAdmin never sends `tenantId` (400).
+- No `Idempotency-Key`: a repeated run stores nothing twice and answers a run with zero counts. No problem code of its own.
+
 ---
 
 ## 8. Explicitly out (until a later phase promotes them)
@@ -855,3 +878,4 @@ One row per change. The text of each change is in git (`git log -p -- docs/api-d
 | 2026-11-25 | Adjustment requests (§7.15); `POST /transactions/adjustment` removed; price and FX rate history (§7.5, §7.16) |
 | 2026-11-26 | The amendments were folded into §7. §1, §3 and §5 now describe the portal clients as [ADR 0016](adr/0016-bff-for-first-party-portals.md) and the BFF specs define them. §7.17 gathers the statement line notes. No rule changed |
 | 2026-11-26 | Account valuation (§6, §7.6): `GET /accounts/{id}/valuation?date=` with `accounts.read`. No new permission or problem code |
+| 2026-11-26 | Valuation run (§3.1, §6, §7.6, §7.18): `valuation-runs.read` and `valuation-runs.start`; `/valuation-runs`; `GET /accounts/{id}/valuations[/{date}]`; `valuedThrough` on the account item. No problem code |

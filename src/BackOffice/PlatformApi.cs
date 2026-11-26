@@ -242,6 +242,26 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         return created.Id;
     }
 
+    public async Task<IReadOnlyList<ValuationRunItem>> ListValuationRunsAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var page = await ReadAsync<ValuationRunPage>(
+            HttpMethod.Get,
+            $"/valuation-runs?tenantId={tenantId}&pageSize=10",
+            json: null,
+            cancellationToken);
+        return page.Items;
+    }
+
+    public async Task<Guid> StartValuationRunAsync(Guid tenantId, DateOnly throughDate, CancellationToken cancellationToken = default)
+    {
+        var created = await ReadAsync<Created>(
+            HttpMethod.Post,
+            "/valuation-runs",
+            JsonSerializer.Serialize(new { tenantId, throughDate = throughDate.ToString("yyyy-MM-dd") }, Json),
+            cancellationToken);
+        return created.Id;
+    }
+
     public Task DisableClientMoneyAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
         SendExpectingSuccessAsync(
             HttpMethod.Post,

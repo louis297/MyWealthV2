@@ -10,6 +10,11 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 [Parallelizable]
 public class TestSeedInstrumentsTests
 {
+    /// <summary>Valuation run §9.1: the weekdays from 2026-01-02 to 2026-03-31, one history row each.</summary>
+    private static readonly int HistoryWeekdays = Enumerable.Range(0, 89)
+        .Select(offset => new DateOnly(2026, 1, 2).AddDays(offset))
+        .Count(day => day.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday);
+
     private static readonly (string Symbol, string Name, string Quote, bool Active, decimal? Price)[] Catalog =
     [
         ("6758", "Sony Group", "JPY", true, 13000m),
@@ -78,7 +83,8 @@ public class TestSeedInstrumentsTests
         }
 
         (await db.InstrumentPrices.AsNoTracking().CountAsync(row => ids.Contains(row.InstrumentId)))
-            .ShouldBe(Catalog.Count(row => row.Price is not null));
+            .ShouldBe(Catalog.Count(row => row.Price is not null)
+                      + Catalog.Count(row => row.Price is not null && !row.Symbol.EndsWith(".SIM", StringComparison.Ordinal)) * HistoryWeekdays);
     }
 
     private static async Task EnsureDemoTenantAsync(ApplicationDbContext db)

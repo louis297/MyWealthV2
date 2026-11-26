@@ -1,10 +1,7 @@
-using MyWealthV2.Application.Accounts;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.MarketData;
-using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Valuations;
-using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
 namespace MyWealthV2.Application.Valuations.Queries.GetAccountValuation;
 
@@ -32,25 +29,7 @@ public class GetAccountValuationQueryHandler(IApplicationDbContext db, ICurrentU
     public async Task<AccountValuationDto> Handle(GetAccountValuationQuery request, CancellationToken cancellationToken)
     {
         // R1: found as GET /accounts/{id}/holdings finds it; any other Account is 404.
-        var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
-        var selfCustomerId = AccountScope.SelfCustomerId(currentUser);
-        var accounts =
-            from account in db.Accounts.AsNoTracking()
-            join customer in db.Users.AsNoTracking() on account.CustomerId equals customer.Id
-            where account.PublicId == request.AccountId
-                  && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
-                  && (selfCustomerId == null || customer.Id == selfCustomerId)
-            select account;
-
-        if (currentUser.Role != UserRole.SystemAdmin)
-        {
-            var tenantId = currentUser.TenantId
-                           ?? throw new NotFoundException("Account", request.AccountId);
-            accounts = accounts.Where(account => account.TenantId == tenantId);
-        }
-
-        var accountRow = await accounts.SingleOrDefaultAsync(cancellationToken)
-                         ?? throw new NotFoundException("Account", request.AccountId);
+        var accountRow = await ValuationAccounts.FindAsync(db, currentUser, request.AccountId, cancellationToken);
 
         var day = MarketDataDates.Parse(request.Date)!.Value;
         var read = await valueAccount.ForDayAsync(accountRow, day, cancellationToken);

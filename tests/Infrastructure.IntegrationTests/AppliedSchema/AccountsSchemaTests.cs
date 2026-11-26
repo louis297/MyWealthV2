@@ -37,7 +37,7 @@ public class AccountsSchemaTests
         columns.Select(column => column.Name).ShouldBe([
             "Id", "PublicId", "TenantId", "CustomerId", "Name", "Type", "Status", "Currency", "IsActive",
             "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion", "CustodyMode", "DepositReference", "InterestAccruedThrough",
-            "ReinvestDividends", "ReinvestDividendsChangedByUserId", "ReinvestDividendsChangedAt"
+            "ReinvestDividends", "ReinvestDividendsChangedByUserId", "ReinvestDividendsChangedAt", "ValuedThrough"
         ]);
 
         Column(columns, "Id").ShouldSatisfyAllConditions(

@@ -10,4 +10,7 @@ public static class ValuationRules
     /// <summary>True when <paramref name="day"/> minus <paramref name="asOfDate"/> is at most
     /// <see cref="MaxAgeDays"/>.</summary>
     public static bool IsFresh(DateOnly asOfDate, DateOnly day) => day.DayNumber - asOfDate.DayNumber <= MaxAgeDays;
+
+    /// <summary>Valuation-run R4: the latest day a stored valuation may be made for on <paramref name="today"/> (UTC).</summary>
+    public static DateOnly LastFinalDay(DateOnly today) => today.AddDays(-2);
 }

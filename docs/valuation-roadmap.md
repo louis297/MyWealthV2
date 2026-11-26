@@ -26,6 +26,7 @@ related:
   - known-issues/eodhd-nz-jp-coverage.md
   - features/market-data-history.md
   - features/account-valuation.md
+  - features/valuation-run.md
 ---
 
 # Historical valuation roadmap
@@ -142,6 +143,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 - **Depends on:** V2.
 - **Also decide:** when a day is final (Q5); whether an incomplete day is stored with its mark or waits (recommended: stored with its mark, so that the fee step can see it and decide); External accounts (Q6); what is stored for a day with no cash and no holding; funds under management per day as a sum of the rows, not a second table.
 - **After it:** step 4 of the business roadmap can open.
+- **Spec:** [valuation-run.md](features/valuation-run.md) (accepted and landed 2026-11-26; the twelve points of its §11 confirmed as recommended). It locks: a day is stored once it is the day before yesterday, when its prices and rates are final, which refines Q5 (reworded); every day is stored, an empty or incomplete day too, and never changed; Custodial accounts of any status, a Closed one through the day its closure completed; one database transaction per account and day under the Account lock, with `Accounts.ValuedThrough` as the marker; a daily job at 13:00 UTC and a SystemAdmin run through a date (`/valuation-runs`); `GET /accounts/{id}/valuations[/{date}]` with `accounts.read`; funds under management of a past day as a sum of the rows, with no route; a fixed `TestSeed` history from 2026-01-02 to 2026-03-31; a Back Office section. Script `0059`.
 
 ### V4. Net worth history and reports as of a date
 
@@ -179,7 +181,7 @@ Every question is **decided** (2026-11-25), as recommended. The answer is what t
 | Q2 | Which price values a holding? | The unadjusted close of the latest source date on or before the day (H4) | V1 |
 | Q3 | How far back does the history go? | One configured floor date for both sources, early enough for the first tax year to be reported. No row before it | V1 |
 | Q4 | How old may a price or a rate be? | 4 calendar days, the limit orders R10 already uses. Older, or none: unpriced and incomplete (H5) | V2 |
-| Q5 | When is a day final? | The run values yesterday after the price job of today has run, as the interest run posts for yesterday. What it stores is final. A price that arrives later changes nothing (§6) | V3 |
+| Q5 | When is a day final? | Two days after it: the run stores the day before yesterday (UTC), the latest day whose price and rate rows are final, after the price job of today has run ([valuation-run](features/valuation-run.md) R4). What it stores is final. A price that arrives later changes nothing (§6) | V3 |
 | Q6 | Are External accounts stored? | No. Custodial accounts only (H7); an External account is valued on read through V2. Revisit with period close | V3 |
 | Q7 | Into which currency is a value folded, and where? | A stored line keeps the quote currency value and the Account currency value with the rate used. A fold into the reporting currency is done on read, from the stored Account currency value and the rate of the same day | V3, V4 |
 | Q8 | Does income earned but not posted count (daily interest accruals not yet posted, a dividend between its ex-date and its payment)? | Not in the first version: a valuation is the ledger's cash and holdings. Record it as a known understatement | V2 |
@@ -196,7 +198,7 @@ Each step depends only on earlier steps.
 | --- | --- | --- | --- | --- |
 | 1 | V1 price and rate history | "Historical back-fill" and the deferred read routes of instrument-prices and fx-rates | [market-data-history](features/market-data-history.md) | landed 2026-11-25 |
 | 2 | V2 valuation as of a date | — | [account-valuation](features/account-valuation.md) | landed 2026-11-26 |
-| 3 | V3 daily valuation run and stored valuations | "Still open: daily snapshots" (function-plan §5.4) | — | not specified |
+| 3 | V3 daily valuation run and stored valuations | "Still open: daily snapshots" (function-plan §5.4) | [valuation-run](features/valuation-run.md) | landed 2026-11-26 |
 | 4 | V4 net worth history and reports as of a date | "Daily snapshots, historical series" and "FX fold" (net-worth Out) | — | not specified; optional for the business roadmap |
 
 Steps 1 to 3 are step 3 of the business roadmap. When step 3 here has landed, step 4 of [future-plans.md](future-plans.md) §1 (the advisory fee) can open. Step 4 here can run beside it.

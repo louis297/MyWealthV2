@@ -315,6 +315,17 @@ Field rules: [dividends](../features/dividends.md). Field rules live there (R10)
 
 ---
 
+### Valuation runs
+
+Field rules: [valuation-run.md](../features/valuation-run.md). The tenant configuration page gains the Tenant's valuation runs and the manual trigger of valuation-run R15. Calls: `GET /valuation-runs?tenantId=` (`valuation-runs.read`) and `POST /valuation-runs` (`valuation-runs.start`). No page shows a stored valuation.
+
+| ID | Behaviour |
+| --- | --- |
+| BO34 | `/tenants/{id}/config` gains a "Valuation runs" section: the newest ten runs from `GET /valuation-runs?tenantId=` with Through, Trigger (Scheduled "Daily run", Manual "Run by the platform team"), Accounts, Failed (in red when above 0), Days stored and Incomplete. |
+| BO35 | A "Run through a date" form in that section: a through date (default the last final day: today minus two days, UTC) and Run, which posts `POST /valuation-runs` and reloads the table. A 400 `errors.ThroughDate` is shown at the date. Under the form: "Runs every day by itself. Use this after a missed run. A day already stored is never valued again, and the last two days cannot be stored yet." |
+
+---
+
 ## Tests
 
 Back Office tests assert routes, role gate, and that the UI client sends the shapes expected by the existing Feature Specs. Do not re-prove backend isolation or dual-write here.
@@ -350,3 +361,4 @@ What changed in this file after it was accepted. Each row is a section above. Th
 | 2026-11-24 | [in-kind-transfers](../features/in-kind-transfers.md) | In-kind transfers |
 | 2026-11-24 | [dividends](../features/dividends.md) | Dividends |
 | 2026-11-26 | — | The amendments became the sections above. No behaviour changed |
+| 2026-11-26 | [valuation-run](../features/valuation-run.md) | Valuation runs |

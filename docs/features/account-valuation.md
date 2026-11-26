@@ -134,7 +134,7 @@ What the example shows:
 
 **Out**
 
-- A stored valuation, a valuation run, a series of days and funds under management per day (roadmap V3)
+- A stored valuation, a valuation run, a series of days and funds under management per day: [valuation-run.md](valuation-run.md) (roadmap V3)
 - Net worth on a past day, a fold into the Tenant's reporting currency, a chart and the Adviser Balances Report for a past date (V4). `GET /net-worth` is unchanged and still counts a missing price as 0 (net-worth R7)
 - Cost, average cost and unrealised gain on a past day. They need ledger replay (roadmap §6)
 - Income earned but not posted: daily accruals not yet posted, and a dividend between its ex-date and its payment (Q8)
@@ -142,7 +142,7 @@ What the example shows:
 - A read of the position alone (`GET /accounts/{id}/holdings` for a date)
 - A price or a rate entered by a caller, and any call to a source on the read path
 - A second price source, and prices for NZX and Tokyo ([known issue](../known-issues/eodhd-nz-jp-coverage.md)): such a holding is not valued
-- `TestSeed` history. It comes with V3
+- `TestSeed` history: [valuation-run.md](valuation-run.md) §9.1
 - Any portal page
 
 ---
@@ -186,7 +186,7 @@ What the example shows:
 | R10 | **Rate.** Only when the Instrument's quote currency is not the Account's currency: `IFxRate.GetRateDetailAsync(quote currency, Account currency, d)`, the stored row of that directed pair with the latest `AsOfDate` on or before `d`, with its date and source. The rate reads "Account currency per 1 unit of the quote currency", the direction of a sell fill (buy-sell R12). The inverse pair is not used. The same currency needs no rate. |
 | R11 | **Age limit.** A price or a rate is **fresh** for day `d` when `d` minus its `AsOfDate` is at most 4 calendar days (`ValuationRules.MaxAgeDays`), the limit of orders R10 and fx-conversions R10 (roadmap Q4). One limit for prices and rates. It covers a weekend with a holiday on each side. A longer closure of a market leaves its holdings not valued from the fifth day. |
 | R12 | **No source.** The read uses stored rows only and never calls a price or rate source (instrument-prices R9, fx-rates R10). |
-| R13 | **When a valuation can still change.** A row dated today or yesterday may be updated (market-data-history R5), and more Transactions may be booked today. So the valuation of today or of yesterday may differ on the next read. For a day two or more days back the rows are final: the valuation of a Custodial account changes only when a missing price or rate row is inserted later, or when a corporate action with an earlier ex-date is posted (R18). The response carries no "final" mark. Storing a valuation is roadmap V3. |
+| R13 | **When a valuation can still change.** A row dated today or yesterday may be updated (market-data-history R5), and more Transactions may be booked today. So the valuation of today or of yesterday may differ on the next read. For a day two or more days back the rows are final: the valuation of a Custodial account changes only when a missing price or rate row is inserted later, or when a corporate action with an earlier ex-date is posted (R18). The response carries no "final" mark. A stored valuation is made only for such a day: the day before yesterday or earlier ([valuation-run.md](valuation-run.md) R4). |
 
 ### 4.4 Lines and totals
 
@@ -466,7 +466,7 @@ Each point was confirmed as recommended (2026-11-26) and is written into the rul
 
 Still open, not this slice:
 
-- Storing a valuation, the daily run, the order of that run after `corporate-action-apply`, and `TestSeed` history (roadmap V3)
+- Storing a valuation, the daily run, the order of that run after `corporate-action-apply`, and `TestSeed` history: [valuation-run.md](valuation-run.md) (roadmap V3)
 - Net worth on a past day, the fold into the reporting currency, charts (V4)
 - Cost and unrealised gain on a past day (ledger replay)
 - Income earned but not posted as part of a value (roadmap step 5)

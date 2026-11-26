@@ -862,6 +862,30 @@ public class BackOfficePageTests
         _api.InterestRunLists.ShouldContain(TenantId);
     }
 
+    [Test]
+    public async Task Configuration_ShowsTheNewestValuationRuns_AndTheRunThroughADateForm()
+    {
+        var body = await GetAsync($"/tenants/{TenantId}/config");
+
+        body.ShouldContain("Valuation runs");
+        foreach (var header in new[] { "Through", "Trigger", "Accounts", "Failed", "Days stored", "Incomplete" })
+        {
+            body.ShouldContain($"<th>{header}</th>");
+        }
+
+        body.ShouldContain("2026-03-11");
+        body.ShouldContain("Run by the platform team");
+        body.ShouldContain("Daily run");
+        Regex.IsMatch(body, "<td[^>]*mud-error-text[^>]*>1</td>").ShouldBeTrue("a run with a failed account shows Failed in red");
+        Regex.IsMatch(body, "<td>0</td>").ShouldBeTrue();
+        body.ShouldContain("Run through a date");
+        var lastFinal = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-2).ToString("yyyy-MM-dd");
+        Regex.IsMatch(body, $"<input[^>]*value=\"{lastFinal}\"").ShouldBeTrue("the through date defaults to the last final day");
+        body.ShouldContain(
+            "Runs every day by itself. Use this after a missed run. A day already stored is never valued again, and the last two days cannot be stored yet.");
+        _api.ValuationRunLists.ShouldContain(TenantId);
+    }
+
     /// <summary>The Disable or Enable button of one client money account row (marked with its id).</summary>
     private static string ClientMoneyButton(string body, Guid id)
     {
@@ -1236,6 +1260,20 @@ public class BackOfficePageTests
         }
 
         public Task<Guid> StartInterestRunAsync(Guid tenantId, DateOnly asOfDate, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Guid.NewGuid());
+
+        public List<Guid> ValuationRunLists { get; } = [];
+
+        public Task<IReadOnlyList<ValuationRunItem>> ListValuationRunsAsync(Guid tenantId, CancellationToken cancellationToken = default)
+        {
+            ValuationRunLists.Add(tenantId);
+            return Task.FromResult<IReadOnlyList<ValuationRunItem>>([
+                new ValuationRunItem(Guid.NewGuid(), new DateOnly(2026, 3, 11), "Manual", 3, 1, 14, 2),
+                new ValuationRunItem(Guid.NewGuid(), new DateOnly(2026, 3, 10), "Scheduled", 2, 0, 5, 0)
+            ]);
+        }
+
+        public Task<Guid> StartValuationRunAsync(Guid tenantId, DateOnly throughDate, CancellationToken cancellationToken = default) =>
             Task.FromResult(Guid.NewGuid());
     }
 }
