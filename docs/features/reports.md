@@ -172,7 +172,7 @@ Script: `database/schema/0019_reports.sql`.
 
 Hangfire tables in schema `Hangfire`.
 
-Seed the two first-phase reports (by Code) in `0019_reports.sql`. Development / TestAppHost `TestSeed` grants both (`customer-transactions`, `adviser-balances`) to the demo tenant. Idempotent on `(TenantId, ReportId)`. Not a schema script. Not Production. New tenants are **not** auto-granted.
+Seed the two first-phase reports (by Code) in `0019_reports.sql`; `0045` adds `bank-reconciliation`. The demo tenant's grants are in §6.1. New tenants are **not** auto-granted.
 
 ### 6.1 Scope and AllowedTriggers columns
 
@@ -549,4 +549,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-24 | [dividends.md](dividends.md) | §9.1: a `Dividend` row |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
 | 2026-11-26 | [valuation-history.md](valuation-history.md) | R14, §7.1, §9.2: the optional `date` of the Adviser Balances Report; Out: historical as-of snapshots point there |
-| 2026-11-27 | — | §1, story 4, §12: the Customer's `reports.customer.create` (R5) and the Tenant policies (R6) stated where the old "read only" text remained; the open question on Customer create is closed. No rule changed |
+| 2026-11-27 | — | §6: the seed paragraph points at §6.1, which already names the three demo grants. §1, story 4, §12: the Customer's `reports.customer.create` (R5) and the Tenant policies (R6) stated where the old "read only" text remained; the open question on Customer create is closed. No rule changed |

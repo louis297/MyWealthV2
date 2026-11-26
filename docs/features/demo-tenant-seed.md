@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-14
-last_updated: 2026-11-26
+last_updated: 2026-11-27
 related:
   - ../deployment.md
   - ../future-plans.md
@@ -28,7 +28,7 @@ An operator runs a one-shot command on `webapi`, `--seed-demo`, to create the de
 
 ## 1. Summary
 
-The **demo seed** is an explicit command, not a start-up step. It creates tenant `demo` (`Demo Advisory`, reporting currency `USD`), the 18 instruments of the **demo catalog**, and grants for both first-phase reports. It is idempotent on natural keys and never changes a row that already exists. Prices and FX rates come from the existing worker jobs, not from this command.
+The **demo seed** is an explicit command, not a start-up step. It creates tenant `demo` (`Demo Advisory`, reporting currency `USD`), the 18 instruments of the **demo catalog**, and grants for the three catalog reports (`customer-transactions`, `adviser-balances`, `bank-reconciliation`). It is idempotent on natural keys and never changes a row that already exists. Prices and FX rates come from the existing worker jobs, not from this command.
 
 This is the first part of [future-plans.md](../future-plans.md) §6 (demo data for visitors). The shared demo logins and the nightly reset are still open there.
 
@@ -76,11 +76,11 @@ This is the first part of [future-plans.md](../future-plans.md) §6 (demo data f
 | R5 | When a tenant with Code `demo` already exists, the seed does not change it: name, reporting currency and enabled flag stay as they are. It still ensures the instruments (R6) and grants (R8) for that tenant. A disabled demo tenant is logged as a warning, not an error. That includes its allowed custody modes and its broker connection. The seed adds no client money account, on a new or an existing `demo` tenant: until SystemAdmin adds one in the Back Office, no new Custodial account can be opened in the demo tenant (client-money-accounts R11). The account numbers must match the simulator bank's accounts, which the seed cannot know. |
 | R6 | Instruments: every row of the demo catalog (§5.1), all active. Idempotent on `(TenantId, Symbol)`. An existing row with the same symbol is left unchanged, even if its name, quote currency or `IsActive` differ. |
 | R7 | The NZD and JPY rows stay in the catalog, although EODHD has no price for them ([known-issues/eodhd-nz-jp-coverage.md](../known-issues/eodhd-nz-jp-coverage.md)). Until it does, valuation, Buy and Sell see no price for them, as on any tenant. |
-| R8 | Report grants: `customer-transactions` and `adviser-balances`. Idempotent on `(TenantId, ReportId)`. A platform-inactive catalog report is not granted and is logged as a warning, matching `POST /tenants/{tenantId}/reports`. A missing catalog code is an error (R11). |
+| R8 | Report grants: `customer-transactions`, `adviser-balances` and `bank-reconciliation` (bank-reconciliation R23). Idempotent on `(TenantId, ReportId)`. A platform-inactive catalog report is not granted and is logged as a warning, matching `POST /tenants/{tenantId}/reports`. A missing catalog code is an error (R11). |
 | R9 | The seed writes nothing else: no people, accounts, transactions, holdings, portfolios, schedules, instrument prices or FX rates. No other tenant is read or written. |
 | R10 | Audit `CreatedBy` = `system`, the same value as `TestSeed`. |
 | R11 | All writes of one run are in one database transaction. Any failure rolls the whole run back, logs the error, and exits with code 1. Success exits with code 0. A run that races another run fails on a unique index and can be run again. |
-| R12 | The log names the tenant and counts what was created and what already existed, for example `Demo seed: tenant created; instruments 18 created, 0 existing; reports 2 granted, 0 existing`. It never logs a connection string or a secret. |
+| R12 | The log names the tenant and counts what was created and what already existed, for example `Demo seed: tenant created; instruments 18 created, 0 existing; reports 3 granted, 0 existing`. It never logs a connection string or a secret. |
 | R13 | The demo catalog has one definition. `TestSeed` uses it for `demo` and `demo2` in Development and adds its own Development-only extras on top: the disabled `NZD-CASH` row and the fake prices and FX rates. Those extras never reach the command. |
 | R14 | The Development demo tenant keeps reporting currency `NZD`. `DevelopmentIdentitySeeder` creates it first, so R5 means the command does not change it when run locally. Only a database without a `demo` tenant gets `USD`. |
 
@@ -166,10 +166,10 @@ Prices and rates arrive on their own: the instrument-price job on its next daily
 | Project | Assert |
 | --- | --- |
 | Application.UnitTests (`Hosting/`, next to `HealthCheckCommandTests`) | `--seed-demo` as first argument is detected; any other first argument, or `--seed-demo` later in the list, is not |
-| Infrastructure.IntegrationTests | Empty database after the schema applicator: one run creates tenant `demo` / `Demo Advisory` / `USD`, enabled; 18 active instruments matching §5.1; grants for both reports |
+| Infrastructure.IntegrationTests | Empty database after the schema applicator: one run creates tenant `demo` / `Demo Advisory` / `USD`, enabled; 18 active instruments matching §5.1; grants for the three reports of R8 |
 | Infrastructure.IntegrationTests | Second run creates no rows and leaves every row unchanged |
 | Infrastructure.IntegrationTests | Existing `demo` tenant with reporting currency `NZD`, one catalog instrument disabled and one missing: the run keeps `NZD`, keeps the disabled row disabled, adds the missing row, adds missing grants |
-| Infrastructure.IntegrationTests | A platform-inactive report is not granted; the other is |
+| Infrastructure.IntegrationTests | A platform-inactive report is not granted; the others are |
 | Infrastructure.IntegrationTests | A second tenant with its own instruments and grants is untouched. No rows appear in users, accounts, transactions, portfolios, `InstrumentPrices` or `FxRates` |
 | Infrastructure.IntegrationTests | A failure after the tenant insert (forced, for example a missing report code) leaves no `demo` tenant behind |
 | Infrastructure.IntegrationTests | Existing `TestSeed` idempotency test still passes with the shared demo catalog |
@@ -187,7 +187,7 @@ No new ADR.
 | Caller | Operator, through `webapi --seed-demo`. No automatic caller |
 | Tenant | Code `demo`, Name `Demo Advisory`, reporting `USD` on create; existing tenant never changed |
 | Catalog | The 18 rows in §5.1, all active, NZD and JPY rows included |
-| Reports | `customer-transactions`, `adviser-balances` |
+| Reports | `customer-transactions`, `adviser-balances`, `bank-reconciliation` |
 | Writes | Tenant, instruments, grants only. One transaction |
 | Scripts / policy | None |
 
@@ -195,7 +195,7 @@ Amends (accepted 2026-11-14):
 
 - [tenants.md](tenants.md) R17: the demo tenant may be created outside Development, by this command only.
 - [instruments.md](instruments.md) §2 Out and §9.1 "Not Production": the demo catalog may be written in production by this command.
-- [reports.md](reports.md) seed paragraph "Not Production": the demo tenant's two grants may be written in production by this command.
+- [reports.md](reports.md) seed paragraph "Not Production": the demo tenant's report grants (R8) may be written in production by this command.
 
 Still open, not this slice ([future-plans.md](../future-plans.md) §6):
 
@@ -215,3 +215,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-20 | [client-money-accounts.md](client-money-accounts.md) | R5: the seed adds no client money account |
 | 2026-11-23 | [orders.md](orders.md) | R4: the broker connection of a new demo tenant |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
+| 2026-11-27 | [bank-reconciliation.md](bank-reconciliation.md) | §1, R8, R12, §10, §11: the seed also grants `bank-reconciliation`, as bank-reconciliation R23 says and the code does |
