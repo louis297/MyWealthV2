@@ -20,9 +20,9 @@ related:
 
 How the .NET hosts start outside Development, behind the TLS-terminating reverse proxy of [deployment.md](../deployment.md). Covers items 1, 2, 3 and 5 of deployment §13: OpenIddict certificates and issuer on `identity`, Data Protection key persistence, forwarded headers and HTTPS redirection, and health endpoints with a container health check. No resource API, no table, no schema script. Development behaviour does not change, except that hosts set an explicit Data Protection application name (R9).
 
-Serving the SPA build from the BFFs is the 2026-11-12 amendment of [bff-adviser-portal.md](bff-adviser-portal.md) and [bff-customer-portal.md](bff-customer-portal.md). The bootstrap SystemAdmin is the 2026-11-12 amendment of [identity-auth.md](identity-auth.md).
+Serving the SPA build from the BFFs is [bff-adviser-portal.md](bff-adviser-portal.md) §8.5 and [bff-customer-portal.md](bff-customer-portal.md) §8.5. The bootstrap SystemAdmin is [identity-auth.md](identity-auth.md) §4.6.
 
-Amendment 2026-11-14: R17. The compose health check calls `/health` every 15 seconds on each host. Each call became a trace and pushed real request traces out of a telemetry viewer's per-resource limit.
+R17 was added on 2026-11-14: The compose health check calls `/health` every 15 seconds on each host. Each call became a trace and pushed real request traces out of a telemetry viewer's per-resource limit.
 
 ---
 
@@ -46,7 +46,7 @@ Outside Development, `identity` signs and encrypts with certificates from files 
 
 **Out**
 
-- Serving the SPA build (BFF amendments 2026-11-12)
+- Serving the SPA build (the two BFF specs, §8.5)
 - Bootstrap SystemAdmin (identity-auth §4.6)
 - The compose file, the Caddyfile and the deploy workflow ([deployment.md](../deployment.md) §5, §9; config)
 - Loading two signing certificates at once for rotation. A certificate swap signs everyone out once
@@ -86,7 +86,7 @@ Outside Development, `identity` signs and encrypts with certificates from files 
 | R14 | `/health` runs every registered check; `/alive` runs only checks tagged `live`, as today. The response body is the default health check text (`Healthy` / `Unhealthy`). No detail is exposed. |
 | R15 | Every host (`identity`, `webapi`, `worker`, both BFFs, `back-office`) checks its first argument before it builds the web host. When it is `--healthcheck`, the process sends `GET http://localhost:{Health:Port}/health` with a 5-second timeout, writes one line to standard output, and exits with code `0` on HTTP 200 and `1` on any other status, a timeout or a connection error. It does not start the web host, read the database or run the schema applicator. |
 | R16 | Configuration keys of this spec are read through the normal configuration chain, so environment variables (`Identity__Issuer`, `ForwardedHeaders__KnownNetworks__0`, …) set them. |
-| R17 | In every environment, a request whose path is `/health` or `/alive`, or starts with either segment, produces no ASP.NET Core trace. The filter matches the path on any port. Every other request is traced as before. Metrics and logs do not change. (Amendment 2026-11-14.) |
+| R17 | In every environment, a request whose path is `/health` or `/alive`, or starts with either segment, produces no ASP.NET Core trace. The filter matches the path on any port. Every other request is traced as before. Metrics and logs do not change. |
 
 ---
 
@@ -198,4 +198,4 @@ The repository should build after each commit. Agents split each line into red t
 3. Data Protection application name and key folder for the public hosts (R9, R10)
 4. Health endpoints on the health port outside Development (R12–R14)
 5. `--healthcheck` self-check in every host (R15)
-6. No traces for health endpoint requests (R17, amendment 2026-11-14)
+6. No traces for health endpoint requests (R17)
