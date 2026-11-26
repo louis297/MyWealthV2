@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-20
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -116,7 +116,7 @@ The rule that distinguishes this slice: a Custodial account's cash now comes in 
 - A recalled or dishonoured receipt after it was credited. On a statement it is a debit line, so it comes with B6 (§11 point 11). The manual undo of a wrong match (R30) is in
 - Sending a return payment. R28 only marks a receipt for return; B6 sends it
 - Nominated bank accounts, withdrawals, available cash, reservations (B5, B6). Hand `TransferOut` and `CloseOut` on a Custodial account stay allowed
-- Bank reconciliation, the bank's closing balance, break lists (B7). The simulator keeps its own balance (R46) for B7 to read later
+- Bank reconciliation and break lists: [bank-reconciliation.md](bank-reconciliation.md). The statement balance of each page is stored here for it (R8)
 - Interest the bank pays on the trust account (B7, I2). Until then such a receipt is ignored by hand (R27)
 - A push from the bank (ADR 0021 rule 5)
 - A manual "pull now" trigger. The job runs every `PollMinutes` (R6), one minute by default
@@ -161,13 +161,13 @@ The rule that distinguishes this slice: a Custodial account's cash now comes in 
 | --- | --- |
 | R6 | **One recurring job per connection.** `worker` registers `bank-statement-sync:{connection}` for each configured connection, on queue `bank`, every `PollMinutes` of that connection (UTC; cron `*/{PollMinutes} * * * *`, `0 * * * *` for 60). The job count is the number of connections, not of client money accounts. No automatic Hangfire retries; the schedule is the retry (ADR 0021 rule 15). A run that starts while another run of the same connection is still going ends at once and does nothing. |
 | R7 | **A run.** For each client money account of the connection (R5), in `Id` order, the job asks the port for statement lines after that account's cursor, 100 at a time, until the party says there are no more or 20 pages were read. Each account is read on its own: a failed call stores nothing more for that account, keeps its cursor, sets `lastFailedAt` and `lastFailure`, and the run goes on with the next account. A run in which any account failed is reported to Hangfire as failed after every account was tried, and logged with the connection, the client money account PublicId and the failure. |
-| R8 | **Store a page.** The new lines of one page, the new cursor and `lastSucceededAt` are written in one database transaction (ADR 0021 rule 7). A line whose (connection, outside id) is already stored, by this or another client money account, or earlier in the same page, is skipped and not changed. The unique index `UX_BankStatementLines_Connection_OutsideId` is the backstop. |
-| R9 | **Cursor.** One cursor per client money account in `BankFeedCursors`, an opaque string of at most 500 characters that the platform never parses. The first read sends none. A replacement client money account (same account number, client-money-accounts R7) starts without a cursor; the lines its predecessor already stored are skipped by R8. |
-| R10 | **A line the platform can store.** Outside id 1–100 characters; a value date; direction `Credit` or `Debit`; amount `> 0` with at most 4 decimal places; currency equal to the client money account's. A page with any line outside this → nothing of that page is stored, the cursor stays, `lastFailure` = `InvalidLine`. Free text is not a reason to refuse: payer name and reference text are trimmed and cut to 140 characters. |
+| R8 | **Store a page.** The new lines of one page, the new cursor and `lastSucceededAt` are written in one database transaction (ADR 0021 rule 7). A line whose (connection, outside id) is already stored, by this or another client money account, or earlier in the same page, is skipped and not changed. The unique index `UX_BankStatementLines_Connection_OutsideId` is the backstop. Each page of the feed also carries the bank's statement balance (`balance`: the trust account's balance after the last line up to the page's cursor). The pull writes it and the commit time to the client money account's feed cursor in the same database transaction as the page's lines and cursor. The first stored balance also sets the cursor's opening balance (that balance minus the signed sum of the lines stored for the account so far), which never changes. A page without a balance stores its lines and cursor and clears the stored balance; the opening balance stays (bank-reconciliation R2–R5). |
+| R9 | **Cursor.** One cursor per client money account in `BankFeedCursors`, an opaque string of at most 500 characters that the platform never parses. The first read sends none. A replacement client money account (same account number, client-money-accounts R7) starts without a cursor; the lines its predecessor already stored are skipped by R8. `BankFeedCursors` also holds `Balance`, `BalanceAt` and `OpeningBalance` (script `0045_bank_reconciliations.sql`). |
+| R10 | **A line the platform can store.** Outside id 1–100 characters; a value date; direction `Credit` or `Debit`; amount `> 0` with at most 4 decimal places; currency equal to the client money account's. A page with any line outside this → nothing of that page is stored, the cursor stays, `lastFailure` = `InvalidLine`. Free text is not a reason to refuse: payer name and reference text are trimmed and cut to 140 characters. A line may carry three more optional fields from the bank, `endToEndId`, `returnOf` and `returnReason`: `EndToEndId` and `ReturnOfOutsideId` are stored as sent (at most 100 characters each, else the page is refused as `InvalidLine`), `ReturnReason` is cut to 140, and `returnOf` is resolved to the stored line of the same connection (`RelatedLineId`) when it exists (withdrawals R38). A line also has a **kind**: `Transfer` (the default) or `Interest` (interest the bank pays or charges on the account itself); a kind is never a reason to refuse a page, and lines stored before `0048` are `Transfer` (interest-run R39). |
 | R11 | **Payer account masked on store.** The platform keeps only the last four letters or digits of the payer's account number, as `****1234`; fewer than five → `****`. The full number is never stored or logged. A return (B6) is sent against the line's outside id, not to a typed account number. |
 | R12 | **New line.** A stored line has status `Received`, `ReceivedAt` = platform time, and the Tenant of its client money account. |
-| R13 | **Process after the pull.** When every account of the connection has been read, the same run processes every `Received` **credit** line of that connection, oldest `ReceivedAt` first, then `Id` (ADR 0021 rule 8). Each line is one database transaction: the ledger write, if any, and the line's new status. The line's `RowVersion` guards it; a conflict skips that line until the next run. A line left `Received` by a crash is processed by the next run. A failed read does not stop the processing of lines already stored. |
-| R14 | **Debit lines wait.** A debit line is stored and stays `Received`. No rule of this slice processes it or lets a person act on it. Withdrawals (B6) process debit lines. The simulator bank sends none in this slice. |
+| R13 | **Process after the pull.** When every account of the connection has been read, the same run processes every `Received` **credit** line of that connection, oldest `ReceivedAt` first, then `Id` (ADR 0021 rule 8). Each line is one database transaction: the ledger write, if any, and the line's new status. The line's `RowVersion` guards it; a conflict skips that line until the next run. A line left `Received` by a crash is processed by the next run. A failed read does not stop the processing of lines already stored. The step processes every `Received` line of the connection, debit and credit, in the same order and the same way; a line named by `returnOf` or `endToEndId` is looked up in the line's Tenant and client money account only (bank-returns R2). Before deposit matching (R15–R20) it takes out, in this order: (1) a credit line of kind `Interest`, which is not matched and whose reference is not read: in one database transaction it becomes `Ignored`, with last action `Ignored`, the note `Bank interest`, the time and no person, and nothing is written to the ledger; a TenantAdmin may reopen it and handle it like any receipt (interest-run R40); (2) debit lines (R14), and a credit line whose `returnOf` names a payout line, which is a returned payout (withdrawals R42); a credit line with a `returnOf` that names no payout to return is `Unmatched` with `UnknownReturn` (bank-returns R8); (3) a credit `Transfer` line with no `returnOf` whose reference text (trimmed, case-insensitive) equals the broker settlement id of a trade settlement of the line's Tenant and client money account: settlement cash, `Matched` with method `Settlement` when the settlement is `AwaitingReceipt` and the amount equals its net, else `Unmatched` with `SettlementMismatch` (trade-settlement R19); (4) a credit `Transfer` line whose reference equals the party action id of a `Feed` dividend of the Tenant in the line's currency: a dividend receipt (dividends R24–R27). None of these is ever matched as a deposit. |
+| R14 | **Debit lines.** A debit line does not wait. A payout is withdrawals R40; the debit of a receipt return is bank-returns R7; a recall or dishonour of a receipt (a debit whose `returnOf` names a receipt) is bank-returns R3; the payment of a trade settlement is trade-settlement R21; any other debit line becomes `Unmatched` with reason `UnknownPayment`. |
 
 ### 4.3 Matching a receipt (B4)
 
@@ -176,7 +176,7 @@ The rule that distinguishes this slice: a Custodial account's cash now comes in 
 | R15 | **Candidates.** The reference text is split at every character that is not an ASCII letter or digit. Each part, and the whole text with those characters removed, is a candidate when it has nine characters. A candidate is upper-cased, `O` becomes `0`, and `I` and `L` become `1`; it is kept when it passes `DepositReference.IsValid`. Duplicates are dropped. So `K7M 3Q9 PXB`, `k7m-3q9-pxb` and `Dep K7M3Q9PXB` all give `K7M3Q9PXB`; a mistyped character fails the check symbol and gives nothing. |
 | R16 | **Accounts.** Each candidate is looked up among the Accounts of the line's Tenant. A candidate that names no Account there is dropped. An Account in another Tenant is treated exactly as no Account, and nothing tells the operator it exists. |
 | R17 | **Match.** When exactly one Account remains, and it is Open, its Customer is not Disabled, its currency is the line's currency, and the line's amount has no more decimal places than that currency's `DecimalPlaces`, the platform posts the deposit (R32) and the line becomes `Matched` with method `Reference`. |
-| R18 | **Unmatched.** Otherwise the line becomes `Unmatched` with the first reason that applies: `NoReference` (no candidate passes the check), `UnknownReference` (candidates pass, none names an Account in the Tenant), `SeveralReferences` (more than one Account), `CurrencyMismatch`, `AccountClosed`, `CustomerDisabled`, `AmountPrecision`. Nothing is written to the ledger (roadmap D7). |
+| R18 | **Unmatched.** Otherwise the line becomes `Unmatched` with the first reason that applies: `NoReference` (no candidate passes the check), `UnknownReference` (candidates pass, none names an Account in the Tenant), `SeveralReferences` (more than one Account), `CurrencyMismatch`, `AccountClosed`, `CustomerDisabled`, `AmountPrecision`. Nothing is written to the ledger (roadmap D7). Reasons added by later specs: `PaymentMismatch` (7; withdrawals), `UnknownPayment` (8), `UnknownReturn` (9), `RecallNotCovered` (10), `ReturnRejected` (11; bank-returns), `AccountClosing` (12), `SettlementMismatch` (13; trade-settlement), `DividendMismatch` (14; dividends). `AccountClosing` is checked directly after `AccountClosed`: the reference names an Account with an account closure `InProgress`; nothing is posted, and the TenantAdmin returns the line or matches it by hand once the closure has ended (account-closure R14). |
 | R19 | **The books follow the bank.** A disabled Tenant's lines are read and matched like any other. The portfolio trade lock does not apply (portfolios R18 allows cash in), and a deposit enqueues no rebalance. No amount limit applies. |
 | R20 | **Once.** The platform matches a line once, when it processes it. A later change (an account reopened, a Customer enabled) does not match it again; a TenantAdmin matches it by hand. |
 
@@ -186,7 +186,7 @@ The rule that distinguishes this slice: a Custodial account's cash now comes in 
 | --- | --- |
 | R21 | **Access.** Every `/statement-lines` route requires the new permission `statement-lines.manage`, which only TenantAdmin holds (roadmap D5). Adviser, Customer and SystemAdmin → 403, checked before the line is read. Missing / dead Bearer → 401, never 302. A disabled current tenant → 403. A line of another Tenant, or a missing one → 404. No caller names a tenant; a `tenantId` in a query or body → 400. |
 | R22 | **List.** `GET /statement-lines` → list envelope, newest `ReceivedAt` first, then newest `Id`. Optional filters: `status` (one or more names, comma-separated), `currency`, `clientMoneyAccountId`. An unknown status name → 400 `errors.Status`. `page` and `pageSize` as everywhere. `GET /statement-lines/{id}` → the item. |
-| R23 | **Transitions.** Credit lines only; on a debit line every action → 400 `errors.Status`. |
+| R23 | **Transitions.** Credit lines only; on a debit line every action → 400 `errors.Status`. `POST /statement-lines/{id}/match` takes exactly one of `accountId`, `migrationBatchId` and `corporateActionId` (else 400 `errors.AccountId`, `Give an account, a migration batch or a dividend.`). With a batch the caller also needs `migration-batches.manage`; the batch must be a `Draft` of the Tenant (else 404, or 400 `errors.MigrationBatchId`); the line becomes `Matched` with method `Migration` and the batch, with no Account and no Transaction, and nothing is posted (migration-batches R12–R16). With a dividend the caller also needs `corporate-actions.manage` (dividends R53). On a debit line, ignore (from `Unmatched`) and reopen (from `Ignored`) are allowed; match, request return and undo match stay refused with `errors.Status`. `ReturnSent` and `Returned` lines, and every `Matched` debit line, accept no action (bank-returns R9). A line matched with method `Recall` refuses undo match, and a line matched to a dividend takes no unmatch, ignore or request return. |
 
 | Action | Route | From | To |
 | --- | --- | --- | --- |
@@ -200,11 +200,11 @@ The rule that distinguishes this slice: a Custodial account's cash now comes in 
 | --- | --- |
 | R24 | **Every action.** Body with `rowVersion` of the line; missing → 400, stale → 409 `stale_row_version`. A line not in a "From" status of its action → 400 `errors.Status` with the message `This receipt is <status> and cannot be <action>.` Success → 204. No `Idempotency-Key`: the status change and `rowVersion` make a repeat a 400 or a 409, never a second write. A refused action writes nothing. |
 | R25 | **Note.** `note`: trimmed, 1–200 characters. Required on ignore, request return and undo match (400 `errors.Note`); optional on match; not taken on reopen. |
-| R26 | **Match by hand.** Body `{ accountId, rowVersion, note? }`. The Account must be visible to the caller in the Tenant (else 404), Custodial (else 400 `errors.AccountId`, `A receipt can be matched only to a Custodial account.`), in the line's currency (else 400 `errors.AccountId`, `The account's currency is NZD; this receipt is USD.`), Open (400, posting R6) and its Customer not Disabled (400 `disabled` / `target=user`). The amount precision of R17 → 400 `errors.AccountId`. Then the deposit is posted (R32) with the TenantAdmin in `CreatedBy`, and the line becomes `Matched` with method `Manual`. |
-| R27 | **Ignore.** For money that is not a Customer's, for example interest the bank pays on the trust account or a test payment by the firm. Nothing is written to the ledger. |
-| R28 | **Request return.** For money that must go back to the payer. Nothing is written to the ledger and no payment is sent in this slice; withdrawals (B6) send the return and close the line. |
-| R29 | **Reopen.** Puts an ignored or to-be-returned line back into suspense. |
-| R30 | **Undo match.** The flow undoes its own write (roadmap P6): it posts the Reversal of the line's deposit (R33) and the line becomes `Unmatched`. The Account must be Open (400, posting R6) and its Customer not Disabled (400 `disabled` / `target=user`), and the cash balance after the Reversal must be `≥ 0` (posting R9); otherwise 400 with the message `The account no longer holds this cash, so the deposit cannot be undone. Correct it with an adjustment.` and nothing changes. Works for a match by `Reference` and by `Manual`. The line keeps its `unmatchedReason` from processing (`null` if it was matched at once). |
+| R26 | **Match by hand.** Body `{ accountId, rowVersion, note? }`. The Account must be visible to the caller in the Tenant (else 404), Custodial (else 400 `errors.AccountId`, `A receipt can be matched only to a Custodial account.`), in the line's currency (else 400 `errors.AccountId`, `The account's currency is NZD; this receipt is USD.`), Open (400, posting R6) and its Customer not Disabled (400 `disabled` / `target=user`). The amount precision of R17 → 400 `errors.AccountId`. Then the deposit is posted (R32) with the TenantAdmin in `CreatedBy`, and the line becomes `Matched` with method `Manual`. A match by hand to a closing account → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key (account-closure R12). An undo of a line matched to a migration batch posts nothing; it is allowed only while the batch is `Draft` (else 400 `errors.Status`), and the line keeps its `unmatchedReason`. |
+| R27 | **Ignore.** For money that is not a Customer's, for example interest the bank pays on the trust account or a test payment by the firm. Nothing is written to the ledger. Interest the bank pays on the trust account needs no person to ignore it when the bank names it as interest (R13); a line the bank sends as a transfer is still handled by hand. |
+| R28 | **Request return.** For money that must go back to the payer. Nothing is written to the ledger and no payment is sent in this slice; withdrawals (B6) send the return and close the line. Request return also creates an outgoing payment of kind `ReceiptReturn` in the same database transaction; the bank sends the money back and the line becomes `ReturnSent`, then `Returned` (bank-returns R5–R7). A rejected return puts the line back to `Unmatched` with reason `ReturnRejected`. |
+| R29 | **Reopen.** Puts an ignored or to-be-returned line back into suspense. Reopen from `ReturnRequested` is allowed only while the return payment has no send attempt, and cancels it; after an attempt → 400 `errors.Status`, `The bank has been asked to return this receipt, so it can no longer be reopened.` |
+| R30 | **Undo match.** The flow undoes its own write (roadmap P6): it posts the Reversal of the line's deposit (R33) and the line becomes `Unmatched`. The Account must be Open (400, posting R6) and its Customer not Disabled (400 `disabled` / `target=user`), and the cash balance after the Reversal must be `≥ 0` (posting R9); otherwise 400 with the message `The account no longer holds this cash, so the deposit cannot be undone. Correct it with an adjustment.` and nothing changes. Works for a match by `Reference` and by `Manual`. The line keeps its `unmatchedReason` from processing (`null` if it was matched at once). On a Custodial account an undo match is refused when it would leave **available cash** below 0, not only the cash `SUM` (withdrawals R36, R37). An undo match of a deposit on a closing account → 400 (account-closure R12). A bulk transfer that was matched as a deposit is undone before it can fund a migration batch; the platform never matches a line to a batch by itself. |
 | R31 | **Last action.** Every action records on the line its name, note, the person and the time, replacing the previous one. The line keeps the deposit it was last matched to until an undo; the ledger keeps every deposit and Reversal. No domain event, no outbox row. |
 
 ### 4.5 The deposit on the ledger
@@ -233,8 +233,8 @@ Amendment to [simulator.md](simulator.md). The party routes add under `/party/ba
 | R42 | **Outside id.** `{WorldId:N}-L{n}`, `n` counting the lines of the world from 1. It never repeats, also after a reset (simulator R25). |
 | R43 | **Feed order.** A line takes the next place in its account's feed when the simulator now reaches its `availableAt` (the first read at or after that instant places it). A line with `deliverTwice` takes two consecutive places. A place never moves, so a cursor never skips a line that arrived late. |
 | R44 | **Feed route.** Party port: `GET /party/bank/accounts/{accountNumber}/statement-lines?after={cursor}&limit={n}` → 200 `{ items, cursor, hasMore }`, the lines placed after the cursor, oldest place first. `limit` 1–100, default 100; outside that range it is clamped, like the control log (simulator R28). No `after` → from the first place. A cursor from another world → from the first place of the current world (simulator R25). A cursor that cannot be read → 400. Unknown account number → 404. The key (simulator R30) and the outage (simulator R27) apply as to every party route. `cursor` is the place of the last item returned; when no item is returned it is the request's cursor, or a cursor before the first place of the current world. |
-| R45 | **Wire item.** `{ "id", "valueDate", "direction": "Credit", "amount", "currency", "payerName", "payerAccount", "reference" }`. `amount` is a JSON number. Every line in this slice is a credit. The payer account is sent in full; the platform masks it (R11). |
-| R46 | **Its own books.** `GET /control/bank/accounts` lists the accounts with `balance`, the sum of all their lines, placed or not (the bank holds the money before the statement shows it). `GET /control/bank/accounts/{accountNumber}/statement-lines` lists every line with its `availableAt` and places. |
+| R45 | **Wire item.** `{ "id", "valueDate", "direction": "Credit", "amount", "currency", "payerName", "payerAccount", "reference" }`. `amount` is a JSON number. Every line in this slice is a credit. The payer account is sent in full; the platform masks it (R11). The feed answer is `{ items, cursor, hasMore, balance }`; `balance` is a JSON number, the balance at the returned cursor, every line counted once (a line delivered twice too), lines the feed leaves out included; before the first place it is `0`. The wire item carries `"kind": "Interest"` on an interest line and no `kind` on every other. |
+| R46 | **Its own books.** `GET /control/bank/accounts` lists the accounts with `balance`, the sum of all their lines, placed or not (the bank holds the money before the statement shows it). `GET /control/bank/accounts/{accountNumber}/statement-lines` lists every line with its `availableAt` and places. The control account list also carries `statementBalance`, the balance the feed would answer at the account's last place. |
 | R47 | **Reset.** A reset empties the bank accounts and lines (simulator R24), then opens the standing accounts again (R39). |
 | R48 | **No platform knowledge.** The simulator does not read or check deposit references; a reference is free text (simulator R33). |
 
@@ -242,7 +242,7 @@ Amendment to [simulator.md](simulator.md). The party routes add under `/party/ba
 
 | ID | Rule |
 | --- | --- |
-| R49 | **`SimulatorBankFeed`.** The Infrastructure adapter for `Adapter = Simulator` calls R44 at `BaseUrl` with header `X-Api-Key` = the connection's `ApiKey` and the connection's timeout. Its own wire types (ADR 0021, no shared contracts). Failures: no connection → `Unreachable`; timeout → `Timeout`; 401 → `Unauthorized`; 503 → `Unavailable`; 404 → `UnknownAccount`; any other status or a body it cannot read → `BadResponse`. The port reports a failure as a result, not as an exception the job must parse. |
+| R49 | **`SimulatorBankFeed`.** The Infrastructure adapter for `Adapter = Simulator` calls R44 at `BaseUrl` with header `X-Api-Key` = the connection's `ApiKey` and the connection's timeout. Its own wire types (ADR 0021, no shared contracts). Failures: no connection → `Unreachable`; timeout → `Timeout`; 401 → `Unauthorized`; 503 → `Unavailable`; 404 → `UnknownAccount`; any other status or a body it cannot read → `BadResponse`. The port reports a failure as a result, not as an exception the job must parse. `SimulatorBankFeed` reads `balance` as a number or `null`; a string, or more than 4 decimal places → `BadResponse`. It reads `kind`: `"Interest"` → `Interest`; absent, `null` or any other text → `Transfer`; a value that is not text → `BadResponse`. |
 
 Policies: `statement-lines.manage` (new). Grants: TenantAdmin only. `tenants.manage` reads `GET /bank-connections`.
 
@@ -543,6 +543,8 @@ Simulator, party port, `GET /party/bank/accounts/SIM-DEMO-USD/statement-lines?af
 
 Control log actions gain `BankAccountOpened` and `BankReceiptAdded`.
 
+What later specs added to the statement line item and its list. The item carries `kind` (`Transfer`, `Interest`), `relatedLineId`, `withdrawalId`, `returnReason`, `tradeSettlementId`, `migrationBatchId`, `corporateActionId` (each `null` unless set) and `returnPayment: { status, attempts, lastFailure }` on a credit line with a return payment, else `null`. `match.accountId`, `match.customerId` and `match.transactionId` are `null` on a match with no Transaction: a `Matched` line may have a related line, a trade settlement, a migration batch or a dividend in place of an Account and a Transaction. Statuses `ReturnSent` (5) and `Returned` (6); match methods `Payment` (2), `PaymentReturn` (3), `Recall` (4), `Settlement` (5), `Migration` (6), `Dividend` (7). `GET /statement-lines` takes the optional filters `direction` (`Credit`, `Debit`; unknown → 400 `errors.Direction`) and `kind` (unknown → 400 `errors.Kind`), and `status` takes the new names.
+
 ### 8.2 Errors
 
 All refusals are ordinary validation (400 with `errors`, no problem `code`) except where named.
@@ -609,25 +611,14 @@ Page contracts: [back-office.md](../backoffice/back-office.md) (BO18, BO19), [ad
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `DepositReferenceScanner`: `K7M3Q9PXB`, `k7m-3q9-pxb`, `K7M 3Q9 PXB`, `Dep K7M3Q9PXB` and a valid reference typed with `O` for `0` or `L` for `1` → one candidate; a changed character → none; two valid references → two; empty / null → none; a ten-character token → none. `PayerAccountMask`: `12-3456-7890042-00` → `****4200`, four characters → `****`, null → null. `BankStatementLine`: every allowed transition; every other From status → throws; every method on a debit line → throws; note limits; match fields set only on Matched and cleared by `Unmatch`. `Transaction.PostBankDeposit`: one `TransferIn` leg, amount > 0, source must be `BankFeed`, detail kept; `Reverse` copies the detail. `TransactionSource.BankFeed(Guid.Empty)` → throws. `CustodyRules`: `TransferIn` refused on Custodial with the R35 message, allowed on External; `AllowsHandReverse(Custodial, BankFeed)` false. `ClientMoneyAccount.Create` requires a connection |
-| Application.FunctionalTests — pull and match | With a fake `IBankFeed`: a receipt with a valid reference of an Open Custodial account in the Tenant and currency → one `TransferIn`, source `(BankFeed, line id)`, `bankReceipt` with value date, reference, payer and `****` payer account, memo `Bank deposit`, `CreatedBy` system, cash balance up, line Matched (Reference). Each R18 reason with its own case, in the R18 order (a reference of another Tenant's account → `UnknownReference`). Two references of two accounts → `SeveralReferences`. The same outside id twice in one page, in two pages, and from a replacement client money account → one line. A page with a wrong-currency line, an amount `≤ 0` or a missing id → nothing stored, cursor unchanged, `lastFailure` `InvalidLine`. Each failure of the fake → stored nothing, cursor unchanged, `lastFailedAt` and `lastFailure` set; the next account of the run is still read; lines stored earlier are still processed. More than one page → all stored, cursor of the last page. An inactive client money account → not read; enabled again → continues from its cursor. A disabled Tenant → matched as usual. A debit line → stored, stays Received. Processing twice → one deposit. A matched deposit on an account with an Active portfolio assignment → allowed, no rebalance enqueued |
-| Application.FunctionalTests — suspense | No Bearer → 401 not 302; Adviser, Customer, SystemAdmin → 403 on all seven routes. TenantAdmin: list filters and order; unknown status → 400; `tenantId` → 400. Match by hand → 204, deposit with `CreatedBy` the TenantAdmin, line Matched (Manual), last action set; to an External account, another currency, a Closed account → 400; Disabled Customer → 400 `disabled` / `target=user`; an unknown account id → 404. Ignore, request return without a note → 400 `errors.Note`; with → 204. Reopen from both → Unmatched. Each action from a wrong status → 400 `errors.Status`. Stale `rowVersion` → 409; missing → 400. Undo match → 204, Reversal with source `BankFeed`, receipt detail copied, balance back, line Unmatched; then match again → a second deposit with the same source id. Undo after the cash was moved out → 400 with the R30 message, nothing written. Hand reverse of a deposit → 400 (transaction-source R13). Two-tenant: tenant B's line id → 404 on get and every action; tenant A's TenantAdmin matching to tenant B's account → 404 |
-| Application.FunctionalTests — other routes | `POST /transactions` `TransferIn` on Custodial → 400 `errors.Type` with the R35 message for TenantAdmin, Adviser and SystemAdmin; on External → 201. An existing `Manual` `TransferIn` on Custodial can still be reversed. `GET /accounts?depositReference=` → the one account, lower case works, unknown → empty, invalid → empty, an Adviser does not see an unassigned Customer's account, another tenant's reference → empty. `GET /bank-connections` → names for SystemAdmin, 403 for TenantAdmin. Create client money account without / with an unknown `bankConnection` → 400; item has `bankConnection` and `bankFeed: null` before any read. Customer reads a deposit with `bankReceipt` |
-| Infrastructure.IntegrationTests | `0040` on a scratch database with client money accounts: every row gets `simulator`, an insert without the column fails. `0041`: the unique (connection, outside id) index; the Matched CHECK (match columns set iff Status 1); a Transaction with `SourceKind = 3` needs a `SourcePublicId`; `SourceKind = 4` violates. EF round-trip of the three tables. `SimulatorBankFeed` against canned HTTP: a page maps to lines and cursor; the `X-Api-Key` header is sent; 401, 404, 503, 500, a timeout, an unreadable body and a refused connection map to R49. Start-up: a bad connection name, an unknown adapter, a `worker` connection without `ApiKey`, a `PollMinutes` of 7 → the host does not start. `BankStatementSyncJob` with the Worker's services and a fake feed: both commands run in order, no automatic retry attribute, a second concurrent run does nothing; a connection with `PollMinutes: 5` is registered as `*/5 * * * *`, one with none as every minute |
-| Simulator.Tests | `0003` applies. Standing accounts opened on first start and after a reset; a second start opens nothing new; a bad entry stops start-up. Open account: 201, duplicate number (other case) → 400. Receipt: each field limit; unknown account → 400; a future value date → 400; default value date is the simulator date. Feed: no key → 401; outage → 503; unknown account → 404; order by place; `limit` clamped; `hasMore`; cursor of the last item; a cursor from before a reset → from the start of the new world; an unreadable cursor → 400. `availableAfter`: not in the feed before the simulator clock reaches it, then placed after lines already read, and a cursor taken before it does not skip it. `deliverTwice`: two places, one id. Outside ids contain the world id and never repeat across a reset. Balance includes lines not yet placed. Control log rows for both actions; a 400 writes none |
-| Back Office | BO18 the two columns and every `bankFeed` state; BO19 the select, preselection, none configured, the 400 |
-| Adviser Portal | D34 nav for TenantAdmin only, the filter, the labels, the 403 sentence; D35 actions per status; D36 both pickers, review sentence, 400 and 409; D37 dialogs and the R30 message; D38 the section, the label and the link for TenantAdmin only; D39 no TransferIn on Custodial, the line under the deposit instructions |
-| Customer Portal | C21 |
-
-Fan-out in the tests:
-
-- `CustodialHttp.FundAsync` (26 files) cannot post a hand `TransferIn` on a Custodial account any more. For a Custodial account it reads the account's `depositReference`, adds a receipt with it to the functional host's fake `IBankFeed` and sends `PullBankStatements` and `ProcessStatementLines` through the host's services, then returns the deposit. Callers keep their signature; those that read the 201 body of the old call change to the returned id. External funding is unchanged.
-- The functional host registers the fake `IBankFeed` and a fake `IBankConnections` with one connection `simulator`; `AccountHttp`'s client money account helper sends `bankConnection: "simulator"`.
-- Tests that assert a hand `TransferIn` on Custodial is allowed (custody-modes matrix tests) change to the R35 refusal.
-- Raw-SQL inserts into `ClientMoneyAccounts` on a database at `0040` or later add `BankConnection`.
-- The Adviser Portal and Customer Portal `Transaction` types gain `bankReceipt`; the Back Office `IPlatformApi` gains `GetBankConnections` and the two item fields.
+| Domain.UnitTests | `Entities/BankStatementLineTests.cs`, `BankFeedCursorTests.cs`, `BankDepositTests.cs`, `BankReturnLineTests.cs` |
+| Application.FunctionalTests | Folders `BankFeed/` and `StatementLines/`; `Custody/CustodialTransferInRefusedTests.cs` |
+| Infrastructure.IntegrationTests | Folder `BankFeed/`; `AppliedSchema/BankStatementLinesSchemaTests.cs`, `BankStatementSyncJobTests.cs` |
+| Simulator.Tests | The simulator bank, receipts side |
 
 ---
 
@@ -684,131 +675,25 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
-
-The repository should build after each commit. Agents split each behaviour into red then green.
-
-1. Bank connections in configuration and on the client money account (R1–R3): `IBankConnections`, start-up checks, script `0040`, `bankConnection` on create and item, `GET /bank-connections` + unit, integration and functional tests. The client money account helpers change here.
-2. Store statement lines and cursors (R8–R12, R14): Domain types, script `0041`, EF mappings + Domain unit tests and the `0041` integration tests.
-3. The bank feed port and the pull (R4, R5, R7, R10, R11): `IBankFeed`, `PullBankStatements`, the fake for functional tests, `bankFeed` on the item + functional tests.
-4. The simulator adapter (R49) + canned-HTTP integration tests.
-5. Matching and the deposit (R13, R15–R20, R32, R36): `DepositReferenceScanner`, source kind `BankFeed`, `TransactionBankReceiptDetail`, `PostBankDeposit`, `ProcessStatementLines`, `bankReceipt` on the item + unit and functional tests.
-6. The recurring job (R6) and its AppHost wiring + integration test.
-7. Hand `TransferIn` refused on a Custodial account (R35) + functional tests. `FundAsync` moves to the fake feed here (§10 fan-out).
-8. Suspense reads (R21, R22) and permission `statement-lines.manage` + functional tests, two-tenant.
-9. Match by hand, ignore, request return, reopen (R23–R29, R31) + functional tests.
-10. Undo match (R30, R33, R34) + functional tests.
-11. `GET /accounts?depositReference=` (R37) + functional tests.
-12. Simulator bank: script `0003`, accounts, standing accounts, receipts, feed route, its own books, reset (R38–R48) + `Simulator.Tests`.
-13. Back Office (BO18, BO19) + page tests.
-14. Adviser Portal (D34–D39), BFF prefix, Customer Portal (C21) + frontend tests.
-15. Deploy: `.env.example` keys, simulator standing accounts (config; exempt from test-first).
-16. Repo docs: mark this file landed; roadmap §13 step 5; the known issue row.
-
-Do not put debit-line processing, payments, returns, nominated bank accounts, withdrawals or reconciliation in these commits.
-
-### Docs amended when this spec was accepted
+## 12. Docs changed when this spec was accepted
 
 [custody-modes.md](custody-modes.md) (R5 matrix: `TransferIn` / Custodial refused, the refusal message), [transaction-source.md](transaction-source.md) (kind `BankFeed` = 3, not hand-reversible, check widened), [posting.md](posting.md) (a `TransferIn` may carry a bank receipt detail; the flow's Reversal), [client-money-accounts.md](client-money-accounts.md) (`bankConnection`, `bankFeed`, the open points of §11 answered), [accounts.md](accounts.md) (`depositReference` filter), [simulator.md](simulator.md) (S1 receipts amendment: R38–R48, script `0003`, the AppHost party key, §11 point 7), [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rule 15 wording (point 5), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix `/statement-lines`), [api-design.md](../api-design.md) (§3.1 permission row, §7.3, §7.6, §7.7 rows, a `/statement-lines` and `/bank-connections` catalog entry, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (the first party port and the `bank` queue), [deployment.md](../deployment.md) (§5 keys), [back-office.md](../backoffice/back-office.md) (BO18, BO19), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D34–D39, D18), [customer-portal.md](../customer-portal/customer-portal.md) (C21), [known-issues/custodial-account-gaps.md](../known-issues/custodial-account-gaps.md) (the deposit half of the first row), [function-plan.md](../function-plan.md) §5, [features/README.md](README.md) row status, the roadmap §5 B3 / B4, §11 S1 and §13 status.
 
 ---
 
-## Amendment 2026-11-20 (nominated bank accounts and withdrawals) — accepted
+## 13. History
 
-Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md). The other debit lines (receipt returns, recalls, debit lines the platform did not cause) stay as this spec leaves them until [bank-returns.md](bank-returns.md).
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/deposit-matching.md`).
 
-- R10: a line may carry three more optional fields from the bank, `endToEndId`, `returnOf` and `returnReason`. `EndToEndId` and `ReturnOfOutsideId` are stored as sent (at most 100 characters each, else the page is refused as `InvalidLine`), `ReturnReason` cut to 140, and `returnOf` resolved to the stored line of the same connection (`RelatedLineId`) when it exists (withdrawals R38).
-- R13: the processing step also handles, in the same order and the same way, every `Received` debit line whose `endToEndId` names a withdrawal of the line's Tenant (a payout, withdrawals R40), and every `Received` credit line whose `returnOf` names a payout line (a returned payout, withdrawals R42). Other credit lines go through R15–R20 as before.
-- R14: a debit line without a withdrawal's `endToEndId` still stays `Received`.
-- R30: on a Custodial account an undo match is refused when it would leave **available cash** below 0, not only the cash `SUM` (withdrawals R36, R37).
-- The line item gains `relatedLineId`, `withdrawalId` and `returnReason`; unmatched reason `PaymentMismatch` (7); match methods `Payment` (2) and `PaymentReturn` (3). `GET /statement-lines` takes an optional `direction` (`Credit`, `Debit`; unknown → 400 `errors.Direction`).
-- §4.6 (simulator bank): the payments side is in withdrawals §4.7.
-
----
-
-## Amendment 2026-11-21 (receipt returns, recalls and other debit lines) — accepted
-
-Status of this amendment: `accepted` (2026-11-21), together with [bank-returns.md](bank-returns.md). Rules R2–R11 live there; this section records what changes here.
-
-- R13: the processing step processes every `Received` line of the connection, debit and credit, in the same order and the same way (bank-returns R2). A line named by `returnOf` or `endToEndId` is looked up in the line's Tenant and client money account only.
-- R14: debit lines no longer wait. A payout is withdrawals R40; the debit of a receipt return is bank-returns R7; a recall or dishonour of a receipt (a debit whose `returnOf` names a receipt) is bank-returns R3; any other debit line becomes `Unmatched` with reason `UnknownPayment`.
-- R18: unmatched reasons gain `UnknownPayment` (8), `UnknownReturn` (9), `RecallNotCovered` (10) and `ReturnRejected` (11). A credit line with a `returnOf` that names no payout to return is `UnknownReturn`, not deposit matching (bank-returns R8).
-- R23: on a debit line, ignore (from `Unmatched`) and reopen (from `Ignored`) are allowed; match, request return and undo match stay refused with `errors.Status`. `ReturnSent` and `Returned` lines, and every `Matched` debit line, accept no action (bank-returns R9). A line matched with method `Recall` refuses undo match.
-- R28: request return also creates an outgoing payment of kind `ReceiptReturn` in the same database transaction; the bank sends the money back and the line becomes `ReturnSent`, then `Returned` (bank-returns R5–R7). A rejected return puts the line back to `Unmatched` with reason `ReturnRejected`.
-- R29: reopen from `ReturnRequested` is allowed only while the return payment has no send attempt, and cancels it; after an attempt → 400 `errors.Status`, `The bank has been asked to return this receipt, so it can no longer be reopened.`
-- New statuses `ReturnSent` (5) and `Returned` (6), match method `Recall` (4). A `Matched` line may have no Account and no Transaction (the debit of a receipt return, the recall of a receipt never credited); its `relatedLineId` is then set.
-- The item (§8.1): `returnPayment: { status, attempts, lastFailure }` on a credit line with a return payment, else `null`; `match.accountId`, `match.customerId` and `match.transactionId` are `null` on a match with no Transaction. The `status` filter takes the new names.
-
----
-
-## Amendment 2026-11-21 (bank reconciliation) — accepted
-
-Status of this amendment: `accepted` (2026-11-21), together with [bank-reconciliation.md](bank-reconciliation.md). Rules R2–R5, R26 and R31 live there; this section records what changes here.
-
-- R7, R8: each page of the feed carries the bank's statement balance (`balance`: the trust account's balance after the last line up to the page's cursor). The pull writes it and the commit time to the client money account's feed cursor in the same database transaction as the page's lines and cursor. The first stored balance also sets the cursor's opening balance (that balance minus the signed sum of the lines stored for the account so far), which never changes. A page without a balance stores its lines and cursor and clears the stored balance; the opening balance stays.
-- R9: `BankFeedCursors` gains `Balance`, `BalanceAt` and `OpeningBalance` (script `0045_bank_reconciliations.sql`).
-- R44, R45: the feed answer is `{ items, cursor, hasMore, balance }`; `balance` is a JSON number, the balance at the returned cursor, every line counted once (a line delivered twice too), lines the feed leaves out included. Before the first place it is `0`.
-- R46: the control account list gains `statementBalance`, the balance the feed would answer at the account's last place.
-- R49: `SimulatorBankFeed` reads `balance` as a number or `null`; a string, or more than 4 decimal places → `BadResponse`.
-- §2 Out "Bank reconciliation": now in [bank-reconciliation.md](bank-reconciliation.md).
-
----
-
-## Amendment 2026-11-22 (account closure) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
-
-- R18: new unmatched reason `AccountClosing` (12), checked directly after `AccountClosed`: the reference names an Account with an account closure `InProgress`. Nothing is posted; the TenantAdmin returns the line or matches it by hand once the closure has ended (account-closure R14).
-- R26, R30: a match by hand to a closing account, and an undo match of a deposit on one → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key (account-closure R12).
-- §6: script `0046_account_closures.sql` widens the `UnmatchedReason` CHECK of `BankStatementLines` to 0–12. The item's `unmatchedReason` may be `AccountClosing`.
-
----
-
-## Amendment 2026-11-22 (interest run) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rules R39, R40 and R45 live there; this section records what changes here.
-
-- R10: a bank statement line has a **kind**: `Transfer` (the default) or `Interest` (interest the bank pays or charges on the account itself). The port's line carries it; a kind is never a reason to refuse a page. Lines stored before `0048` are `Transfer`. The statement line item gains `kind`, and `GET /statement-lines` an optional `kind` filter (unknown → 400 `errors.Kind`).
-- R13: in the processing step a `Received` **credit** line of kind `Interest` is not matched and its reference is not read: in one database transaction it becomes `Ignored`, with last action `Ignored`, the note `Bank interest`, the time and no person. Nothing is written to the ledger. A TenantAdmin may reopen it and handle it like any receipt (R29).
-- R27: interest the bank pays on the trust account no longer needs a person to ignore it when the bank names it as interest; a line the bank sends as a transfer is still handled by hand.
-- R45: the wire item gains `"kind"`: `"Interest"` on such a line, absent on every other.
-- R49: `SimulatorBankFeed` reads `kind`: `"Interest"` → `Interest`; absent, `null` or any other text → `Transfer`; a value that is not text → `BadResponse`.
-
----
-
-## Amendment 2026-11-22 (market data connections) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [simulated-instruments.md](simulated-instruments.md). No rule of this spec changes.
-
-- A **market data connection** (`MarketDataConnections:{name}`, simulated-instruments R1–R3) follows the shape of a bank connection (R1): a name in configuration with the same name rule, adapter `Simulator`, the address, key, `TimeoutSeconds` and `PollMinutes` only on `worker`, a start-up check that reads the configuration and not the environment name, one recurring job per connection with no automatic retries, and a job of a connection no longer configured removed at start. It adds a symbol suffix and has its own section, job (`market-data-sync:{connection}`), queue (`market`), feed state table (`MarketDataFeeds`) and list route (`GET /market-data-connections`). The two kinds of connection do not share names, jobs or state.
-- The AppHost and the VPS give `worker` the same simulator party address and key for both connections.
-
----
-
-## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement.md](trade-settlement.md). Rules R19 and R21 live there; this section records what changes here.
-
-- R13: before deposit matching, and after the `Interest` rule, a credit `Transfer` line with no `returnOf` whose reference text (trimmed, case-insensitive) equals the broker settlement id of a trade settlement of the line's Tenant and client money account is settlement cash and is never matched as a deposit. It is `Matched` with method `Settlement = 5` when the settlement is `AwaitingReceipt` and the amount equals its net, else `Unmatched` with the new reason `SettlementMismatch = 13`.
-- The statement line item gains `tradeSettlementId` (`null` unless matched to a trade settlement).
-
----
-
-## Amendment 2026-11-24 (migration batches) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rules R12–R16 and R30 live there; this section records what changes here.
-
-- R23: `POST /statement-lines/{id}/match` takes `migrationBatchId` in place of `accountId`, exactly one of the two (else 400 `errors.AccountId`, `Give an account or a migration batch.`). With a batch the caller also needs `migration-batches.manage`; the batch must be a `Draft` of the Tenant (else 404, or 400 `errors.MigrationBatchId`). The line becomes `Matched` with the new method `Migration = 6` and the batch, with no Account and no Transaction; nothing is posted.
-- R26: an undo of a line matched to a batch posts nothing; it is allowed only while the batch is `Draft` (else 400 `errors.Status`). The line keeps its `unmatchedReason`.
-- R30: a bulk transfer that was matched as a deposit is undone before it can fund a batch. The platform never matches a line to a batch by itself.
-- The statement line item gains `migrationBatchId` (`null` unless the line funds a batch), and `method` may be `Migration`.
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R24–R27 and R53 live there; this section records what changes here.
-
-- R13: after the settlement rule (trade-settlement R19) and before deposit matching, a credit `Transfer` line whose reference equals the party action id of a `Feed` dividend of the Tenant in the line's currency is a dividend receipt and never a deposit.
-- R23–R25: `POST /statement-lines/{id}/match` takes `corporateActionId` as a third target, exactly one of `accountId`, `migrationBatchId` and `corporateActionId` (400 `errors.AccountId`, `Give an account, a migration batch or a dividend.`); a dividend also needs `corporate-actions.manage`.
-- Match method gains `Dividend` (7); unmatched reason gains `DividendMismatch` (14). A line matched to a dividend takes no unmatch, ignore or request return. The statement line item gains `corporateActionId`.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-20 | [withdrawals.md](withdrawals.md) | R10, R13, R14, R30, §8.1: payouts and returned payouts on the statement; available cash |
+| 2026-11-21 | [bank-returns.md](bank-returns.md) | R13, R14, R18, R23, R28, R29, §8.1: receipt returns, recalls and other debit lines |
+| 2026-11-21 | [bank-reconciliation.md](bank-reconciliation.md) | R8, R9, R45, R46, R49: the statement balance on each page |
+| 2026-11-22 | [account-closure.md](account-closure.md) | R18, R26, R30: a closing account |
+| 2026-11-22 | [interest-run.md](interest-run.md) | R10, R13, R27, R45, R49: the kind of a line; bank interest |
+| 2026-11-22 | [simulated-instruments.md](simulated-instruments.md) | No rule here: a market data connection follows the shape of a bank connection (R1) |
+| 2026-11-23 | [trade-settlement.md](trade-settlement.md) | R13, R14: settlement cash |
+| 2026-11-24 | [migration-batches.md](migration-batches.md) | R23, R26, R30: a line that funds a migration batch |
+| 2026-11-24 | [dividends.md](dividends.md) | R13, R18, R23: a dividend receipt |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
