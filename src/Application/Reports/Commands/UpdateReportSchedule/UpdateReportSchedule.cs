@@ -72,7 +72,8 @@ public class UpdateReportScheduleCommandHandler(
             var role = currentUser.Role ?? throw new UnauthorizedAccessException();
             await AdviserReportScope.EnsureSnapshotAsync(
                 db, currentUser, schedule.ParametersJson, "ReportSchedule", cancellationToken);
-            var binding = AdviserBalancesBinder.Bind(request.Parameters, role, currentUser.PublicId);
+            var binding = AdviserBalancesBinder.Bind(
+                request.Parameters, role, currentUser.PublicId, AdviserBalancesBindMode.Schedule);
             await AdviserReportScope.EnsureAsync(
                 db,
                 tenantId,

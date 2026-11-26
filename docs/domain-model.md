@@ -665,6 +665,17 @@ A read model, not an entity: nothing is stored and no event is raised. Types in 
 
 Invariants: a line has a value if and only if it is `Valued`; the total is the cash plus the value of every `Valued` line; a price or rate more than 4 days older than the day never produces a value; the quantity differs from the ledger quantity only on a day a corporate action's price is on the new basis and its entitlement is not booked yet. Field rules: [features/account-valuation.md](features/account-valuation.md).
 
+The FX fold of a day ([features/valuation-history.md](features/valuation-history.md)) sits beside it, also a read with no store and no event:
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `FxFold` | Static | `Compute(totals, reportingCurrency, decimalPlaces, rates, day)` → `FoldedTotal`: each currency's total times the `StoredRate` of the directed pair into the reporting currency, rounded to the reporting currency's places (`AwayFromZero`). The reporting currency needs no rate. Reads no clock and no store |
+| `FoldLine` | Value | Currency, total, `FoldLineStatus`, the rate row or none, value or none |
+| `FoldedTotal` | Value | Reporting currency, lines sorted by currency, `Total`, `Complete` |
+| `FoldLineStatus` | Enum | `Folded`, `NoRate`, `StaleRate` |
+
+Invariants: a fold line has a value if and only if it is `Folded`; the folded total is the sum of the values of the `Folded` lines; a rate more than 4 days older than the day never produces a value; the fold is complete only when every line is `Folded`.
+
 ### 8.23 Stored valuation and valuation run (accepted — valuation-run slice)
 
 Types in `src/Domain/Valuations` and `src/Domain/Entities`. No domain event: a stored valuation is not posted and nothing listens to it.
@@ -720,6 +731,7 @@ One row per change. The text of each change is in git (`git log -p -- docs/domai
 | 2026-11-26 | The amendments were folded into §4–§8. No rule changed |
 | 2026-11-26 | Account valuation: `LedgerDay`, `AccountPosition`, `ValuationRules`, `ValuationLineStatus`, `BasisChange`, `AccountValuation` (§8.22). No entity or event. [features/account-valuation.md](features/account-valuation.md) |
 | 2026-11-26 | Valuation run: `StoredValuation`, `StoredValuationLine`, `ValuationRun`, `ValuationRunTrigger`, `ValuationRules.LastFinalDay` (§8.23); `Account.ValuedThrough` and `MarkValued` (§8.5). No event. [features/valuation-run.md](features/valuation-run.md) |
+| 2026-11-26 | Valuation history: `FxFold`, `FoldLine`, `FoldedTotal`, `FoldLineStatus` (§8.22). No entity or event. [features/valuation-history.md](features/valuation-history.md) |
 
 ---
 

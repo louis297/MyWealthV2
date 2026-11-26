@@ -44,7 +44,8 @@ public static class AdviserReportScope
         try
         {
             using var parameters = JsonDocument.Parse(parametersJson);
-            binding = AdviserBalancesBinder.Bind(parameters.RootElement, UserRole.TenantAdmin, callerPublicId: null);
+            binding = AdviserBalancesBinder.Bind(
+                parameters.RootElement, UserRole.TenantAdmin, callerPublicId: null, AdviserBalancesBindMode.Snapshot);
         }
         catch (JsonException)
         {

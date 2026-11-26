@@ -2,7 +2,7 @@ import { configureStore } from "@reduxjs/toolkit";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ReportsPage } from "@/features/reports/ReportsPage";
 import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { api } from "@/shared/api/api";
@@ -715,5 +715,121 @@ describe("ReportsPage", () => {
     openTab("Reports");
     expect(screen.getByRole("combobox", { name: "Report" })).toHaveTextContent("Select a report");
     expect(screen.queryByLabelText("Include closed accounts")).not.toBeInTheDocument();
+  });
+});
+
+describe("ReportsPage Adviser Balances for a past date (D110)", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-03-13T10:00:00Z"));
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const adviser = user({ role: "adviser", name: "Sam Reed", adviserId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" });
+
+  function serve(request: () => Response = () => json({ id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" }, 202), executions: unknown[] = []) {
+    return (url: string, method: string) => {
+      if (method === "GET" && new URL(url).pathname === "/api/reports") {
+        return json([adviserBalances]);
+      }
+      if (url.includes("/reports/schedules") && method === "GET") {
+        return json([]);
+      }
+      if (url.includes("/reports/executions") && method === "GET") {
+        return json({ items: executions, page: 1, pageSize: 20, totalCount: executions.length });
+      }
+      if (url.includes("/reports/request") && method === "POST") {
+        return request();
+      }
+      return new Response("", { status: 404 });
+    };
+  }
+
+  async function requestBody(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.url.includes("/reports/request"));
+    expect(request).toBeDefined();
+    return JSON.parse(await request!.clone().text()) as { reportId: string; parameters: Record<string, unknown> };
+  }
+
+  it("offers an empty date up to the last final day and sends it when set, with closed accounts off", async () => {
+    const { fetchMock } = renderReports(adviser, serve());
+
+    await chooseOption("Report", "Adviser Balances");
+    const form = generateForm();
+    const date = within(form).getByLabelText("Balances at the end of");
+    expect(date).toHaveAttribute("type", "date");
+    expect(date).toHaveValue("");
+    expect(date).toHaveAttribute("max", "2026-03-11");
+    const closed = within(form).getByLabelText("Include closed accounts");
+    fireEvent.click(closed);
+    expect(closed).toBeChecked();
+
+    fireEvent.change(date, { target: { value: "2026-03-11" } });
+    expect(closed).not.toBeChecked();
+    expect(closed).toBeDisabled();
+    expect(
+      within(form).getByText("A report for a past date includes every account that held cash or holdings that day."),
+    ).toBeInTheDocument();
+    fireEvent.click(within(form).getByRole("button", { name: "Generate now" }));
+
+    expect(await screen.findByText("Report queued")).toBeInTheDocument();
+    expect(await requestBody(fetchMock)).toEqual({
+      reportId: adviserBalances.id,
+      parameters: { includeClosedAccounts: false, date: "2026-03-11" },
+    });
+  });
+
+  it("shows a 400 on date at the input", async () => {
+    renderReports(
+      adviser,
+      serve(() => json({ errors: { date: ["A report for a past date can be made up to the day before yesterday (UTC)."] } }, 400)),
+    );
+
+    await chooseOption("Report", "Adviser Balances");
+    const form = generateForm();
+    const date = within(form).getByLabelText("Balances at the end of");
+    fireEvent.change(date, { target: { value: "2026-03-11" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Generate now" }));
+
+    const message = await within(form).findByText("A report for a past date can be made up to the day before yesterday (UTC).");
+    expect(date).toHaveAttribute("aria-invalid", "true");
+    expect(date.getAttribute("aria-describedby")).toBe(message.id);
+    expect(screen.queryByText("Report queued")).not.toBeInTheDocument();
+  });
+
+  it("has no date on the schedule form", async () => {
+    renderReports(adviser, serve());
+
+    openTab("Schedules");
+    await chooseOption("Schedule report", "Adviser Balances");
+    expect(await screen.findByRole("heading", { name: "Schedules" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Balances at the end of")).not.toBeInTheDocument();
+  });
+
+  it("shows the date of a past-date run in the history", async () => {
+    renderReports(
+      adviser,
+      serve(undefined, [
+        {
+          id: "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+          reportId: adviserBalances.id,
+          status: "Succeeded",
+          triggerKind: "Manual",
+          created: "2026-03-13T10:00:00+00:00",
+          asOf: "2026-03-13T10:00:00+00:00",
+          parameters: { adviserId: adviser.adviserId, includeClosedAccounts: false, date: "2026-03-11" },
+        },
+      ]),
+    );
+
+    openTab("History");
+    expect(await screen.findByText("At the end of 2026-03-11")).toBeInTheDocument();
   });
 });

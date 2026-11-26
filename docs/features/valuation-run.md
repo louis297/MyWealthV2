@@ -74,7 +74,7 @@ sequenceDiagram
 | A missed day | — | The next run values every day after the account's `valuedThrough` |
 | An External account | Valued on read | Unchanged: valued on read, never stored (roadmap Q6) |
 | A run for a date | — | A SystemAdmin runs through a date after a missed run (`POST /valuation-runs`) |
-| Funds under management on a past day | Not available | The sum of the stored valuations of the day, per currency (R26); no route yet |
+| Funds under management on a past day | Not available | The sum of the stored valuations of the day, per currency (R26); read by `GET /net-worth/funds-under-management` ([valuation-history.md](valuation-history.md)) |
 
 The rule that distinguishes this slice: a stored valuation is the figure later steps rely on. It is stored only for a day whose prices and rates are final, once, and it does not follow a price that arrives afterwards.
 
@@ -124,7 +124,7 @@ What the example shows:
 - Stored valuations of External accounts (roadmap Q6; H7). They are valued on read. Revisit with period close (custodial-roadmap X3)
 - Changing or deleting a stored valuation, for any reason: a late or corrected price or rate, a corporate action posted late, an adjustment. Roadmap §6: step 4 decides what a fee does when its base would change
 - Valuing today or yesterday, or any day after the last final day, and an option to allow it
-- Funds under management per day as a route, a series of a scope (a Customer, an Adviser's book, the firm), the fold into the reporting currency, charts and the Adviser Balances Report for a past date (roadmap V4)
+- Funds under management per day as a route, a series of a scope (a Customer, an Adviser's book, the firm), the fold into the reporting currency, charts and the Adviser Balances Report for a past date: [valuation-history.md](valuation-history.md) (roadmap V4)
 - Cost, average cost and unrealised gain on a past day (ledger replay)
 - Income earned but not posted (roadmap Q8)
 - The advisory fee itself (business roadmap step 4)
@@ -203,7 +203,7 @@ What the example shows:
 | ID | Rule |
 | --- | --- |
 | R25 | **The base of a fee.** A later step that needs the value of a Custodial account on a past day reads the stored valuation of that day, not the read of account-valuation. When the day is not stored yet, it waits; when the stored day is incomplete, it decides itself what to do (roadmap §6). This spec does not decide either. |
-| R26 | **Funds under management of a past day.** For a scope of Custodial accounts and a day `d`: per currency, the sum of `total` of the stored valuations of day `d` of the accounts of the scope, no FX fold; **complete** when every one of them is complete and every Custodial account of the scope whose first day is on or before `d` has a stored valuation of `d`. It is a sum of the rows, not a second table (roadmap V3). No route reads it in this slice; roadmap V4 does. It is not the same figure as `breakdowns.byCustodyMode` of net worth now, which counts a holding with no price as 0 (net-worth R7) and only Open accounts. |
+| R26 | **Funds under management of a past day.** For a scope of Custodial accounts and a day `d`: per currency, the sum of `total` of the stored valuations of day `d` of the accounts of the scope, no FX fold; **complete** when every one of them is complete and every Custodial account of the scope expected on `d` has a stored valuation of `d`: an account is expected from its first day and, when Closed, through the day its closure completed ([valuation-history.md](valuation-history.md) R6, R7). It is a sum of the rows, not a second table (roadmap V3). `GET /net-worth/funds-under-management` reads it ([valuation-history.md](valuation-history.md)). It is not the same figure as `breakdowns.byCustodyMode` of net worth now, which counts a holding with no price as 0 (net-worth R7) and only Open accounts. |
 
 Policies: the two of R1 (new). Grants: as R1.
 
@@ -454,7 +454,7 @@ Cross-tenant or wrong-collection id → **404**, not 403. Keep the resource cata
 
 ## 9. UI
 
-Page contract: [back-office.md](../backoffice/back-office.md) (BO34, BO35), amended when this spec was accepted. No Adviser Portal or Customer Portal page shows a stored valuation or a run; the series and the charts are roadmap V4.
+Page contract: [back-office.md](../backoffice/back-office.md) (BO34, BO35), amended when this spec was accepted. No Adviser Portal or Customer Portal page shows a stored valuation or a run; the series and the charts are [valuation-history.md](valuation-history.md).
 
 `bff-adviser-portal` and `bff-customer-portal` already proxy the prefix `/accounts`, so R17 and R18 can be reached through both by a signed-in user who may read the Account. No page calls them. `/valuation-runs` is on no BFF allow-list; a TenantAdmin reads it with a Bearer token (Scalar).
 
@@ -541,7 +541,6 @@ Still open, not this slice:
 
 - What a fee does with an incomplete or missing day, and with a base that a later price would change (business roadmap step 4)
 - Stored valuations of External accounts (period close, custodial-roadmap X3)
-- Funds under management per day as a route, series of a scope, the fold into the reporting currency, charts, the Adviser Balances Report for a past date (roadmap V4)
 - Moving the manual trigger to the `worker` queue
 - Cost and unrealised gain on a past day (ledger replay)
 

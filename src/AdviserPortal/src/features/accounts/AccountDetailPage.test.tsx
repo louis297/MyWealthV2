@@ -1853,3 +1853,85 @@ describe("AccountDetailPage withdrawals (withdrawals D44)", () => {
     expect(screen.queryByText("Not settled")).not.toBeInTheDocument();
   });
 });
+
+describe("AccountDetailPage value over time (D109)", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("location", {
+      origin: "http://localhost:3000",
+      pathname: `/accounts/${accountId}`,
+      search: "",
+      href: `http://localhost:3000/accounts/${accountId}`,
+      assign: vi.fn(),
+    });
+  });
+
+  const valuations = {
+    items: [
+      { date: "2026-03-11", currency: "NZD", cash: 14356.6, holdingsValue: 20394.12, total: 34750.72, complete: false, unvaluedCount: 1 },
+      { date: "2026-03-10", currency: "NZD", cash: 14356.6, holdingsValue: 28573.49, total: 42930.09, complete: true, unvaluedCount: 0 },
+    ],
+    page: 1,
+    pageSize: 100,
+    totalCount: 2,
+  };
+
+  function valuationUrls(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
+    return fetchMock.mock.calls
+      .map(([input]) => (typeof input === "string" ? input : input instanceof Request ? input.url : String(input)))
+      .filter((url) => url.includes("/valuations"));
+  }
+
+  function serve(item: unknown) {
+    return (url: string, method: string) => {
+      if (url.includes(`/accounts/${accountId}/valuations`) && method === "GET") {
+        return json(valuations);
+      }
+      if (url.endsWith(`/accounts/${accountId}/holdings`) && method === "GET") {
+        return json({ items: [] });
+      }
+      if (url.includes("/transactions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.endsWith(`/accounts/${accountId}`) && method === "GET") {
+        return json(item);
+      }
+      return new Response("", { status: 404 });
+    };
+  }
+
+  it("charts the stored valuations of the 90 days up to the valued-through date, oldest first", async () => {
+    const { fetchMock } = renderDetail(serve({ ...custodialAccount, valuedThrough: "2026-03-11" }));
+
+    const section = (await screen.findByRole("heading", { name: "Value over the last 90 days" })).closest("section")!;
+    await waitFor(() =>
+      expect(valuationUrls(fetchMock)).toEqual([
+        `http://localhost:3000/api/accounts/${accountId}/valuations?from=2025-12-12&to=2026-03-11&pageSize=100`,
+      ]),
+    );
+    const points = await within(section).findAllByRole("button", { name: /^2026-03-1/ });
+    expect(points.map((point) => point.getAttribute("aria-label"))).toEqual([
+      "2026-03-10: 42,930.09 NZD",
+      "2026-03-11: 34,750.72 NZD. Some holdings were not valued on this day.",
+    ]);
+    expect(points[1]).toHaveAttribute("fill", "none");
+  });
+
+  it("says when a Custodial account has no stored valuation yet", async () => {
+    const { fetchMock } = renderDetail(serve({ ...custodialAccount, valuedThrough: null }));
+
+    expect(
+      await screen.findByText("Not valued yet. The first value appears two days after the account was opened."),
+    ).toBeInTheDocument();
+    expect(valuationUrls(fetchMock)).toEqual([]);
+  });
+
+  it("shows no chart on an External account", async () => {
+    const { fetchMock } = renderDetail(serve({ ...account, valuedThrough: null }));
+
+    expect(await screen.findByRole("heading", { name: "Everyday spending" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Value over the last 90 days" })).not.toBeInTheDocument();
+    expect(valuationUrls(fetchMock)).toEqual([]);
+  });
+});

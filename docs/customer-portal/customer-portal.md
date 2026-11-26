@@ -31,6 +31,7 @@ related:
   - ../features/migration-batches.md
   - ../features/in-kind-transfers.md
   - ../features/dividends.md
+  - ../features/valuation-history.md
 ---
 
 # Customer Portal
@@ -80,7 +81,7 @@ Holdings read reuses `accounts.read` (existing rule). Instrument names and symbo
 - Book-scoped reports.
 - Report schedules (create / edit / disable).
 - Catalog or tenant-grant management.
-- Charts, historical comparison, FX fold, live vendor prices.
+- Historical comparison, live vendor prices. The charts and the folded total are [Valuation history](#valuation-history).
 - SystemAdmin screens.
 - Shared BFF with the Adviser Portal.
 
@@ -371,6 +372,16 @@ Field rules: [dividends](../features/dividends.md). No new BFF prefix: `dividend
 | C43 | A reinvested dividend | Account page activity | The row also shows "Reinvested in <reinvestedQuantity> shares at <reinvestmentPrice>", and the holding shows the new quantity. |
 | C44 | A Custodial account | Account page | "Dividends are reinvested" or "Dividends are paid in cash", read only, with "Ask your adviser to change this." |
 
+### Valuation history
+
+Field rules: [valuation-history](../features/valuation-history.md). No new BFF prefix: `GET /net-worth/funds-under-management` (self scope) and `GET /accounts/{id}/valuations` are under the existing `/net-worth` and `/accounts` prefixes, and `folded` comes with the net-worth read. The charts are plain SVG with no chart library, with a hollow marker on an incomplete day, the date and total on hover or focus, and a "Show figures" table under each chart.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C45 | Customer with a Custodial account | Dashboard | Under "Held on platform and elsewhere" (C14), a chart "Held on platform over time" from `GET /net-worth/funds-under-management` (self scope), 90 days, with the choice of 1 year. Above it: "In <reportingCurrency>, at each day's exchange rate. The latest two days are added once their prices are final." An incomplete day's point says "Some holdings could not be valued on this day." No Custodial account in the range → the chart is not shown. External accounts are not in it, and the "Held elsewhere" note (C14) is not repeated. |
+| C46 | Customer | Dashboard | Under the per-currency totals, "Total in <folded.currency>: <folded.total> at today's exchange rates", as D108, with "Not counted: <currency>" when a line is not folded. With one currency only, which is the reporting currency, the line is not shown. |
+| C47 | Customer with a Custodial account | Account page | The chart of D109, with the Customer's words for an incomplete day ("Some holdings could not be valued on this day.") and "Not valued yet. The first value appears two days after the account was opened." An External account shows no chart. |
+
 ---
 
 ## Tests
@@ -381,7 +392,7 @@ Portal tests assert routes, role visibility (Customer only), and API-client shap
 
 ## Still open
 
-- Charts and historical net-worth series.
+- A net-worth series with External accounts (valuation-history, Out).
 - Report schedules for self.
 - Firm name in the shell (`tenants.read` for Customer).
 - Instrument detail pages.
@@ -410,4 +421,5 @@ What changed in this file after it was accepted. Each row is a section above. Th
 | 2026-11-24 | [migration-batches](../features/migration-batches.md) | Migration batches |
 | 2026-11-24 | [in-kind-transfers](../features/in-kind-transfers.md) | In-kind transfers |
 | 2026-11-24 | [dividends](../features/dividends.md) | Dividends |
+| 2026-11-26 | [valuation-history](../features/valuation-history.md) | Valuation history |
 | 2026-11-26 | — | The amendments became the sections above. No behaviour changed |

@@ -16,6 +16,8 @@ export type Account = {
   interestAccruedThrough?: string | null;
   /** dividends R17: whether dividends with a reinvestment plan are paid in shares; false on an External account. */
   reinvestDividends?: boolean;
+  /** valuation-run R20: the last day stored for a Custodial account; null before the first and on an External one. */
+  valuedThrough?: string | null;
   /** account-closure R27: the Account's latest account closure, or null. */
   closure?: {
     id: string;
@@ -25,6 +27,17 @@ export type Account = {
     requestedAt: string;
     completedAt: string | null;
   } | null;
+};
+
+/** valuation-run R17: one stored valuation of an Account, in its currency. */
+export type StoredValuation = {
+  date: string;
+  currency: string;
+  cash: number;
+  holdingsValue: number;
+  total: number;
+  complete: boolean;
+  unvaluedCount: number;
 };
 
 /** client-money-accounts R22: where to pay in to an Open Custodial account. */
@@ -184,6 +197,11 @@ export const accountsApi = api.injectEndpoints({
       query: (id) => `/accounts/${id}`,
       providesTags: ["Account"],
     }),
+    /** C47: the stored valuations of a range, newest first, at most 100 days a page. */
+    getAccountValuations: builder.query<PagedList<StoredValuation>, { id: string; from: string; to: string }>({
+      query: ({ id, from, to }) => `/accounts/${id}/valuations?from=${from}&to=${to}&pageSize=100`,
+      providesTags: ["Account"],
+    }),
     getCashBalance: builder.query<
       {
         cashBalance: number;
@@ -233,6 +251,7 @@ export const {
   useGetAccountInKindTransfersQuery,
   useGetAccountsQuery,
   useGetAccountQuery,
+  useGetAccountValuationsQuery,
   useGetCashBalanceQuery,
   useGetDepositInstructionsQuery,
   useGetHoldingsQuery,

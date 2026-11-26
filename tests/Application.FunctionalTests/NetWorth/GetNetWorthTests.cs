@@ -96,7 +96,7 @@ public class GetNetWorthTests : TestBase
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var root = json.RootElement;
-        root.EnumerateObject().Select(property => property.Name).ShouldBe(["asOf", "currencies", "breakdowns"]);
+        root.EnumerateObject().Select(property => property.Name).ShouldBe(["asOf", "currencies", "folded", "breakdowns"]);
         var asOf = root.GetProperty("asOf").GetDateTimeOffset();
         asOf.ShouldBeGreaterThanOrEqualTo(before.AddSeconds(-1));
         asOf.ShouldBeLessThanOrEqualTo(after.AddSeconds(1));

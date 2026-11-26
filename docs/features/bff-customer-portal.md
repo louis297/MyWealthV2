@@ -217,6 +217,8 @@ Cross-tenant or wrong-collection resource ids remain **404** from `webapi`, pass
 | `/api/transactions` | `/transactions` |
 | `/api/net-worth` | `/net-worth` |
 | `/api/users/customers/{id}/net-worth` | `/users/customers/{id}/net-worth` |
+| `/api/net-worth/funds-under-management` | `/net-worth/funds-under-management` (self scope, [valuation-history.md](valuation-history.md); under the existing prefix) |
+| `/api/accounts/{id}/valuations` | `/accounts/{id}/valuations` ([valuation-run.md](valuation-run.md); the account page chart of [valuation-history.md](valuation-history.md)) |
 | `/api/reports` | `/reports` |
 | `/api/reports/request` | `/reports/request` |
 | `/api/reports/executions` | `/reports/executions` |
@@ -313,3 +315,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-13 | [bff-adviser-portal.md](bff-adviser-portal.md) §4.1 | R7: refresh single-flight |
 | 2026-11-20 – 11-24 | [withdrawals.md](withdrawals.md), [orders.md](orders.md), [in-kind-transfers.md](in-kind-transfers.md) | R20: four prefixes added to the allow-list |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
+| 2026-11-26 | [valuation-history.md](valuation-history.md) | Route table: the series and the stored valuations, under the existing `/net-worth` and `/accounts` prefixes. R20 does not change |

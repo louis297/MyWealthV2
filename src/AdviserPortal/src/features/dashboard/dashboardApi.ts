@@ -13,9 +13,45 @@ export type NetWorthCurrency = {
   net: number;
 };
 
+/** One currency of an FX fold (valuation-history R12). Only a `Folded` line has a `value`. */
+export type FoldLine = {
+  currency: string;
+  total: number;
+  status: "Folded" | "NoRate" | "StaleRate";
+  fx: { rate: number; date: string; source: string } | null;
+  value: number | null;
+};
+
+/** The per-currency net of now in the Tenant's reporting currency (valuation-history R14). */
+export type FoldedTotal = {
+  currency: string;
+  total: number;
+  complete: boolean;
+  currencies: FoldLine[];
+};
+
+/** One day of the funds under management series (valuation-history R12). */
+export type FundsDay = {
+  date: string;
+  currencies: FoldLine[];
+  total: number;
+  complete: boolean;
+  accounts: number;
+  incompleteAccounts: number;
+  missingAccounts: number;
+};
+
+export type FundsUnderManagement = {
+  reportingCurrency: string;
+  from: string;
+  to: string;
+  days: FundsDay[];
+};
+
 export type NetWorth = {
   asOf: string;
   currencies: NetWorthCurrency[];
+  folded?: FoldedTotal;
   breakdowns: {
     byCustomer: {
       customerId: string;
@@ -47,6 +83,11 @@ export const dashboardApi = api.injectEndpoints({
       query: () => "/net-worth",
       providesTags: ["NetWorth"],
     }),
+    /** D107: `from` only; `to` is the last final day. */
+    getFundsUnderManagement: builder.query<FundsUnderManagement, string>({
+      query: (from) => `/net-worth/funds-under-management?from=${from}`,
+      providesTags: ["NetWorth"],
+    }),
     getCustomerNetWorth: builder.query<NetWorth, string>({
       query: (id) => `/users/customers/${id}/net-worth`,
       providesTags: (_result, _error, id) => [{ type: "NetWorth", id }],
@@ -54,4 +95,4 @@ export const dashboardApi = api.injectEndpoints({
   }),
 });
 
-export const { useGetNetWorthQuery, useGetCustomerNetWorthQuery } = dashboardApi;
+export const { useGetNetWorthQuery, useGetCustomerNetWorthQuery, useGetFundsUnderManagementQuery } = dashboardApi;

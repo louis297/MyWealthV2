@@ -46,7 +46,7 @@ The worker fetches the latest Frankfurter rates every hour and stores directed p
 **Out**
 
 - Instrument prices / `IMarketData` (accepted separately: [instrument-prices.md](instrument-prices.md)).
-- Net-worth FX fold (later; current net-worth stays per-currency).
+- Net-worth FX fold: [valuation-history.md](valuation-history.md) (`folded` on net worth now and the funds under management series; the per-currency arrays stay).
 - HTTP endpoint for rates (deferred; a read surface is expected later for Scalar / ops, not a permanent exclusion).
 - Real-time or intraday rates.
 - Per-tenant rate overrides.
@@ -74,7 +74,7 @@ The worker fetches the latest Frankfurter rates every hour and stores directed p
 | R5 | Upsert key is `(BaseCurrency, QuoteCurrency, AsOfDate)`. `AsOfDate` is the date the source returns (previous working day on weekends / holidays). On each successful run, if the `AsOfDate` already exists for a pair, update `Rate` and `FetchedAt`; if it is a new date, insert. Keep both columns. A row whose `AsOfDate` is two or more days before the platform's UTC date is **final**: it is never updated or deleted, and a missing one may still be inserted. A row dated today or yesterday is updated as above. This holds for both jobs (market-data-history R4–R6). |
 | R5a | **History.** A second `worker` job, `fx-rate-history-sync` on queue `fx`, daily at 11:30 UTC with no automatic retries, asks Frankfurter once per active base for the range from `MarketDataHistory:FloorDate` to yesterday (`/v2/rates?base=X&quotes=…&from=…&to=…`) and stores every record. Frankfurter answers a rate for every calendar day, so weekends have rows of their own. With no floor date set the job ends at once. The hourly `fx-rate-sync` keeps its schedule, its skip rule and its request (market-data-history R12–R16). |
 | R6 | Same currency → `IFxRate` returns 1. No row is required. |
-| R7 | Missing cross pair (no row at all for that pair) → throw `FxRateNotFoundException`. Never return 1. Callers do not catch and substitute. A valuation catches it and marks the line `NoRate`, with no value and no number in its place ([account-valuation](account-valuation.md) R14). |
+| R7 | Missing cross pair (no row at all for that pair) → throw `FxRateNotFoundException`. Never return 1. Callers do not catch and substitute. A valuation catches it and marks the line `NoRate`, with no value and no number in its place ([account-valuation](account-valuation.md) R14). An FX fold catches it in the same way: the currency's fold line is `NoRate` and the folded total leaves it out ([valuation-history](valuation-history.md) R10, R11). |
 | R8 | Rates are platform data. No `TenantId`. |
 | R9 | On fetch failure the job logs and leaves the previous rows in place. It does not delete. |
 | R10 | Read path never calls Frankfurter. Only the job does. |
@@ -234,3 +234,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-25 | [market-data-history.md](market-data-history.md) | R5, R5a, R14, §5: history from the floor date, final rows, `GET /fx-rates` |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
 | 2026-11-26 | [account-valuation.md](account-valuation.md) | R7: a valuation catches a missing pair and marks the line |
+| 2026-11-26 | [valuation-history.md](valuation-history.md) | Out and R7: the net-worth FX fold, which catches a missing pair as a valuation does |

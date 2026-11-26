@@ -14,6 +14,7 @@ related:
   - ../features/bff-adviser-portal.md
   - ../adr/0017-background-worker.md
   - ../features/bank-reconciliation.md
+  - ../features/valuation-history.md
 ---
 
 # Adviser Portal — Reports
@@ -55,7 +56,7 @@ Backend prerequisites (landed):
 - Customer Portal (Customer has `reports.customer.read` but no portal client).
 - Raw cron string editor.
 - Email delivery of the PDF.
-- Historical as-of snapshots, FX fold, live vendor prices.
+- FX fold, live vendor prices. A relative date in a schedule. The Adviser Balances Report for a past date is [Adviser Balances for a past date](#adviser-balances-for-a-past-date).
 - Event-triggered executions in the UI (plumbing exists on the backend; no concrete events are bound).
 - SystemAdmin reports screens.
 - Parameter schema driven dynamic forms (first phase hard-codes the two known parameter shapes; the Generate dropdown still switches on the selected report’s code / PublicId).
@@ -285,6 +286,14 @@ Field rules: [bank-reconciliation](../features/bank-reconciliation.md). Report s
 | --- | --- |
 | D52 | The Reports tab (`/reports`) also lists Tenant-scoped reports for a TenantAdmin (`GET /reports?scope=Tenant`), under the heading "Firm reports". For `bank-reconciliation` the generate and schedule forms ask for the client money account (from the overview of D51) and send no `reconciliationId`. An Adviser does not see the heading. The run page of D51 has no PDF button. |
 
+### Adviser Balances for a past date
+
+Field rules: [valuation-history](../features/valuation-history.md) R16–R20 (the optional `date` of `adviser-balances`). Calls: the existing `POST /reports/request`; no new route or BFF prefix. Tests: the date input, `parameters.date` sent only when set, the disabled checkbox, a 400 on `date` shown at the input, and the History summary.
+
+| ID | Behaviour |
+| --- | --- |
+| D110 | Reports tab, Adviser Balances generate form: an optional "Balances at the end of" date input, empty by default (empty = now), with no date after today minus two days (UTC) offered. While a date is set, "Include closed accounts" is unchecked and disabled, with "A report for a past date includes every account that held cash or holdings that day." `parameters.date` is sent only when set. The schedule form has no date input. A 400 on `date` is shown at the input. History shows "At the end of <date>" in the parameters summary when the snapshot has `date`. |
+
 ---
 
 ## Tests
@@ -311,4 +320,5 @@ What changed in this file after it was accepted. Each row is a section above. Th
 | Date | With | Section |
 | --- | --- | --- |
 | 2026-11-21 | [bank-reconciliation](../features/bank-reconciliation.md) | Tenant-scoped reports |
+| 2026-11-26 | [valuation-history](../features/valuation-history.md) | Adviser Balances for a past date |
 | 2026-11-26 | — | The amendments became the sections above. No behaviour changed |

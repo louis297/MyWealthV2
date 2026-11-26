@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAppSelector } from "@/app/hooks";
 import { canAccessAccounts, roles } from "@/features/session/roles";
+import { AccountValueSection } from "@/features/accounts/AccountValueSection";
 import { DividendReinvestmentSection } from "@/features/accounts/DividendReinvestmentSection";
 import { Link, useNavigate, useParams } from "react-router";
 import { AssignmentRebalanceLine } from "@/features/rebalances/AssignmentRebalanceLine";
@@ -446,6 +447,7 @@ export function AccountDetailPage() {
           </DetailGrid>
         </CardContent>
       </Card>
+      {isCustodial(data) ? <AccountValueSection account={data} decimalPlaces={places} /> : null}
       {isCustodial(data) ? (
         <DividendReinvestmentSection
           account={data}

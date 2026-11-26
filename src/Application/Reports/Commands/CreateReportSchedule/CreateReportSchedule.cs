@@ -41,7 +41,8 @@ public class CreateReportScheduleCommandHandler(
         else if (report.Code == AdviserBalancesBinder.Code)
         {
             var role = currentUser.Role ?? throw new UnauthorizedAccessException();
-            var binding = AdviserBalancesBinder.Bind(request.Parameters, role, currentUser.PublicId);
+            var binding = AdviserBalancesBinder.Bind(
+                request.Parameters, role, currentUser.PublicId, AdviserBalancesBindMode.Schedule);
             await AdviserReportScope.EnsureAsync(
                 db, tenantId, binding.AdviserId, role, currentUser.PublicId, cancellationToken);
             snapshotJson = binding.SnapshotJson;

@@ -14,6 +14,9 @@ import { Pager } from "@/shared/components/Pager";
 import { formatInstant } from "@/shared/time/instant";
 
 function summary(parameters: ReportParameters): string | null {
+  if (typeof parameters.date === "string") {
+    return `At the end of ${parameters.date}`;
+  }
   if (typeof parameters.from === "string" && typeof parameters.to === "string") {
     return `${parameters.from} to ${parameters.to}`;
   }

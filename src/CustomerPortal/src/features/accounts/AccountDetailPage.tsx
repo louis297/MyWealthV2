@@ -1,4 +1,5 @@
 import { useParams } from "react-router";
+import { AccountValueSection } from "@/features/accounts/AccountValueSection";
 import { DetailGrid, DetailItem, Muted, Page, PageHeading, Section, StatusBadge } from "@/components/portal";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -355,6 +356,7 @@ export function AccountDetailPage() {
           </DetailGrid>
         </CardContent>
       </Card>
+      {custodial ? <AccountValueSection account={account.data} /> : null}
       {payable ? (
         <Section title="How to pay in">
           {instructions.data ? (

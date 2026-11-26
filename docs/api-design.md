@@ -346,7 +346,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Instruments | `/instruments` | list / get / create / update / disable / enable; `GET …/prices` (features/market-data-history.md) | `instruments.read` / `instruments.create` / `instruments.manage` |
 | Accounts | `/accounts` | list / get / create / update / close / reopen; `GET …/cash-balance`; `GET …/deposit-instructions` (features/client-money-accounts.md); sub-resource `…/closures`: request (`Idempotency-Key`) / list / get (features/account-closure.md); `GET …/interest-accruals` (features/interest-run.md); `GET …/valuation?date=` (features/account-valuation.md); `GET …/valuations`, `GET …/valuations/{date}` (features/valuation-run.md) | `accounts.read` / `accounts.create` / `accounts.manage`; closures `account-closures.read` / `.request` |
 | Transactions | `/transactions` | list / get / create / reverse | `transactions.read` / `transactions.create` |
-| Net worth | `/net-worth`, `/users/customers/{id}/net-worth` | GET. See features/net-worth.md; `breakdowns.byCustodyMode` in features/custody-mode-grouping.md | `accounts.read` |
+| Net worth | `/net-worth`, `/users/customers/{id}/net-worth`, `/net-worth/funds-under-management` | GET. See features/net-worth.md; `breakdowns.byCustodyMode` in features/custody-mode-grouping.md; `folded` and the funds under management series (`from`, `to`) in features/valuation-history.md | `accounts.read` |
 | Portfolios | `/portfolios`, `/accounts/{id}/portfolio`, `/accounts/{id}/rebalance` | list / get / create / update / disable; assign / unassign / rebalance. See features/portfolios.md | `portfolios.read` / `portfolios.manage` + `transactions.create` |
 | Fees | `/fees/trade-schedules` (namespace `/fees`) | list / get / create / update / delete. See features/trade-fees.md | `fees.read` / `fees.manage` |
 | Interest | `/interest/rate-schedules`, `/interest/runs` (namespace `/interest`) | rate schedules: list / get / create / update / delete; runs: list / get / create (start a run). See features/interest-run.md | `interest-rates.read` / `.manage`; `interest-runs.read` / `.start` |
@@ -830,6 +830,18 @@ Field rules: [features/valuation-run.md](features/valuation-run.md).
 - `throughDate` missing, not a date, or after the last final day (today minus two days, UTC) → 400 `errors.ThroughDate`; there is no option for a later date. An unknown `trigger` → 400 `errors.Trigger`. A TenantAdmin never sends `tenantId` (400).
 - No `Idempotency-Key`: a repeated run stores nothing twice and answers a run with zero counts. No problem code of its own.
 
+**Read for people** ([features/valuation-history.md](features/valuation-history.md)):
+
+| Method | Route | Policy | Success |
+| --- | --- | --- | --- |
+| GET | `/net-worth/funds-under-management?from=&to=` | `accounts.read` | 200 `{ reportingCurrency, from, to, days }`: one day per calendar day, oldest first, each `{ date, currencies, total, complete, accounts, incompleteAccounts, missingAccounts }` |
+
+- The scope is that of `GET /net-worth`: the firm, an Adviser's Customers now, a Customer's own accounts; a SystemAdmin must send `tenantId`. Custodial accounts of any status; External accounts are never counted.
+- `to` defaults to the last final day and may not be after it; `from` defaults to `to` minus 89 days; at most 366 days. Not a date, `to` too late, `from` after `to`, or too long → 400 `errors.From` / `errors.To`. No paging.
+- A currency line is `{ currency, total, status, fx, value }` with `status` `Folded`, `NoRate` or `StaleRate`: the fold into the Tenant's reporting currency at the stored rate of that day, with the age limit of a valuation. A currency that is not folded, a missing account and an incomplete stored valuation make the day incomplete; never an error.
+- `GET /net-worth` and `GET /users/customers/{id}/net-worth` carry a top-level `folded` `{ currency, total, complete, currencies }` with the same line shape, at today's rates.
+- The Adviser Balances Report takes an optional `date` on a manual request (§7 reports; features/reports.md §9.2).
+
 ---
 
 ## 8. Explicitly out (until a later phase promotes them)
@@ -879,3 +891,4 @@ One row per change. The text of each change is in git (`git log -p -- docs/api-d
 | 2026-11-26 | The amendments were folded into §7. §1, §3 and §5 now describe the portal clients as [ADR 0016](adr/0016-bff-for-first-party-portals.md) and the BFF specs define them. §7.17 gathers the statement line notes. No rule changed |
 | 2026-11-26 | Account valuation (§6, §7.6): `GET /accounts/{id}/valuation?date=` with `accounts.read`. No new permission or problem code |
 | 2026-11-26 | Valuation run (§3.1, §6, §7.6, §7.18): `valuation-runs.read` and `valuation-runs.start`; `/valuation-runs`; `GET /accounts/{id}/valuations[/{date}]`; `valuedThrough` on the account item. No problem code |
+| 2026-11-26 | Valuation history (§6, §7.18): `GET /net-worth/funds-under-management`; `folded` on the net-worth reads; `date` of the Adviser Balances Report. No permission or problem code |

@@ -13,6 +13,8 @@ public class GetCustomerNetWorthQueryHandler(
     IApplicationDbContext db,
     ICurrentUser currentUser,
     IMarketData marketData,
+    IFxRate fxRates,
+    ICurrencyCatalog currencies,
     TimeProvider time) : IRequestHandler<GetCustomerNetWorthQuery, NetWorthDto>
 {
     public async Task<NetWorthDto> Handle(GetCustomerNetWorthQuery request, CancellationToken cancellationToken)
@@ -40,6 +42,6 @@ public class GetCustomerNetWorthQueryHandler(
                        ?? throw new NotFoundException("Customer", request.Id);
 
         return await NetWorthReader.ReadAsync(
-            db, marketData, time, customer.TenantId!.Value, customer.Id, assignedAdviserId, cancellationToken);
+            db, marketData, fxRates, currencies, time, customer.TenantId!.Value, customer.Id, assignedAdviserId, cancellationToken);
     }
 }

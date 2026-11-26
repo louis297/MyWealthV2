@@ -9,6 +9,8 @@ using MyWealthV2.Domain.Enums;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
 
+using MyWealthV2.Domain.Valuations;
+
 namespace MyWealthV2.Application.Reports.Commands.RequestReport;
 
 [Authorize(Policy = Policies.ReportsCustomerCreate + "," + Policies.ReportsBookCreate + "," + Policies.ReportsTenantCreate)]
@@ -85,7 +87,11 @@ public class RequestReportCommandHandler(
         }
         else if (report.Code == AdviserBalancesBinder.Code)
         {
-            var binding = AdviserBalancesBinder.Bind(request.Parameters, role, currentUser.PublicId);
+            var binding = AdviserBalancesBinder.Bind(
+                request.Parameters,
+                role,
+                currentUser.PublicId,
+                AdviserBalancesBindMode.Request(ValuationRules.LastFinalDay(LedgerDay.Of(time.GetUtcNow()))));
             await AdviserReportScope.EnsureAsync(
                 db, tenantId, binding.AdviserId, role, currentUser.PublicId, cancellationToken);
             snapshotJson = binding.SnapshotJson;

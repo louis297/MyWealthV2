@@ -132,7 +132,7 @@ public sealed class ReportJob(
             }
             else
             {
-                var adviserId = AdviserBalancesBinder.Bind(parameters, UserRole.TenantAdmin, callerPublicId: null)
+                var adviserId = AdviserBalancesBinder.Bind(parameters, UserRole.TenantAdmin, callerPublicId: null, AdviserBalancesBindMode.Snapshot)
                     .AdviserId;
                 var adviserExists = await db.Users.AsNoTracking().AnyAsync(row =>
                     row.PublicId == adviserId

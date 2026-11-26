@@ -23,7 +23,7 @@ public class StoreAccountValuations(IApplicationDbContext db, IValueAccount valu
         }
 
         var accountId = account.Id;
-        var firstDay = LedgerDay.Of(account.Created);
+        var firstDay = ValuationDays.FirstDay(account.Created);
         var lastDay = await LastDayAsync(account, throughDate, cancellationToken);
         var next = account.ValuedThrough?.AddDays(1) ?? firstDay;
         if (next > lastDay)
@@ -91,11 +91,8 @@ public class StoreAccountValuations(IApplicationDbContext db, IValueAccount valu
             return throughDate;
         }
 
-        var completedAt = await db.AccountClosures.IgnoreQueryFilters()
-            .Where(closure => closure.AccountId == account.Id
-                              && closure.TenantId == account.TenantId
-                              && closure.Status == AccountClosureStatus.Completed)
-            .MaxAsync(closure => closure.CompletedAt, cancellationToken);
-        return completedAt is { } at && LedgerDay.Of(at) < throughDate ? LedgerDay.Of(at) : throughDate;
+        var closures = await ValuationDays.LastClosuresAsync(db, account.TenantId, [account.Id], cancellationToken);
+        var lastDay = ValuationDays.LastDay(account.Status, closures.GetValueOrDefault(account.Id));
+        return lastDay is { } last && last < throughDate ? last : throughDate;
     }
 }
