@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-19
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -65,9 +65,9 @@ The rule that distinguishes this slice: the two surfaces never mix. Control rout
 
 **Out**
 
-- Every outside party (bank, broker, custodian, issuer): S1–S4, each with its flow
+- The rules of each outside party (bank, market, broker, custodian): the spec of its flow. §4.6 lists the parties and their surfaces
 - Every platform port, adapter, feed cursor table or `worker` job: from B3 (ADR 0021 rule 1)
-- Named scenarios and the scenario library: with S1, when the first step kinds exist (ADR 0021 rule 20)
+- Named scenarios and a scenario library: not built (§4.6)
 - Any read of platform data by the simulator, including instruments and reference prices (§11 point 8)
 - A Blazor page set for the control surface (Scalar only in this slice)
 - Managing `SimulatorOperator` people through an API or a page (bootstrap and seed only; §11 point 1)
@@ -134,11 +134,11 @@ The rule that distinguishes this slice: the two surfaces never mix. Control rout
 | R21 | **Simulator clock.** Simulator now = real UTC now + `ClockOffset` while running; = `PausedAt` while paused. `ClockOffset` is never negative. The simulator clock never goes back: no command moves it to an instant before the current simulator now. `ClockOffset` is whole seconds, rounded up when a command sets it, so simulator now never lands before the instant a command asked for. |
 | R22 | **Advance.** `POST /control/clock/advance` with exactly one of `by` (ISO 8601 duration, `> 0`, at most `P366D`) or `to` (instant, later than simulator now, at most 366 days ahead). Running: adds to `ClockOffset`. Paused: moves `PausedAt`. Returns the world. |
 | R23 | **Pause and resume.** `POST /control/clock/pause` freezes simulator now at its current value. `POST /control/clock/resume` sets `ClockOffset` so simulator now continues from the paused value without a jump. When the paused value is behind real now (the clock was paused longer than its offset), that offset would be negative, so resume sets `ClockOffset` to zero and the clock continues at real now (amended 2026-11-19 while landing, §11 point 13). Pausing a paused clock or resuming a running one returns 200 and changes nothing. |
-| R24 | **Reset.** `POST /control/reset` with optional `seed` (int; omitted → random). New `WorldId`, the seed, offset zero, running, no outage, `StartedAt` = real now. Every party table (none in this slice) is emptied in the same transaction. The control log is kept. |
-| R25 | **Outside ids and cursors across resets.** Every outside id and cursor the simulator ever hands out contains the `WorldId` it was made in, so an id never repeats after a reset (ADR 0021 rule 7). A cursor from an earlier world reads the current world from its start. (No id or cursor exists in this slice; the rule is fixed now so S1 does not have to.) |
+| R24 | **Reset.** `POST /control/reset` with optional `seed` (int; omitted → random). New `WorldId`, the seed, offset zero, running, no outage, `StartedAt` = real now. Every party table (none in this slice) is emptied in the same transaction. The control log is kept. Each party says what a reset empties and restores (§4.6). |
+| R25 | **Outside ids and cursors across resets.** Every outside id and cursor the simulator ever hands out contains the `WorldId` it was made in, so an id never repeats after a reset (ADR 0021 rule 7). A cursor from an earlier world reads the current world from its start. (No id or cursor exists in this slice; the rule is fixed now so S1 does not have to.) The ids each party hands out are in §4.6. |
 | R26 | **Randomness.** Every random choice the simulator makes is drawn from a generator built from (`Seed`, purpose name, sequence number). No `Random.Shared`, no `Guid.NewGuid()` for an outside value. `WorldId` itself is a new GUID on reset. |
 | R27 | **Outage.** `POST /control/party/outage` with `{ "on": true | false }`. While on, every `/party/*` route returns 503 after the credential check (R30). Control routes are not affected. |
-| R28 | **Control log.** Every control write (advance, pause, resume, outage, reset) appends one row: real instant, simulator instant after the action, the operator's email from the session, the action and its body. A refused write (400) appends nothing. `GET /control/log` lists newest first, `{ items, page, pageSize, totalCount }`, page default 1, pageSize default 20, max 100. A pageSize above 100 is answered with 100, and a page or pageSize below 1 with 1; neither is a 400. |
+| R28 | **Control log.** Every control write (advance, pause, resume, outage, reset) appends one row: real instant, simulator instant after the action, the operator's email from the session, the action and its body. A refused write (400) appends nothing. `GET /control/log` lists newest first, `{ items, page, pageSize, totalCount }`, page default 1, pageSize default 20, max 100. A pageSize above 100 is answered with 100, and a page or pageSize below 1 with 1; neither is a 400. Each party adds its own log actions (§4.6). |
 | R29 | **Concurrency.** Control writes on the world row use its `RowVersion`. Two writes at once: one wins, the other returns 409 and changes nothing. |
 
 ### 4.5 Party surface
@@ -149,6 +149,56 @@ The rule that distinguishes this slice: the two surfaces never mix. Control rout
 | R31 | **Key configuration.** The host refuses to start, before it listens, when `Simulator:PartyApiKey` is missing or shorter than 32 characters, in every environment. The rule reads the configuration, not the environment name. |
 | R32 | **Status.** `GET /party/status` → 200 `{ "worldId", "now" }` (`now` is simulator now). During an outage → 503. This is the only party route in this slice; each party adds its own under `/party/{party}/…`. |
 | R33 | **No platform knowledge.** Party responses never contain a platform PublicId, tenant code or table value that the platform did not send in the same call. (Nothing is sent in this slice.) |
+
+### 4.6 The parties
+
+This spec owns the host, the world, the clock and the two surfaces. Each party was added with the platform flow that needs it, and its rules live in that flow's spec. Every party route follows R27 (outage), R30 (key) and R33; every feed route takes `?after={cursor}&limit={n}` as deposit-matching R44. There is no scenario library: one-off control calls have been enough, and a named scenario earns its place when it combines steps across parties (§11 point 7).
+
+| Party | What it does | Rules and simulator scripts |
+| --- | --- | --- |
+| **Bank** (S1) | Trust accounts with their own books, receipts, payments, returns and recalls, charges, interest, and the statement balance | [deposit-matching.md](deposit-matching.md) §4.6 (`0003_bank.sql`); [withdrawals.md](withdrawals.md) §4.7 (`0004_bank_payments.sql`); [bank-returns.md](bank-returns.md) §4.5 (`0005_bank_returns.sql`); [bank-reconciliation.md](bank-reconciliation.md) §4.7 (`0006_bank_balances.sql`); [interest-run.md](interest-run.md) R43, R44 (`0007_bank_line_kind.sql`) |
+| **Market** (S4) | Data vendor and issuer of its own instruments (symbol ending in `.SIM`): one price per simulator day; splits, consolidations, bonus issues and dividends | [simulated-instruments.md](simulated-instruments.md) §4.3 (`0008_market.sql`); [corporate-actions.md](corporate-actions.md) §4.8 (`0009_market_corporate_actions.sql`); [dividends.md](dividends.md) R54–R64 (`0014_dividends.sql`) |
+| **Broker** (S2) | Accepts, rejects, fills, partly fills, cancels and expires orders; settles fills; breaks a trade. It holds no positions and no cash and checks neither | [orders.md](orders.md) §4.10 (`0010_broker.sql`); [trade-settlement.md](trade-settlement.md) §4.8 (`0011_broker_settlement.sql`) |
+| **Custodian** (S3) | Safekeeping accounts with positions, transfers in and out, movements, the delivery of settled fills, corporate actions on its positions, dividend payments and reinvestment elections | [in-kind-transfers.md](in-kind-transfers.md) R60–R72 (`0012_custodian.sql`); [dividends.md](dividends.md) R54–R64 |
+
+**Bank.**
+
+- Accounts are opened by `POST /control/bank/accounts` or from configuration `Simulator:Bank:StandingAccounts`, again after every reset. Its own books: `GET /control/bank/accounts` (with `statementBalance`) and `GET /control/bank/accounts/{accountNumber}/statement-lines` (with `kind`).
+- Receipts: `POST /control/bank/receipts`, with an optional delay into the feed and an optional second delivery. Charges: `POST /control/bank/charges` `{ accountNumber, amount, reference?, valueDate?, availableAfter?, omitFromFeed? }` adds a debit line that is a fee the bank takes (no payee, no `endToEndId`, no `returnOf`). Interest: `POST /control/bank/interest` → 201 `{ id }` adds a **credit** line of kind `Interest` with payer name `Bank interest`, for the amount the operator types (`> 0`, at most 4 decimal places), with optional `reference` (default `Interest`), `valueDate`, `availableAfter` and `omitFromFeed`; the simulator does not compute interest from a rate. Receipts and charges take `omitFromFeed`: the line is in the bank's books and in `balance` but the feed never returns it.
+- Recall: `POST /control/bank/lines/{outsideId}/recall` `{ reason, availableAfter? }` adds a debit line with `returnOf` and `returnReason`.
+- Payments: party route `POST /party/bank/accounts/{accountNumber}/payments`, idempotent on the platform's `instructionId`. It takes a `payee`, or `returnOf` (the outside id of a credit line on that account) in its place: an executed return is a debit line with `endToEndId` and `returnOf`, payer fields = the original payer; a return of no credit line, of a return line, or of a line already returned or recalled is rejected with reason `UnknownLine`. Control routes `POST /control/bank/payment-mode` (`Execute`, `Hold`, `Reject`), `POST /control/bank/payments/{paymentId}/execute`, `POST /control/bank/payments/{paymentId}/return` and `GET /control/bank/payments`. An executed payment is a debit line in the feed, carrying the instruction id as `endToEndId`; a return is a credit line with `returnOf`. A broker settlement's receipt is a credit line on the trust account.
+- Feed: `GET /party/bank/accounts/{accountNumber}/statement-lines?after=&limit=`, with `balance` on every page and `"kind": "Interest"` on an interest line.
+- Ids: outside ids `{WorldId:N}-L{n}`, payment ids `{WorldId:N}-P{n}`. Reset: empties the bank tables and the payments, opens the standing accounts, and sets the payment mode to `Execute`; the platform's next reconciliation shows the old world's lines as a statement difference (bank-reconciliation R30).
+- Log actions: `BankAccountOpened`, `BankReceiptAdded`, `BankPaymentModeChanged`, `BankPaymentExecuted`, `BankPaymentReturned`, `BankReceiptRecalled`, `BankChargeAdded`, `BankInterestPaid`. A payment received on the party port is not a control action.
+
+**Market.**
+
+- Simulated instruments (symbol ending in `.SIM`, name, currency, `dailyMovePercent`) have one price per simulator day, stepped from the day before by a seeded random move of at most `dailyMovePercent` (purpose `market-price:{symbol}`, sequence the day number from 2000-01-01, R26) or set by the operator. Before any market route answers, the price of every day up to the current simulator day is worked out and stored. Standing instruments come from configuration `Simulator:Market:StandingInstruments`, added when the world is created and again after every reset; a bad entry stops the host before it listens.
+- As issuer it announces, amends and cancels splits, consolidations, bonus issues and dividends, and makes one `Effective` when the clock reaches its ex-date, rebasing the price. Every announce, amend, cancel and effective appends one version to the feed. Party action id `{WorldId:N}-CA{n}`, version outside id `{WorldId:N}-CA{n}-V{v}`.
+- Control routes: `GET /control/market/instruments`, `POST /control/market/instruments`, `POST /control/market/instruments/{symbol}/price`, `POST /control/market/instruments/{symbol}/daily-move`, `GET /control/market/instruments/{symbol}/prices`; `GET /control/market/corporate-actions`, `GET …/{id}`, `POST /control/market/corporate-actions`, `POST …/{id}/amend`, `POST …/{id}/cancel`. Party routes: `GET /party/market/prices` and `GET /party/market/corporate-actions?after={cursor}&limit={n}`.
+- Reset: empties the market tables, the corporate actions and their versions, then adds the standing instruments at their configured price.
+- Log actions: `MarketInstrumentAdded`, `MarketPriceSet`, `MarketDailyMoveSet`, `CorporateActionAnnounced`, `CorporateActionAmended`, `CorporateActionCancelled`.
+- The market never reads the platform's catalog and does not know which Tenant lists or holds an instrument, or what the platform posted.
+
+**Broker.**
+
+- Ids: broker order id `{WorldId:N}-O{n}`, report outside id `{WorldId:N}-X{n}`, contract note `CN-{n}`. It stores the client order id as an opaque string and never learns the Tenant, Account or Customer of an order.
+- The order call carries the platform's reference price, and the broker fills a symbol it does not own near that price; a simulated instrument fills at the simulator market's own price. The simulator reads nothing from the platform.
+- Advancing the clock (R22) is how the operator lets working orders expire (the end of the simulator day they were accepted on) and fills settle (the settlement date, a number of weekdays after the trade date; Saturday and Sunday are skipped, and there is no holiday calendar).
+- Control routes: `GET /control/broker`, `POST /control/broker/order-mode`, `POST /control/broker/slippage`, `POST /control/broker/settlement-days`, `POST /control/broker/settlement-mode`, `GET /control/broker/orders`, `GET /control/broker/orders/{brokerOrderId}`, `POST …/{brokerOrderId}/fill`, `POST …/{brokerOrderId}/cancel`, `GET /control/broker/settlements`, `POST /control/broker/settlements/{settlementId}/pay`, `POST /control/broker/fills/{fillReportId}/break`.
+- Party routes: `POST /party/broker/orders` (idempotent on the client order id; optional `settlementAccount` and `safekeepingAccount`), `POST /party/broker/orders/{clientOrderId}/cancel`, `GET /party/broker/reports?after={cursor}&limit={n}`. The feed item carries `settlementId`, `settlementAccount`, `currency`, `netAmount` and `fillCount`, and has the kinds `Broken` and `Settlement`.
+- Configuration `Simulator:Broker:BankAccounts` (`Currency`, `AccountNumber`, `Name`); a bad entry stops start-up.
+- Reset: empties the broker's orders, fills, reports and settlements and restores its settings (mode `Fill` at 100, slippage `0.10`, settlement days 2, settlement mode `Pay`).
+- Log actions: `BrokerOrderModeChanged`, `BrokerSlippageSet`, `BrokerSettlementDaysSet`, `BrokerOrderFilled`, `BrokerOrderCancelled`, `BrokerSettlementModeChanged`, `BrokerSettlementPaid`, `BrokerFillBroken`.
+
+**Custodian.**
+
+- Party routes: `POST /party/custodian/accounts/{accountNumber}/transfers` (idempotent on the instruction id and the body), `GET /party/custodian/accounts/{accountNumber}/movements?after=&limit=` with `positions` on every page, and `POST /party/custodian/accounts/{accountNumber}/elections`.
+- Control routes: `GET /control/custodian`, `GET|POST /control/custodian/accounts`, `GET /control/custodian/accounts/{accountNumber}/movements`, `GET /control/custodian/transfers`, `POST /control/custodian/transfer-mode`, `POST /control/custodian/transfers/{transferId}/execute`, `POST /control/custodian/movements`, `POST /control/custodian/rounding-mode`, `POST /control/custodian/accounts/{accountNumber}/income-account`, `POST /control/custodian/income-mode`, `GET /control/custodian/dividend-payments`, `POST /control/custodian/dividend-payments/{id}/pay`.
+- Configuration `Simulator:Custodian:StandingAccounts` (`AccountNumber`, `Currency`, `Name`, optional `Positions` of `Symbol`, `Quantity`); a bad entry stops start-up. Ids `{WorldId:N}-T{n}` (transfers) and `{WorldId:N}-M{n}` (movements).
+- A settled fill of an order with a safekeeping account adds a `Trade` movement; an effective corporate action settles open fills in the symbol first and adds a `CorporateAction` movement per account with a position.
+- Reset: empties the custodian's accounts, movements and transfers, opens the standing accounts with their positions again, and sets the transfer mode to `Execute` and the rounding mode to `Fractional`.
+- Log actions: `CustodianAccountOpened`, `CustodianTransferModeChanged`, `CustodianTransferExecuted`, `CustodianMovementAdded`, `CustodianRoundingModeChanged`, `CustodianIncomeAccountChanged`, `CustodianIncomeModeChanged`, `CustodianDividendPaid`.
 
 ---
 
@@ -316,6 +366,8 @@ Scalar on the control port is the only UI in this slice. No portal, Back Office 
 
 ### 9.2 Development (AppHost) and tests (TestAppHost)
 
+The AppHost gives the party key to `worker` as the `ApiKey` of the `simulator` bank connection and of the `simulator` market data connection, with the party endpoint as their `BaseUrl`. The Development settings list four standing bank accounts that match `TestSeed`'s client money accounts, and the standing instruments `ACME.SIM` (USD, 100.00) and `KIWI.SIM` (NZD, 5.00) that `TestSeed` adds to the catalog.
+
 - AppHost: `dbserver` gains database `MyWealthSimulatorDb`. Resource `simulator` references it and `identity`, waits for both, with the `party` endpoint (R11), parameters `simulator-client-secret` and `simulator-party-api-key` (secret), and `Identity__SimulatorClientSecret` / `Identity__SimulatorOrigin` on `identity`. No platform host receives the party key in this slice.
 - `Services` gains `Simulator = "simulator"`, `SimulatorDatabase = "MyWealthSimulatorDb"`, `TestSimulatorDatabase = "MyWealthSimulatorDb-test"`.
 - TestAppHost: `dbserver-test` gains database `MyWealthSimulatorDb-test`, used only by `tests/Simulator.Tests`. TestAppHost does not start the simulator process; platform functional tests never need it (ADR 0021 rule 19).
@@ -341,15 +393,13 @@ Amendment to [deployment.md](../deployment.md). Written there as §15 when accep
 
 ## 10. Tests
 
-| Project | Assert |
-| --- | --- |
-| Domain.UnitTests | `User` factory for `SimulatorOperator`: no tenant, no adviser. `LoginEligibility`: Active `SimulatorOperator` with no tenant → true; with a tenant → false; Disabled → false |
-| Application.UnitTests | `RolePermissions.Has(SimulatorOperator, p)` is false for every policy. `ClientRoleAllowList`: `simulator` allows only `SimulatorOperator`; `SimulatorOperator` on `adviser-portal`, `customer-portal`, `back-office` → false |
-| Application.FunctionalTests | A `SimulatorOperator` token → 401 on `GET /users/me`, `GET /currencies` and one ledger route. Hosted login for client `simulator`: the operator without tenantCode → code issued; SystemAdmin, TenantAdmin, Adviser, Customer → uniform failure, no code. The operator on `back-office` and `adviser-portal` → uniform failure. Identity cookie isolation: a `back-office` cookie does not authorize `simulator`, and signing out of `simulator` keeps the `back-office` cookie. A token for `simulator` has no `api` scope and no refresh token |
-| Infrastructure.IntegrationTests | Script `0036`: an insert with `Role = 4`, no tenant, no adviser succeeds; `Role = 4` with a tenant violates the check; existing role shapes still pass. Bootstrap R9: the A25–A31 cases for `Bootstrap:SimulatorOperator:*`; an existing SystemAdmin does not stop the operator from being created, and the reverse; the same email as a SystemAdmin → fails on the unique index, nothing created. Development seed creates the operator once. The moved schema applicator passes its existing tests |
-| Simulator.Tests | Scripts apply on an empty `MyWealthSimulatorDb-test`; a second start applies nothing. First start creates one world; a second start keeps it. Clock: advance by and to, running and paused; refuse zero, negative, both, neither, a past `to`, more than 366 days; pause → now frozen; resume → no jump; offset never negative. Reset with and without a seed: new `WorldId`, offset zero, log kept. Same seed → same draws for the same (purpose, sequence). Outage on → `/party/status` 503, control routes still 200; off → 200. Party: no key → 401, wrong key → 401, right key → 200; key checked before outage (no key during outage → 401). Start-up fails with no key and with a 31-character key. Routes by port: `/party/status` on the control port → 404, `/control/world` on the party port → 404. Control without session → 401; `/scalar` without session → redirect; a session with another role → no access. Control log: one row per write with actor and both instants; a 400 writes no row; newest first; paging. Concurrent writes → one 409 at most. Control sign-in uses a test authentication handler; the OIDC exchange itself is covered by the identity tests above |
+The tests are the executable form of §4. Where they live:
 
-No two-tenant isolation tests: the simulator holds no tenant data, and the platform changes add no tenant-scoped route.
+| Project | Where |
+| --- | --- |
+| Simulator.Tests | The host, the world, the clock, both surfaces and every party |
+| Application.FunctionalTests | `Identity/SimulatorClientTests.cs`; folder `Simulator/` |
+| Infrastructure.IntegrationTests | `AppliedSchema/SimulatorOperatorBootstrapTests.cs`, `UsersRoleSimulatorOperatorSchemaTests.cs` |
 
 ---
 
@@ -397,7 +447,7 @@ Each point was confirmed as recommended and is written into the rules above as s
 Still open, not this slice:
 
 - The first port, adapter, feed cursor table and pull job: roadmap B3 with S1
-- The scenario library and its first step kinds: S1
+- A scenario library, when a named scenario combines steps across parties
 - Business calendars and settlement dates: S2, O2
 - How the simulator gets reference data for real instruments: S2 (point 8)
 - A Blazor control page set
@@ -405,154 +455,16 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
+## 12. History
 
-The repository should build after each commit. Agents split each behaviour into red then green.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/simulator.md`).
 
-1. Move the schema applicator into `src/Schema` (refactor; existing applicator and script tests stay green). No behaviour change.
-2. Role `SimulatorOperator` (R1, R2, R4): enum, `User` factory, `LoginEligibility`, script `0036`, `RolePermissions` + unit and integration tests.
-3. `webapi` refuses the role (R3) + functional tests.
-4. Bootstrap and Development seed (R9, R10) + integration tests.
-5. `identity`: client `simulator`, allow-list, cookie scheme, hosted login without tenantCode (R5–R8) + functional tests.
-6. Simulator host: project, `database/simulator/` scripts, applicator at start-up, ports and routes by port, health, AppHost and TestAppHost entries (R11–R15) + `Simulator.Tests`.
-7. Control sign-in, role check, Scalar, content type rule (R16–R19) + tests.
-8. World, clock, reset, seeded random, control log (R20–R26, R28, R29) + tests.
-9. Party surface: key, status, outage (R27, R30–R33) + tests.
-10. Deploy: compose service with profile, Caddy site, `.env.example`, deploy workflow image (config; exempt from test-first).
-11. Repo docs: deployment, identity-auth, ADR 0013, architecture, database-design, domain-model, api-design amendments; mark this file landed; roadmap §13 step 2.
-
-Do not put a party, a platform port, a feed table or a scenario in these commits.
-
----
-
-## Amendment 2026-11-20 (S1 bank, receipts side) — accepted
-
-Status of this amendment: `accepted` (2026-11-20), together with [deposit-matching.md](deposit-matching.md). Rules R38–R48 and the simulator script `0003_bank.sql` live there (§4.6, §6.3); this section records what changes here.
-
-- §2 Out "Every outside party": the bank's receipts side is in. Bank accounts (opened by `POST /control/bank/accounts` or from configuration `Simulator:Bank:StandingAccounts`, again after every reset), receipts (`POST /control/bank/receipts`, with an optional delay into the feed and an optional second delivery), its own books (`GET /control/bank/accounts`, `GET /control/bank/accounts/{accountNumber}/statement-lines`), and the party route `GET /party/bank/accounts/{accountNumber}/statement-lines?after=&limit=`. Payments, returns, recalls and balances for reconciliation come with roadmap B6 and B7.
-- R24: a reset also empties the bank tables and then opens the standing accounts. R25: bank outside ids are `{WorldId:N}-L{n}` and feed cursors carry the world id.
-- R28: new control log actions `BankAccountOpened` and `BankReceiptAdded`.
-- §9.2: the AppHost now gives the party key to `worker` as the `simulator` bank connection's `ApiKey`, with the party endpoint as its `BaseUrl`. The Development settings list four standing accounts that match `TestSeed`'s client money accounts.
-- §11 point 7 changes: no scenario library with the receipts side. One-off control calls are enough; a named scenario earns its place when it combines steps across parties, from B6 (deposit-matching §11 point 16).
-
----
-
-## Amendment 2026-11-20 (S1 bank, payments side) — accepted
-
-Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md). Rules R48–R57 and the simulator script `0004_bank_payments.sql` live there (§4.7, §6.3); this section records what changes here.
-
-- §2 Out "Every outside party": the bank's payments side is in. Party route `POST /party/bank/accounts/{accountNumber}/payments`, idempotent on the platform's `instructionId`; control routes `POST /control/bank/payment-mode` (`Execute`, `Hold`, `Reject`), `POST /control/bank/payments/{paymentId}/execute`, `POST /control/bank/payments/{paymentId}/return` and `GET /control/bank/payments`. An executed payment is a debit line in the feed, carrying the instruction id as `endToEndId`; a return is a credit line with `returnOf`.
-- R24: a reset also empties the payments and sets the payment mode to `Execute`. R25: payment ids are `{WorldId:N}-P{n}`.
-- R28: new control log actions `BankPaymentModeChanged`, `BankPaymentExecuted` and `BankPaymentReturned`. A payment received on the party port is not a control action.
-- §11 point 7: still no scenario library (withdrawals §11 point 19); it is proposed for B7.
-
----
-
-## Amendment 2026-11-21 (S1 bank, returns and recalls) — accepted
-
-Status of this amendment: `accepted` (2026-11-21), together with [bank-returns.md](bank-returns.md). Rules R12–R16 and the simulator script `0005_bank_returns.sql` live there (§4.5, §6.2); this section records what changes here.
-
-- §2 Out "Every outside party": the bank also returns a receipt and recalls one. The payment route takes `returnOf` (the outside id of a credit line on that account) in place of `payee`; an executed return is a debit line with `endToEndId` and `returnOf`, payer fields = the original payer. A return of no credit line, of a return line, or of a line already returned or recalled is rejected with reason `UnknownLine`. Control route `POST /control/bank/lines/{outsideId}/recall` `{ reason, availableAfter? }` adds a debit line with `returnOf` and `returnReason`.
-- R24: a reset is unchanged (it already empties lines and payments).
-- R28: new control log action `BankReceiptRecalled`.
-
----
-
-## Amendment 2026-11-21 (S1 bank, balances) — accepted
-
-Status of this amendment: `accepted` (2026-11-21), together with [bank-reconciliation.md](bank-reconciliation.md). Rules R26–R30 and the simulator script `0006_bank_balances.sql` live there (§4.7, §6.2); this section records what changes here.
-
-- §2 Out "Every outside party": the bank's statement feed carries `balance` on every page. Control route `POST /control/bank/charges` `{ accountNumber, amount, reference?, valueDate?, availableAfter?, omitFromFeed? }` adds a debit line that is a fee the bank takes (no payee, no `endToEndId`, no `returnOf`). Receipts and charges take `omitFromFeed`: the line is in the bank's books and in `balance` but the feed never returns it. `GET /control/bank/accounts` gains `statementBalance`.
-- R24: a reset is unchanged; the platform's next reconciliation shows the old world's lines as a statement difference (bank-reconciliation R30).
-- R28: new control log action `BankChargeAdded`.
-- §11 point 7: still no scenario library (bank-reconciliation §11 point 12).
-
----
-
-## Amendment 2026-11-22 (interest run) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rules R43 and R44 live there; this section records what changes here.
-
-- §4 bank: new control route `POST /control/bank/interest` → 201 `{ id }`: a **credit** line of kind `Interest` with payer name `Bank interest`, no payer account, no `endToEndId` and no `returnOf`, for the amount the operator types (`> 0`, at most 4 decimal places), with optional `reference` (default `Interest`), `valueDate`, `availableAfter` and `omitFromFeed` as for a bank charge. Log action `BankInterestPaid`. The simulator does not compute interest from a rate.
-- The feed item gains `"kind"`: `"Interest"` on such a line, absent on every other. `GET /control/bank/accounts/{accountNumber}/statement-lines` shows `kind` on each line. The line counts in `balance` and `statementBalance` like any credit. A reset is unchanged.
-- §6: simulator script `0007_bank_line_kind.sql` adds `BankLines.Kind int NOT NULL DEFAULT 0` (CHECK 0–1). Existing lines are transfers.
-- §11 point 7: still no scenario library (interest-run §11 point 16).
-
----
-
-## Amendment 2026-11-22 (S4 market, data vendor half) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [simulated-instruments.md](simulated-instruments.md). Rules R14–R24 and the simulator script `0008_market.sql` live there (§4.3, §6.2); this section records what changes here.
-
-- §2 Out "Every outside party": the **simulator market** is in, as the data vendor of its own instruments. Simulated instruments (symbol ending in `.SIM`, name, currency, `dailyMovePercent`) with one price per simulator day, stepped from the day before by a seeded random move of at most `dailyMovePercent` (purpose `market-price:{symbol}`, sequence the day number from 2000-01-01, R26) or set by the operator. Before any market route answers, the price of every day up to the current simulator day is worked out and stored. Standing instruments come from configuration `Simulator:Market:StandingInstruments`, added when the world is created and again after every reset; a bad entry stops the host before it listens.
-- Control routes: `GET /control/market/instruments`, `POST /control/market/instruments`, `POST /control/market/instruments/{symbol}/price`, `POST /control/market/instruments/{symbol}/daily-move`, `GET /control/market/instruments/{symbol}/prices`. Party route: `GET /party/market/prices` (key R30 and outage R27 as for every party route).
-- R24: a reset also empties the market tables and then adds the standing instruments at their configured price.
-- R28: new control log actions `MarketInstrumentAdded`, `MarketPriceSet` and `MarketDailyMoveSet`.
-- R33: the market never reads the platform's catalog and does not know which Tenant lists or holds an instrument.
-- §9.2: the AppHost gives the party key to `worker` as the `simulator` market data connection's `ApiKey`, with the party endpoint as its `BaseUrl`, and gives the simulator the standing instruments `ACME.SIM` (USD, 100.00) and `KIWI.SIM` (NZD, 5.00) that `TestSeed` adds to the catalog.
-- §11 point 7: still no scenario library (simulated-instruments §11 point 13).
-
----
-
-## Amendment 2026-11-22 (corporate actions) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md). Rules R39–R47 and the simulator script `0009_market_corporate_actions.sql` live there (§4.8, §6.2); this section records what changes here.
-
-- The **simulator market** is also the issuer of its own instruments: it announces, amends and cancels splits, consolidations and bonus issues, and makes one `Effective` when the clock reaches its ex-date, rebasing the price. Every announce, amend, cancel and effective appends one version to the feed. Party action id `{WorldId:N}-CA{n}`, version outside id `{WorldId:N}-CA{n}-V{v}`.
-- Control routes: `GET /control/market/corporate-actions`, `GET /control/market/corporate-actions/{id}`, `POST /control/market/corporate-actions`, `POST /control/market/corporate-actions/{id}/amend`, `POST /control/market/corporate-actions/{id}/cancel`. Party route: `GET /party/market/corporate-actions?after={cursor}&limit={n}` (cursor, limit, key and outage as deposit-matching R44).
-- R24: a reset also empties the corporate actions and their versions.
-- R28: new control log actions `CorporateActionAnnounced`, `CorporateActionAmended` and `CorporateActionCancelled`.
-- R33: the simulator never learns who holds an instrument or what the platform posted.
-
----
-
-## Amendment 2026-11-23 (orders and settlement) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R52–R65 and the simulator script `0010_broker.sql` live there (§4.10, §6.2); this section records what changes here.
-
-- A new party, the **simulator broker**: it accepts, rejects, fills, partly fills, cancels and expires orders, and settles fills. It holds no positions and no cash and checks neither. Broker order id `{WorldId:N}-O{n}`, report outside id `{WorldId:N}-X{n}`, contract note `CN-{n}`.
-- Control routes: `GET /control/broker`, `POST /control/broker/order-mode`, `POST /control/broker/slippage`, `POST /control/broker/settlement-days`, `GET /control/broker/orders`, `GET /control/broker/orders/{brokerOrderId}`, `POST /control/broker/orders/{brokerOrderId}/fill`, `POST /control/broker/orders/{brokerOrderId}/cancel`. Party routes: `POST /party/broker/orders` (idempotent on the client order id), `POST /party/broker/orders/{clientOrderId}/cancel`, `GET /party/broker/reports?after={cursor}&limit={n}` (cursor, limit, key and outage as deposit-matching R44).
-- R22: advancing the clock is how the operator lets working orders expire (the end of the simulator day they were accepted on) and fills settle (the settlement date, a number of weekdays after the trade date).
-- R24: a reset also empties the broker's orders, fills and reports and restores its settings (mode `Fill` at 100, slippage `0.10`, settlement days 2).
-- R28: new control log actions `BrokerOrderModeChanged`, `BrokerSlippageSet`, `BrokerSettlementDaysSet`, `BrokerOrderFilled` and `BrokerOrderCancelled`.
-- R33: the simulator stores the client order id as an opaque string and never learns the Tenant, Account or Customer of an order.
-- §11 point 8 is answered: the order call carries the platform's reference price, and the broker fills a symbol it does not own near that price; a simulated instrument fills at the simulator market's own price. The simulator reads nothing from the platform.
-- "Still open": business calendars and settlement dates are answered for S2 by a settlement-days setting that skips Saturday and Sunday, with no holiday calendar.
-
----
-
-## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement.md](trade-settlement.md). Rules R35–R42 and the simulator script `0011_broker_settlement.sql` live there (§4.8, §6.2); this section records what changes here.
-
-- Party port: `POST /party/broker/orders` takes an optional `settlementAccount`; the feed item gains `settlementId`, `settlementAccount`, `currency`, `netAmount` and `fillCount`, and kinds `Broken` and `Settlement`. The simulator bank has no new route; the broker's receipt is a credit line on the trust account.
-- Control port: `POST /control/broker/settlement-mode`, `GET /control/broker/settlements`, `POST /control/broker/settlements/{settlementId}/pay`, `POST /control/broker/fills/{fillReportId}/break`.
-- Configuration `Simulator:Broker:BankAccounts` (`Currency`, `AccountNumber`, `Name`); a bad entry stops start-up.
-- Control log actions `BrokerSettlementModeChanged`, `BrokerSettlementPaid`, `BrokerFillBroken`.
-- Reset (R24) also empties the broker settlements and sets the settlement mode to `Pay`.
-
----
-
-## Amendment 2026-11-24 (S3 custodian) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R60–R72 live there; this section records what changes here.
-
-- Party port: `POST /party/custodian/accounts/{accountNumber}/transfers` (idempotent on the instruction id and the body) and `GET /party/custodian/accounts/{accountNumber}/movements?after=&limit=` with `positions` on every page. `POST /party/broker/orders` takes an optional `safekeepingAccount`.
-- Control port: `GET /control/custodian`, `GET|POST /control/custodian/accounts`, `GET /control/custodian/accounts/{accountNumber}/movements`, `GET /control/custodian/transfers`, `POST /control/custodian/transfer-mode`, `POST /control/custodian/transfers/{transferId}/execute`, `POST /control/custodian/movements`, `POST /control/custodian/rounding-mode`.
-- Configuration `Simulator:Custodian:StandingAccounts` (`AccountNumber`, `Currency`, `Name`, optional `Positions` of `Symbol`, `Quantity`); a bad entry stops start-up.
-- Ids `{WorldId:N}-T{n}` (transfers) and `{WorldId:N}-M{n}` (movements).
-- Control log actions `CustodianAccountOpened`, `CustodianTransferModeChanged`, `CustodianTransferExecuted`, `CustodianMovementAdded`, `CustodianRoundingModeChanged`.
-- A settled fill of an order with a safekeeping account adds a `Trade` movement; an effective corporate action settles open fills in the symbol first and adds a `CorporateAction` movement per account with a position.
-- Reset (R24) also empties the custodian's accounts, movements and transfers, opens the standing accounts with their positions again, and sets the transfer mode to `Execute` and the rounding mode to `Fractional`.
-- Script `database/simulator/0012_custodian.sql`.
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R54–R64 live there; this section records what changes here.
-
-- Control port: `POST /control/market/corporate-actions` and its amend take kind `Dividend`; `POST /control/custodian/accounts/{accountNumber}/income-account`, `POST /control/custodian/income-mode`, `GET /control/custodian/dividend-payments` and `POST /control/custodian/dividend-payments/{id}/pay`.
-- Party port: `POST /party/custodian/accounts/{accountNumber}/elections`; the market's corporate action feed may carry dividends.
-- Log actions `CustodianIncomeAccountChanged`, `CustodianIncomeModeChanged`, `CustodianDividendPaid`.
-- Script `database/simulator/0014_dividends.sql`.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-20 | [deposit-matching.md](deposit-matching.md), [withdrawals.md](withdrawals.md) | §4.6: the bank, receipts and payments |
+| 2026-11-21 | [bank-returns.md](bank-returns.md), [bank-reconciliation.md](bank-reconciliation.md) | §4.6: the bank, returns, recalls, charges and balances |
+| 2026-11-22 | [interest-run.md](interest-run.md) | §4.6: bank interest |
+| 2026-11-22 | [simulated-instruments.md](simulated-instruments.md), [corporate-actions.md](corporate-actions.md) | §4.6: the market, as data vendor and as issuer |
+| 2026-11-23 | [orders.md](orders.md), [trade-settlement.md](trade-settlement.md) | §4.6: the broker |
+| 2026-11-24 | [in-kind-transfers.md](in-kind-transfers.md), [dividends.md](dividends.md) | §4.6: the custodian; dividends |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
