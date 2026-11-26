@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-22
-last_updated: 2026-11-22
+last_updated: 2026-11-26
 related:
   - ../custodial-roadmap.md
   - ../future-plans.md
@@ -126,7 +126,7 @@ The rule that distinguishes this slice: interest is earned per day and paid per 
 - A reduced NRWT rate under a double tax agreement, and the approved issuer levy. An overseas Customer is withheld at 15 % (R4)
 - Paying the withheld tax to Inland Revenue, the investment income report to Inland Revenue, and a tax certificate or year-end tax statement for the Customer
 - Recording withholding tax on a hand-entered `Interest` of an External account (income events, future-plans §1 step 2)
-- Dividends (roadmap C2). They reuse the `Tax` leg and the tax detail of R25
+- Dividends on External accounts. Dividends on Custodial accounts are [dividends.md](dividends.md), which reuses the `Tax` leg and the tax detail of R25
 - Passing the bank's trust interest through to Customers, a fee on interest, and a computed margin figure (§11 point 6)
 - Interest on negative balances (a Custodial balance is never negative), and negative rates
 - Per-Customer, per-Account or per-portfolio rates. A platform default schedule
@@ -202,7 +202,7 @@ The pattern of the trade fee schedule ([trade-fees.md](trade-fees.md) R5–R13),
 
 | ID | Rule |
 | --- | --- |
-| R16 | **Day and day balance.** A day is a UTC date, as everywhere on the platform ([utc-instants](../fixes/utc-instants.md)). The **day balance** of an account for day `d` is the sum of its cash legs, of every role, on Transactions with `bookedAt` before 00:00 UTC of `d + 1`: the closing balance of the day. Reserved cash counts, because the money is still in the trust account. On a Custodial account the server sets `bookedAt` (custody-modes R10), so the day balance of a past day never changes. |
+| R16 | **Day and day balance.** A day is a UTC date, as everywhere on the platform ([utc-instants](../fixes/utc-instants.md)). The **day balance** of an account for day `d` is the sum of its cash legs, of every role, on Transactions with `bookedAt` before 00:00 UTC of `d + 1`: the closing balance of the day. Reserved cash counts, because the money is still in the trust account. On a Custodial account the server sets `bookedAt` (custody-modes R10), so the day balance of a past day never changes. Migrated cash accrues interest from the closing balance of the UTC day its batch was posted, not from the batch's `asOfDate` (migration-batches R24). |
 | R17 | **Accrual.** For day `d` with an applicable schedule (R11): `accrual = Round(bands.Apply(dayBalance) / 365, 8, AwayFromZero)`, where `bands.Apply` is the sum over bands of `ratePercent / 100 × (the part of the balance inside the band)` (trade-fees R8). The divisor is 365 for every currency and every year (Actual/365 Fixed). When the accrual is `0` (no balance, no schedule, a zero rate) no row is stored. |
 | R18 | **Accrual row.** One row per account and day: the day, the day balance, the schedule used, the effective annual rate (`bands.Apply(dayBalance) / dayBalance × 100`, 4 decimals) and the amount (8 decimals). At most one per `(Account, day)`. It is written once and never changed, except that R22 stamps it with the Transaction that paid it. |
 | R19 | **Accrue through a day.** Each account has `interestAccruedThrough`: the last day accrual was worked out for, `null` before the first time. To accrue an account through day `D`, the platform locks the Account row as every posting does (posting R22) and, in one database transaction, stores the rows of every day after `interestAccruedThrough` (or from the UTC date the account was created, when `null`) up to `D`, then sets `interestAccruedThrough` to `D`. An account already accrued through `D` or later is left as it is. So each `(Account, day)` is accrued exactly once, whoever asks and however often. |
@@ -218,7 +218,7 @@ Amendment to [posting.md](posting.md), [trade-fees.md](trade-fees.md) (cash leg 
 | R22 | **Posting.** `accrued` = the sum of those rows. `gross = Round(accrued, dp, AwayFromZero)`, `dp` the currency's `DecimalPlaces`. When `gross` is `0`, nothing is posted and the rows stay unposted, so they count in the next posting. Otherwise the platform posts one `Interest` Transaction (R23) and stamps every row with it, in the same database transaction as R19. The part of `accrued` that rounding takes or adds is not carried forward. |
 | R23 | **The Transaction.** Type `Interest`, with one `Principal` cash leg on the Account of `+gross`; when the tax of R24 is above 0, a second cash leg with role `Tax` of `−tax` and its tax detail (R25); an interest detail (R26); source `InterestRun` (6) with the run's PublicId as source id; `bookedAt` = platform time when it is posted (ADR 0021 rule 10); memo `Interest`; `reference` `null`. Built by `Transaction.PostInterest` without the manual entry matrix (custody-modes R7). `CreatedBy` is the worker's system name for the daily job, the person for a manual run or an account closure (R33). |
 | R24 | **Withholding at posting.** The tax kind and rate are R4 for the Customer's tax profile when the Transaction is built. `tax = Round(gross × ratePercent / 100, dp, AwayFromZero)`, in the Account's currency. When `tax` is `0`, the Transaction has no `Tax` leg and no tax detail. Inland Revenue's pages state no rounding rule for the amount; the half-up rounding of the platform is used (§11 point 10). |
-| R25 | **`Tax` cash leg and tax detail.** `CashLegRole` gains `Tax = 2`: an amount withheld from the Transaction's income and owed to a tax authority, always negative on the Account. Every `Tax` leg has exactly one tax detail, and no other leg has one: tax kind (`Rwt`, `Nrwt`), rate percent, basis amount (the gross the tax was computed on), tax amount and currency. At most one tax detail per `(Transaction, kind)`. In this slice a `Tax` leg appears only on an `Interest` posted by an interest run; the Domain refuses it on every other type. Dividends (roadmap C2) reuse the role and the detail and add their kinds. |
+| R25 | **`Tax` cash leg and tax detail.** `CashLegRole` gains `Tax = 2`: an amount withheld from the Transaction's income and owed to a tax authority, always negative on the Account. Every `Tax` leg has exactly one tax detail, and no other leg has one: tax kind (`Rwt`, `Nrwt`), rate percent, basis amount (the gross the tax was computed on), tax amount and currency. At most one tax detail per `(Transaction, kind)`. In this slice a `Tax` leg appears only on an `Interest` posted by an interest run; the Domain refuses it on every other type. Dividends (roadmap C2) reuse the role and the detail and add their kinds. `TaxKind` also has `ForeignWithholding` (2). A `Tax` leg is allowed on `Interest` (kinds `Rwt`, `Nrwt`) and on `Dividend` (all three kinds) and on no other type (dividends R38). `WithholdingRates` also holds the dividend rates: RWT 33 % for every New Zealand Customer, NRWT 30 % for an overseas Customer on a New Zealand company's dividend; the rates of interest are as above (dividends R33). |
 | R26 | **Interest detail.** Every interest posting has exactly one interest detail: `periodFrom` and `periodTo` (the earliest and latest day of the rows it paid), `days` (the number of rows), `accruedAmount` (8 decimals) and `grossAmount`. The rows themselves say which schedule and rate each day used (R36). |
 | R27 | **No reversal by hand, none by the flow.** `InterestRun` is not a hand-reversible source (transaction-source R12): `POST /transactions/{id}/reverse` of an interest posting → 400 by transaction-source R13. No flow of this slice reverses one; a wrong posting is corrected with an adjustment ([adjustments.md](adjustments.md)). `Transaction.Reverse` copies a `Tax` leg with its role and tax detail and copies the interest detail, as it copies a fee detail (trade-fees R19), so a later flow can undo its own posting. |
 | R28 | **Cash rules.** The net of an interest posting is never negative (the highest rate is 45 %), so available cash only rises (withdrawals R36). The portfolio trade lock does not apply and no rebalance is enqueued, as for a deposit (deposit-matching R19). |
@@ -251,7 +251,7 @@ Amendment to [deposit-matching.md](deposit-matching.md) R10, R13, R45 and R49, [
 | --- | --- |
 | R39 | **Line kind.** A bank statement line has a **kind**: `Transfer` (a payment in or out; the default) or `Interest` (interest the bank pays or charges on the account itself). The port's line carries it; an adapter maps the party's own code and gives `Transfer` for a code it does not know. A kind is never a reason to refuse a page (deposit-matching R10). Lines stored before this slice are `Transfer`. The statement line item gains `kind`, and `GET /statement-lines` an optional `kind` filter (unknown → 400 `errors.Kind`). |
 | R40 | **Processing.** In the processing step (deposit-matching R13), a `Received` **credit** line of kind `Interest` is not matched and its reference is not read. In one database transaction the platform sets it `Ignored`, with last action `Ignored`, the note `Bank interest`, the time and no person. Nothing is written to the ledger: the interest Customers earn is posted by the interest run from the Tenant's schedule, not from this line (§11 point 6). A TenantAdmin may reopen the line and handle it like any receipt (deposit-matching R29). A **debit** line of kind `Interest` gets no special rule: it is processed as any debit line (bank-returns R2–R4) and waits in suspense. |
-| R41 | **Reconciliation items.** Three new kinds, all Known. `BankInterest`: one item per `Ignored` credit line of kind `Interest`, in place of the `Ignored` item of bank-reconciliation R9, with the line's amount. `InterestCredited`: for the Transactions with source `InterestRun` on the Tenant's Custodial accounts in the currency, minus the sum of their `Principal` legs (negative: Custodial cash rose and the bank balance did not), `count` = the Transactions. `TaxWithheld`: minus the sum of their `Tax` legs (positive: Custodial cash fell and the money is still in the trust account), `count` = the Transactions with a `Tax` leg. These legs no longer count in `OtherLedgerCash`. An item whose amount is `0` is left out. The items of a run still add up to its difference. |
+| R41 | **Reconciliation items.** Three new kinds, all Known. `BankInterest`: one item per `Ignored` credit line of kind `Interest`, in place of the `Ignored` item of bank-reconciliation R9, with the line's amount. `InterestCredited`: for the Transactions with source `InterestRun` on the Tenant's Custodial accounts in the currency, minus the sum of their `Principal` legs (negative: Custodial cash rose and the bank balance did not), `count` = the Transactions. `TaxWithheld`: minus the sum of their `Tax` legs (positive: Custodial cash fell and the money is still in the trust account), `count` = the Transactions with a `Tax` leg. These legs no longer count in `OtherLedgerCash`. An item whose amount is `0` is left out. The items of a run still add up to its difference. `TaxWithheld` also counts the `Rwt` and `Nrwt` legs of every `Dividend` on the Tenant's Custodial accounts in the currency (dividends R45). |
 | R42 | **What the three items mean.** Their sum is the bank's interest that was not credited to Customers: the tax withheld and not yet paid over, plus the firm's interest margin when it is positive, minus what the firm credited above the bank's interest. The platform does not compute a margin, pay the tax or move the firm's share. When the firm takes money out of the trust account for either, the bank's debit line goes to suspense and a TenantAdmin ignores it with a note (bank-returns R9); that `Ignored` item offsets these. Whether a firm may keep a margin is a matter of its client agreement and the client money rules; the platform records the flows and does not decide it. |
 | R43 | **Simulator: pay interest.** `POST /control/bank/interest` → 201 `{ id }` (the outside id). Body: `accountNumber` (an open account, else 400 `errors.AccountNumber`); `amount` (`> 0`, at most 4 decimal places); optional `reference` (≤ 140, default `Interest`); optional `valueDate`, `availableAfter` and `omitFromFeed` as for a bank charge (bank-reconciliation R27, R28). It adds a **credit** line of kind `Interest` with payer name `Bank interest`, no payer account, no `endToEndId` and no `returnOf`. The operator types the amount; the simulator does not compute interest from a rate. Log action `BankInterestPaid`. |
 | R44 | **Simulator: wire and books.** The feed item (deposit-matching R45) gains `"kind"`: `"Interest"` on such a line, absent on every other. `GET /control/bank/accounts/{accountNumber}/statement-lines` shows `kind` on each line. The line counts in `balance` and `statementBalance` like any credit. A reset is unchanged. |
@@ -630,24 +630,14 @@ Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-d
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `WithholdingRates.For`: the four rows of R4, each of the five chosen rates. `CustomerTaxProfile.Set`: a rate without a held IRD number, with `Overseas`, or outside the five → throws; `NotProvided` → Rwt 45 NonDeclaration. `InterestRateSchedule.AccrualFor`: one band (5 000 at 3 % → 0.41095890, rate 3.0000); two bands with the balance below, on and above the edge and the blended rate; a zero rate and a zero balance → 0; 8-decimal rounding. Pending and in effect for update and delete. `Transaction.PostInterest`: `Principal` +gross and `Tax` −tax with its detail; gross rounded per `DecimalPlaces` 2 and 0; tax 0 → no `Tax` leg and no detail; gross 0 → throws; the source must be `InterestRun`; the interest detail's fields. `Reverse` copies the `Tax` leg, tax detail and interest detail. `PostBuy`, `Post` and the other factories refuse a `Tax` leg. `TransactionSource.InterestRun(Guid.Empty)` → throws. `CustodyRules.AllowsHandReverse(Custodial, InterestRun)` false. `Account.MarkInterestAccrued`: never moves back; refused on External. `InterestRun.PostingDate`: 31 Dec → 31 Dec; 15 Jan → 31 Dec; 1 Jan → 31 Dec. `BankStatementLine.SetAsideAsBankInterest`: only a `Received` credit line of kind `Interest`. `BankReconciliation.Compute`: an ignored interest line → `BankInterest`, not `Ignored`; the two ledger kinds with their signs and counts; zero amounts left out; the items still add up to the difference |
-| Application.FunctionalTests — tax profile | No Bearer → 401; SystemAdmin → 403; a Customer on the customers route → 403. Never saved → the not-provided item. TenantAdmin and the assigned Adviser set and read it; another Adviser → 404; each R3 refusal → 400; stale `rowVersion` → 409; the first write with `rowVersion` `null`, a second first write → 409. `GET /users/me/tax-profile`: the Customer's own, no `updatedBy`; an Adviser → 404. Two-tenant: tenant B's customer id → 404 on GET and PUT |
-| Application.FunctionalTests — schedules | No Bearer → 401; Customer and SystemAdmin → 403; Adviser reads, write → 403; TenantAdmin creates, updates and deletes a pending row; `effectiveFrom` today → 400; duplicate → 400; band shape → 400; after an account was accrued through a later day, a row on or before that day → 400 on create and 409 `interest_schedule_in_effect` on update and delete; stale `rowVersion` → 409. Two-tenant: tenant B's schedule id → 404; a run uses only its own tenant's schedules |
-| Application.FunctionalTests — runs | With the option on in the test host. A deposit, then a run through the month end → one row per day from the schedule's first day, each on that day's closing balance (a second deposit mid-month raises the later days only); `accruedInterest` and `interestAccruedThrough` on the account before the month end; at the month end one `Interest` with `Principal`, `Tax` (the profile's rate), both details, source `InterestRun`, the rows stamped, `accruedInterest` 0. The same run again → zero counts, no second Transaction. A mid-month as-of date → rows, no posting. Two missed months → one Transaction covering both. A balance too small to round above 0 → no Transaction, rows carried into the next month. A schedule change mid-month → each day at its own schedule. A profile changed before posting → the new rate on the whole posting; not provided → 45 %; `Overseas` → `Nrwt` 15 %. Reserved cash still earns. A Disabled Customer and a disabled Tenant are accrued. Closed, closing and External accounts are not. One account made to fail → the others are posted, `accountsFailed` 1, and the next run completes it. `POST /interest/runs`: SystemAdmin → 201; TenantAdmin, Adviser, Customer → 403; unknown tenant → 404; with the option off, an as-of date of today → 400 and of yesterday → 201. A host started with `UseEnvironment("Production")` and the option on fails at start-up. Reads: TenantAdmin sees the tenant's runs with totals; SystemAdmin without `tenantId` → 400; Adviser → 403. `GET /accounts/{id}/interest-accruals`: filters, the Customer's own, another Customer's account → 404. Hand reverse of the posting → 400; hand `Interest` on the Custodial account → 400 still. The Customer Transactions Report shows the net amount and the Tax column. Two-tenant: tenant B's run id → 404; a run for tenant A never accrues tenant B's accounts |
-| Application.FunctionalTests — closure | Request a closure on an account with unposted rows → the final interest is posted first (source a run with trigger `AccountClosure`), the payout is the balance with the net interest, the closure's `cashBalanceAtRequest` includes it. A refused request (a holding) posts nothing. A closing account is skipped by a run; after the withdrawal is rejected the next run accrues the days in between. An account with no accrual → no run row |
-| Application.FunctionalTests — bank interest | With the fake `IBankFeed`: a credit line of kind `Interest` → `Ignored` with the note `Bank interest` and no person, no Transaction, also when its reference names an account; reopen → `Unmatched`. A debit line of kind `Interest` → suspense (`UnknownPayment`). `GET /statement-lines?kind=Interest`. Reconciliation after an interest posting and a bank interest line → `BankInterest`, `InterestCredited`, `TaxWithheld`, status `Agreed`, nothing in `OtherLedgerCash` |
-| Infrastructure.IntegrationTests | `0047`: the residency, rate and rate-needs-IRD CHECKs; one row per Customer. `0048`: a second row for the same `(Account, day)` violates; role `2` allowed and `3` violates; a second tax detail of the same kind on a Transaction violates; `SourceKind = 6` needs a `SourcePublicId`, `7` violates; line `Kind` 2 violates; item `Kind = 12` needs a line, `15` violates; the run CHECKs. EF round-trips. `InterestRunJob` on a worker host: every Tenant with a schedule, a Tenant without one skipped, one failing Tenant does not stop the next. `SimulatorBankFeed`: `kind` `Interest`, absent, `null`, an unknown text → `Transfer`; a number → `BadResponse`. TestSeed idempotent |
-| Simulator.Tests | `0007` applies. `POST /control/bank/interest` → a credit line of kind `Interest`, payer name `Bank interest`; `kind` on the feed item of that line only; counted in `balance`; `omitFromFeed`; an unknown account → 400; the control log row |
-| Adviser Portal | D58 the section, the disabled rate select, the 400 and 409; D59 the list, the band text, TenantAdmin-only actions, the in-effect message; D60 TenantAdmin only, columns and labels, no start button; D61 the interest block, the daily table, no Reverse, the list row; D62 the accrued line and the Close account sentence; D63 the tag, the filter, the three labels |
-| Customer Portal | C28–C30 |
-| Back Office | BO20, BO21 |
-
-Fan-out in the tests:
-
-- Tests that read a cash leg's `role` or the reconciliation item kinds as closed lists gain the new values.
-- The Adviser Portal and Customer Portal `Transaction` types gain `interest` and leg `tax`; `Account` gains `accruedInterest` and `interestAccruedThrough`; `StatementLine` gains `kind`.
+| Domain.UnitTests | Folder `Interest/` |
+| Application.FunctionalTests | Folder `Interest/` |
+| Infrastructure.IntegrationTests | `AppliedSchema/InterestSchemaTests.cs`, `CustomerTaxProfilesSchemaTests.cs`, `InterestRunJobTests.cs`, `TestSeedInterestTests.cs` |
+| Simulator.Tests | The simulator bank: trust interest |
 
 ---
 
@@ -708,50 +698,18 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
-
-The repository should build after each commit. Agents split each behaviour into red then green. Start after [account-closure.md](account-closure.md) has landed (it has, 2026-11-22).
-
-1. Script `0047`, `CustomerTaxProfile`, `TaxResidency`, `WithholdingRates` + Domain unit tests and the `0047` integration tests.
-2. Tax profile routes (R1–R8) + functional tests, two-tenant.
-3. Script `0048`; `InterestRateSchedule` and `AccrualFor` (R9, R17) + Domain unit tests and the `0048` integration tests.
-4. Interest rate schedule routes, the permissions, the cut-off date and the problem code (R9–R15) + functional tests, two-tenant.
-5. `CashLegRole.Tax`, the tax detail, the interest detail, source kind `InterestRun`, `Transaction.PostInterest`, `Reverse` copies (R23–R27) + Domain unit tests.
-6. `AccountInterest`: accrue through a day and post (R16–R22, R28) + functional tests through a test-only call of the service.
-7. `RunInterest`, the run record, `POST /interest/runs`, the option and its start-up check, the run reads (R20, R30, R32, R37) + functional tests, two-tenant.
-8. The daily job (R31) + integration tests on a worker host.
-9. Reads: the transaction item, the account item, the accrual rows, the Customer Transactions Report Tax column (R34–R36, R38) + functional tests.
-10. Account closure: the final interest and no accrual while closing (R33) + functional tests.
-11. Statement line kind, the bank interest line set aside, `SimulatorBankFeed` (R39, R40, R45) + functional and integration tests.
-12. Reconciliation kinds `BankInterest`, `InterestCredited`, `TaxWithheld` (R41) + Domain unit and functional tests.
-13. Simulator: script `0007`, `POST /control/bank/interest`, `kind` on the feed (R43, R44) + `Simulator.Tests`.
-14. TestSeed schedules and tax profile; the Development setting.
-15. BFF prefix, Adviser Portal D58–D63 + frontend tests.
-16. Customer Portal C28–C30 + frontend tests.
-17. Back Office BO20, BO21 + tests.
-18. Repo docs: mark this file landed; roadmap §13 step 9 and the §2 matrix; remove the "No interest" known-issue row.
-
-Do not put dividends, a tax statement, an Inland Revenue filing or an interest report in these commits.
-
-### Docs amended when this spec is accepted
+## 12. Docs changed when this spec was accepted
 
 [customers.md](customers.md) (the tax profile sub-resource and `GET /users/me/tax-profile`), [posting.md](posting.md) (R16, R20 and the type table: `Interest` on a Custodial account is written by the interest run, with a `Tax` leg), [trade-fees.md](trade-fees.md) (the cash leg role `Tax`; R20 wording), [custody-modes.md](custody-modes.md) (R5 matrix: "written by" the interest run), [transaction-source.md](transaction-source.md) (kind `InterestRun` = 6, not hand-reversible, check widened), [accounts.md](accounts.md) (`accruedInterest`, `interestAccruedThrough`, the accrual rows route), [account-closure.md](account-closure.md) (R4–R7: final interest; R11: not accrued while closing; §2 Out and "Still open" updated), [deposit-matching.md](deposit-matching.md) (R10, R13, R27, R45, R49: line kind, the interest line set aside), [bank-returns.md](bank-returns.md) (a debit line of kind `Interest`, unchanged rule, note), [bank-reconciliation.md](bank-reconciliation.md) (R9–R11 and §5: three kinds; §2 Out and "Still open" updated), [withdrawals.md](withdrawals.md) (R36: an interest posting only raises available cash, note), [reports.md](reports.md) (Customer Transactions Report Tax column), [simulator.md](simulator.md) (R43, R44, script `0007`), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix `/interest`), [api-design.md](../api-design.md) (§3.1 four permission rows, §4.2 the problem code, §6 resource rows, a new §7.10 Interest, §7.4 and §7.6 notes, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (the `worker` job and queue), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D58–D63), [customer-portal.md](../customer-portal/customer-portal.md) (C28–C30), [back-office.md](../backoffice/back-office.md) (BO20, BO21), [known-issues/custodial-account-gaps.md](../known-issues/custodial-account-gaps.md) (the "No interest" row notes this spec; it is removed when the slice lands), [glossary.md](../glossary.md) (the review terms become accepted; Cash leg role and Transaction source gain their new values), [function-plan.md](../function-plan.md) §5 (the roadmap step, and "Still later": tax residency and the IRD number flag now exist as the tax profile; KYC / AML stays later), [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §1 step 2 (the tax leg and the tax profile exist), and the roadmap §6 I1 and I2, §11 S1, §12 D12 and D18, and §13 status.
 
 ---
 
-## Amendment 2026-11-24 (migration batches) — accepted
+## 13. History
 
-Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rule R24 lives there; this section records what changes here.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/interest-run.md`).
 
-- §4.4: migrated cash accrues interest from the closing balance of the UTC day its batch was posted, not from the batch's `asOfDate`.
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R33, R38 and R45 live there; this section records what changes here.
-
-- R25: `TaxKind` gains `ForeignWithholding` (2). A `Tax` leg is allowed on `Interest` (kinds `Rwt`, `Nrwt`) and on `Dividend` (all three kinds) and on no other type.
-- R41: `TaxWithheld` also counts the `Rwt` and `Nrwt` legs of every `Dividend` on the Tenant's Custodial accounts in the currency.
-- `WithholdingRates` gains the dividend rates: RWT 33 % for every New Zealand Customer, NRWT 30 % for an overseas Customer on a New Zealand company's dividend. The rates of interest are unchanged.
-- §2 Out: dividends on Custodial accounts are no longer out; dividends on External accounts still are.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-24 | [migration-batches.md](migration-batches.md) | R16: when migrated cash starts to accrue |
+| 2026-11-24 | [dividends.md](dividends.md) | R25, R41: tax legs on a `Dividend`; the dividend withholding rates |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
