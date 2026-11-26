@@ -7,8 +7,8 @@ namespace MyWealthV2.Domain.Valuations;
 public static class LedgerDay
 {
     /// <summary>00:00 UTC of the day after <paramref name="day"/>.</summary>
-    public static DateTimeOffset End(DateOnly day) => default;
+    public static DateTimeOffset End(DateOnly day) => new(day.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
 
     /// <summary>The UTC date of <paramref name="instant"/>.</summary>
-    public static DateOnly Of(DateTimeOffset instant) => default;
+    public static DateOnly Of(DateTimeOffset instant) => DateOnly.FromDateTime(instant.UtcDateTime);
 }
