@@ -15,7 +15,8 @@ public static class AdviserBalancesBinder
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
     };
 
-    public static AdviserBalancesBinding Bind(JsonElement parameters, UserRole role, Guid? callerPublicId)
+    public static AdviserBalancesBinding Bind(
+        JsonElement parameters, UserRole role, Guid? callerPublicId, AdviserBalancesBindMode mode)
     {
         AdviserBalancesInput input;
         try
@@ -70,5 +71,7 @@ public static class AdviserBalancesBinder
         public Guid? AdviserId { get; set; }
 
         public bool? IncludeClosedAccounts { get; set; }
+
+        public string? Date { get; set; }
     }
 }

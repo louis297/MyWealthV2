@@ -22,7 +22,8 @@ public sealed class AdviserBalancesReportGenerator(
         }
 
         using var parameters = JsonDocument.Parse(execution.ParametersJson);
-        var binding = AdviserBalancesBinder.Bind(parameters.RootElement, UserRole.TenantAdmin, callerPublicId: null);
+        var binding = AdviserBalancesBinder.Bind(
+            parameters.RootElement, UserRole.TenantAdmin, callerPublicId: null, AdviserBalancesBindMode.Snapshot);
         var tenant = await db.Tenants.AsNoTracking()
                          .SingleOrDefaultAsync(row => row.Id == execution.TenantId, cancellationToken)
                      ?? throw new InvalidOperationException("Tenant was not found.");
