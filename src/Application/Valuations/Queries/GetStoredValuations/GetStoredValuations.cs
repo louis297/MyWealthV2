@@ -1,10 +1,7 @@
-using MyWealthV2.Application.Accounts;
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.MarketData;
-using MyWealthV2.Domain.Entities;
-using MyWealthV2.Domain.Enums;
 using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
 namespace MyWealthV2.Application.Valuations.Queries.GetStoredValuations;
@@ -40,7 +37,7 @@ public class GetStoredValuationsQueryHandler(IApplicationDbContext db, ICurrentU
     public async Task<PagedList<StoredValuationSummaryDto>> Handle(
         GetStoredValuationsQuery request, CancellationToken cancellationToken)
     {
-        var account = await StoredValuationReader.AccountAsync(db, currentUser, request.AccountId, cancellationToken);
+        var account = await ValuationAccounts.FindAsync(db, currentUser, request.AccountId, cancellationToken);
         var query = db.StoredValuations.IgnoreQueryFilters().AsNoTracking()
             .Where(row => row.AccountId == account.Id && row.TenantId == account.TenantId);
         if (MarketDataDates.Parse(request.From) is { } from)
@@ -95,7 +92,7 @@ public class GetStoredValuationQueryHandler(IApplicationDbContext db, ICurrentUs
 {
     public async Task<StoredValuationDto> Handle(GetStoredValuationQuery request, CancellationToken cancellationToken)
     {
-        var account = await StoredValuationReader.AccountAsync(db, currentUser, request.AccountId, cancellationToken);
+        var account = await ValuationAccounts.FindAsync(db, currentUser, request.AccountId, cancellationToken);
         var day = MarketDataDates.Parse(request.Date)!.Value;
         var stored = await db.StoredValuations.IgnoreQueryFilters().AsNoTracking().Include(row => row.Lines)
                          .SingleOrDefaultAsync(row => row.AccountId == account.Id && row.TenantId == account.TenantId && row.Date == day,
@@ -141,31 +138,5 @@ public class GetStoredValuationQueryHandler(IApplicationDbContext db, ICurrentUs
             stored.UnvaluedCount,
             runId,
             stored.ValuedAt);
-    }
-}
-
-internal static class StoredValuationReader
-{
-    /// <summary>R1: the Account found as <c>GET /accounts/{id}/valuation</c> finds it; any other Account is 404.</summary>
-    public static async Task<Account> AccountAsync(
-        IApplicationDbContext db, ICurrentUser currentUser, Guid accountId, CancellationToken cancellationToken)
-    {
-        var assignedAdviserId = AccountScope.AssignedAdviserInternalId(currentUser);
-        var selfCustomerId = AccountScope.SelfCustomerId(currentUser);
-        var accounts =
-            from account in db.Accounts.AsNoTracking()
-            join customer in db.Users.AsNoTracking() on account.CustomerId equals customer.Id
-            where account.PublicId == accountId
-                  && (assignedAdviserId == null || customer.AdviserId == assignedAdviserId)
-                  && (selfCustomerId == null || customer.Id == selfCustomerId)
-            select account;
-
-        if (currentUser.Role != UserRole.SystemAdmin)
-        {
-            var tenantId = currentUser.TenantId ?? throw new NotFoundException("Account", accountId);
-            accounts = accounts.Where(account => account.TenantId == tenantId);
-        }
-
-        return await accounts.SingleOrDefaultAsync(cancellationToken) ?? throw new NotFoundException("Account", accountId);
     }
 }
