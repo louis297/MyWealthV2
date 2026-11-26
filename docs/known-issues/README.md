@@ -3,7 +3,7 @@ title: Known issues
 status: draft
 language: en
 created: 2026-11-08
-updated: 2026-11-19
+updated: 2026-11-27
 ---
 
 # Known issues
@@ -19,4 +19,5 @@ Open gaps that are accepted for now. Not a backlog. A closed issue stays here wi
 | [Refresh grant does not re-check person or tenant status](refresh-grant-skips-status-check.md) | open | Revocation waits for the outbox; a dead-lettered event leaves a refresh token valid for up to 14 days. `webapi` still refuses its access tokens after a disable. |
 | [Data Protection keys are not encrypted at rest](dataprotection-keys-unencrypted.md) | open | Key rings in `data/dataprotection/<host>/` are plain XML; readable by root or the `docker` group. |
 | [Two hosts run the schema applicator without a lock](schema-applicator-two-hosts.md) | open | `webapi` and `worker` both apply scripts at start-up; on an empty Development database one of them can fail once. The VPS start order avoids it. |
+| [The four-eyes rule separates accounts, not people](four-eyes-rule-separates-accounts.md) | open | A TenantAdmin creates Advisers with a password they choose, so one person can act on both sides of a withdrawal or an in-kind transfer out. Planned fix: a second TenantAdmin approves a new Adviser, who sets their own password. |
 | [Custodial accounts still rely on hand entry, and some writes are missing](custodial-account-gaps.md) | open | Applies since custody-modes landed (2026-11-17). Deposits and withdrawals are hand-entered; no interest, split, in-kind transfer, opening balance or backdated history on a Custodial account. |
