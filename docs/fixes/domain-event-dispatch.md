@@ -1,19 +1,21 @@
 ---
 title: Fix — Domain event dispatch timing and reliability
-status: accepted
+status: deprecated
 language: en
 created: 2026-10-21
-updated: 2026-10-21
+updated: 2026-11-27
 related:
   - ../architecture.md
   - ../domain-model.md
+  - ../features/outbox.md
+  - ../adr/0018-transactional-outbox.md
 ---
 
 # Fix: Domain event dispatch timing and reliability
 
-Status: accepted
+Status: deprecated. Replaced by [features/outbox.md](../features/outbox.md) and [ADR 0018](../adr/0018-transactional-outbox.md).
 
-The transactional outbox left out of scope here is accepted in [ADR 0018](../adr/0018-transactional-outbox.md). Implementation follows [features/outbox.md](../features/outbox.md). This fix remains the record of the previous post-`SaveChanges` dispatch behaviour.
+The post-`SaveChanges` dispatch this fix describes is gone. Domain events are now written to `OutboxMessages` in the same database transaction as the business change (`ApplicationDbContext.CaptureOutboxMessages`), and only the `worker` runs their handlers (outbox R1, R2). `DispatchDomainEventsInterceptor` and `PublishAfterCommitAsync` no longer exist. Do not build from this page; it is kept as the record of the earlier behaviour.
 
 ## Problem
 
