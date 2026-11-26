@@ -45,6 +45,19 @@ export type Account = {
   reinvestDividends?: boolean;
   /** dividends R52: dividends that went ex with an entitlement of this account and are not paid yet. */
   pendingDividends?: number;
+  /** valuation-run R20: the last day stored for a Custodial account; null before the first and on an External one. */
+  valuedThrough?: string | null;
+};
+
+/** valuation-run R17: one stored valuation of an Account, in its currency. */
+export type StoredValuation = {
+  date: string;
+  currency: string;
+  cash: number;
+  holdingsValue: number;
+  total: number;
+  complete: boolean;
+  unvaluedCount: number;
 };
 
 export type AccountListArgs = {
@@ -121,6 +134,11 @@ export const accountsApi = api.injectEndpoints({
       query: (id) => `/accounts/${id}`,
       providesTags: (_result, _error, id) => [{ type: "Account", id }],
     }),
+    /** D109: the stored valuations of a range, newest first, at most 100 days a page. */
+    getAccountValuations: builder.query<PagedList<StoredValuation>, { id: string; from: string; to: string }>({
+      query: ({ id, from, to }) => `/accounts/${id}/valuations?from=${from}&to=${to}&pageSize=100`,
+      providesTags: (_result, _error, { id }) => [{ type: "Account", id }],
+    }),
     getAccountHoldings: builder.query<{ items: AccountHolding[] }, string>({
       query: (id) => `/accounts/${id}/holdings`,
       providesTags: (_result, _error, id) => [{ type: "Account", id }],
@@ -168,6 +186,7 @@ export const {
   useGetAccountsQuery,
   useGetAccountQuery,
   useGetAccountHoldingsQuery,
+  useGetAccountValuationsQuery,
   useGetDepositInstructionsQuery,
   useCreateAccountMutation,
   useCloseAccountMutation,

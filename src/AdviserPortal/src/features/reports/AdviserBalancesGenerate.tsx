@@ -1,27 +1,33 @@
 import { type FormEvent, useState } from "react";
-import { CheckField, Messages, SelectField } from "@/components/portal";
+import { CheckField, Messages, Muted, SelectField, TextField } from "@/components/portal";
 import { SelectItem } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useGetAdvisersQuery } from "@/features/advisers/advisersApi";
 import { useRequestReportMutation } from "@/features/reports/reportsApi";
 import { roles } from "@/features/session/roles";
+import { lastFinalDay } from "@/shared/time/days";
 
 function isStatus(error: unknown, status: number) {
   return typeof error === "object" && error !== null && "status" in error && error.status === status;
 }
 
-function problemMessages(error: unknown): string[] {
+/** The messages of a 400, with those of `date` apart so that they are shown at the date input (D110). */
+function problemMessages(error: unknown): { date: string[]; other: string[] } {
   if (typeof error !== "object" || error === null || !("data" in error)) {
-    return [];
+    return { date: [], other: [] };
   }
   const data = (error as { data?: { errors?: Record<string, string[]>; detail?: string } }).data;
   if (data?.errors) {
-    return Object.values(data.errors).flat();
+    const entries = Object.entries(data.errors);
+    return {
+      date: entries.filter(([key]) => key.toLowerCase() === "date").flatMap(([, values]) => values),
+      other: entries.filter(([key]) => key.toLowerCase() !== "date").flatMap(([, values]) => values),
+    };
   }
   if (data?.detail) {
-    return [data.detail];
+    return { date: [], other: [data.detail] };
   }
-  return [];
+  return { date: [], other: [] };
 }
 
 export function AdviserBalancesGenerate({
@@ -40,10 +46,13 @@ export function AdviserBalancesGenerate({
   );
   const [adviserId, setAdviserId] = useState("");
   const [includeClosedAccounts, setIncludeClosedAccounts] = useState(false);
+  const [date, setDate] = useState("");
+  const [dateErrors, setDateErrors] = useState<string[]>([]);
   const [messages, setMessages] = useState<string[]>([]);
   const [queued, setQueued] = useState(false);
   const [requestReport, { isLoading }] = useRequestReportMutation();
   const blocked = needsAdviser && adviserId === "";
+  const dateId = `balances-date-${reportId}`;
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -52,11 +61,13 @@ export function AdviserBalancesGenerate({
     }
 
     try {
-      const created = await requestReport({
-        reportId,
-        parameters: needsAdviser ? { adviserId, includeClosedAccounts } : { includeClosedAccounts },
-      }).unwrap();
+      const parameters: Record<string, unknown> = needsAdviser ? { adviserId, includeClosedAccounts } : { includeClosedAccounts };
+      if (date !== "") {
+        parameters.date = date;
+      }
+      const created = await requestReport({ reportId, parameters }).unwrap();
       setMessages([]);
+      setDateErrors([]);
       setQueued(true);
       onQueued?.(created.id);
     } catch (error: unknown) {
@@ -65,7 +76,9 @@ export function AdviserBalancesGenerate({
         setMessages(["Report is not available."]);
         return;
       }
-      setMessages(problemMessages(error));
+      const problems = problemMessages(error);
+      setMessages(problems.other);
+      setDateErrors(problems.date);
     }
   }
 
@@ -92,9 +105,35 @@ export function AdviserBalancesGenerate({
           ))}
         </SelectField>
       ) : null}
-      <CheckField checked={includeClosedAccounts} onChange={(event) => setIncludeClosedAccounts(event.target.checked)}>
+      <TextField
+        id={dateId}
+        label="Balances at the end of"
+        type="date"
+        max={lastFinalDay()}
+        value={date}
+        aria-invalid={dateErrors.length > 0 ? true : undefined}
+        aria-describedby={dateErrors.length > 0 ? `${dateId}-error` : undefined}
+        onChange={(event) => {
+          setDate(event.target.value);
+          setDateErrors([]);
+          if (event.target.value !== "") {
+            setIncludeClosedAccounts(false);
+          }
+        }}
+      />
+      {dateErrors.length > 0 ? (
+        <p id={`${dateId}-error`} className="text-sm text-destructive">
+          {dateErrors.join(" ")}
+        </p>
+      ) : null}
+      <CheckField
+        checked={includeClosedAccounts}
+        disabled={date !== ""}
+        onChange={(event) => setIncludeClosedAccounts(event.target.checked)}
+      >
         Include closed accounts
       </CheckField>
+      {date !== "" ? <Muted>A report for a past date includes every account that held cash or holdings that day.</Muted> : null}
       <Button type="submit" variant="outline" size="sm" disabled={isLoading || blocked}>
         Generate now
       </Button>
