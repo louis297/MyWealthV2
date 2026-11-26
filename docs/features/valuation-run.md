@@ -1,6 +1,6 @@
 ---
 title: Valuation run
-status: review
+status: accepted
 phase: 3
 language: en
 owner: ""
@@ -34,7 +34,7 @@ Every day the platform values each Custodial account for each day that has not b
 
 New: tables `StoredValuations`, `StoredValuationLines` and `ValuationRuns`, and `Accounts.ValuedThrough`, in script `0059_stored_valuations.sql`; permissions `valuation-runs.read` and `valuation-runs.start`; routes `GET /accounts/{id}/valuations`, `GET /accounts/{id}/valuations/{date}`, `GET|POST /valuation-runs` and `GET /valuation-runs/{id}`; `valuedThrough` on the account item; the `worker` job `valuation-run` on the new queue `valuation`; `TestSeed` history; a Back Office section. No problem code, domain event, `TransactionType`, port, setting or simulator change. No Adviser Portal or Customer Portal page.
 
-**Status is `review` (2026-11-26).** It is not a build contract. The twelve points of §11 are recommendations that wait for an answer. Point 1 refines roadmap Q5.
+**Status is `accepted` (2026-11-26).** The twelve points of §11 were confirmed as recommended. Point 1 refines roadmap Q5, which was reworded.
 
 ---
 
@@ -235,7 +235,7 @@ Invariants:
 
 Domain events: none. A stored valuation is not posted and nothing listens to it in this slice.
 
-Recorded in [domain-model.md](../domain-model.md) §8.5 (`ValuedThrough`) and §8.22 (the stored valuation and the run) when this spec is accepted.
+[domain-model.md](../domain-model.md) §8.5 (`ValuedThrough`) and §8.23 (the stored valuation and the run) list these types.
 
 ---
 
@@ -311,7 +311,7 @@ No new index on the ledger tables. The read of a day is the read of account-valu
 
 Size: one `StoredValuations` row per Custodial account and day, and one line per holding of the day: about 365 rows and 365 × the number of holdings lines per account a year.
 
-Recorded in [database-design.md](../database-design.md) (a new §11.22, the `Accounts` column, the change log) when this spec is accepted.
+[database-design.md](../database-design.md) §11.22 records these tables and the `Accounts` column.
 
 ---
 
@@ -444,7 +444,7 @@ Cross-tenant or wrong-collection id → **404**, not 403. Keep the resource cata
 
 ## 9. UI
 
-Page contract: [back-office.md](../backoffice/back-office.md) (BO34, BO35), amended and accepted together with this spec. No Adviser Portal or Customer Portal page shows a stored valuation or a run; the series and the charts are roadmap V4.
+Page contract: [back-office.md](../backoffice/back-office.md) (BO34, BO35), amended when this spec was accepted. No Adviser Portal or Customer Portal page shows a stored valuation or a run; the series and the charts are roadmap V4.
 
 `bff-adviser-portal` and `bff-customer-portal` already proxy the prefix `/accounts`, so R17 and R18 can be reached through both by a signed-in user who may read the Account. No page calls them. `/valuation-runs` is on no BFF allow-list; a TenantAdmin reads it with a Bearer token (Scalar).
 
@@ -506,7 +506,7 @@ No new ADR. The valuation run calls no outside party, so [ADR 0021](../adr/0021-
 
 ### Points to confirm
 
-Each point is a recommendation. The alternatives are kept for the record.
+Each point was confirmed as recommended (2026-11-26) and is written into the rules above as stated here. The alternatives are kept for the record.
 
 1. **The run values the day before yesterday, not yesterday** (R4, R14). This refines roadmap Q5, which values yesterday after today's price job. Recommended, for three reasons. (a) A price or rate row of yesterday may still change until today ends (market-data-history R5): `fx-rate-sync` writes every hour, and a stored day would then disagree with the read of the same day for good. From the day before yesterday on, the rows are final, so the stored valuation equals the read (R10), which is what account-valuation R13 and its story 5 were written for. (b) When today's price job fails or is late, a valuation of yesterday finds the bar of the day before, which is still fresh: the day is stored as complete at the wrong price, and never corrected. Two days later the next price job has inserted the missing bar (market-data-history R8). (c) A fee base one day later costs nothing: a monthly fee is worked out after the month ends. Alternative: roadmap Q5 as written, a run at 12:30 UTC for yesterday.
 2. **Every day is stored, an empty day too** (R11). Recommended: a gap then always means "not valued yet", the fee step can count days without asking the ledger, and an empty day is one small row with no line. Alternative: store nothing for a day with no cash and no holding.
@@ -523,7 +523,7 @@ Each point is a recommendation. The alternatives are kept for the record.
 
 ### Found while writing, not changed here
 
-- **Roadmap Q5 and account-valuation R13 disagree.** Q5 values yesterday; account-valuation R13 and its story 5 expect a stored day to be two or more days back. Point 1 settles it; when it is confirmed, Q5 is reworded in the roadmap, as H5 was by account-valuation point 1.
+- **Roadmap Q5 and account-valuation R13 disagreed.** Q5 valued yesterday; account-valuation R13 and its story 5 expect a stored day to be two or more days back. Point 1 settles it, and Q5 was reworded in the roadmap, as H5 was by account-valuation point 1.
 - **A Custodial account Closed with no completed account closure.** Between custody-modes (2026-11-17) and account-closure (2026-11-22), `POST /accounts/{id}/close` was allowed on a Custodial account. Such an account has no `CompletedAt` to stop at, and R3 would value it through every run's through date as an empty day. A development database may hold one; the VPS should be checked before the deploy.
 - **A holding of an inactive Instrument** becomes `StalePrice` after four days and every stored day of the account is incomplete from then on (account-valuation, "Found while writing"). With stored valuations this lasts: the days are not valued again. The fix there (keep fetching an Instrument any Account holds) should land before step 4 reads the rows.
 - **Two failed price jobs in a row** still store a day at the bar of the day before (fresh, so complete). Point 1 covers one failure, not two. A check that the price job succeeded for the day before a run values it would cover more, and needs a record of the job's runs that does not exist.
@@ -541,9 +541,9 @@ Still open, not this slice:
 
 ## 12. Changes to other docs
 
-The plan while this spec is in review; the other docs change when it is accepted.
+Made when this spec was accepted (2026-11-26):
 
-[account-valuation.md](account-valuation.md) (R13: a stored valuation is made from the day before yesterday on; §2 Out and "Still open": the V3 rows point here), [accounts.md](accounts.md) (`valuedThrough` on the account item), [account-closure.md](account-closure.md) (a Closed Custodial account is valued through the day its closure completed, note), [custody-mode-grouping.md](custody-mode-grouping.md) and [net-worth.md](net-worth.md) (funds under management of a past day is R26 here; "daily snapshots" in Out point here, the series stays V4), [back-office.md](../backoffice/back-office.md) (BO34, BO35), [api-design.md](../api-design.md) (§3.1 two permission rows, §6 resource rows, a new §7.18 Valuations, a §7.6 note on `valuedThrough` and the two account routes, change log), [domain-model.md](../domain-model.md) (§8.5 `ValuedThrough`, §8.22 the stored valuation and the run), [database-design.md](../database-design.md) (§11.22 and the change log), [architecture.md](../architecture.md) (§10 the `worker` job and queue), [function-plan.md](../function-plan.md) §5.4 ("daily snapshots" is no longer open), [glossary.md](../glossary.md) (the review terms become accepted; "Funds under management" gains its past-day reading; "Final row" and "Valuation" point at the stored valuation), [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §1 (step 3 is done when this lands; step 4 can open), and [valuation-roadmap.md](../valuation-roadmap.md) (Q5 reworded by point 1, §5 V3, §8).
+[account-valuation.md](account-valuation.md) (R13: a stored valuation is made from the day before yesterday on; §2 Out and "Still open": the V3 rows point here), [accounts.md](accounts.md) (`valuedThrough` on the account item), [account-closure.md](account-closure.md) (a Closed Custodial account is valued through the day its closure completed, note), [custody-mode-grouping.md](custody-mode-grouping.md) and [net-worth.md](net-worth.md) (funds under management of a past day is R26 here; "daily snapshots" in Out point here, the series stays V4), [back-office.md](../backoffice/back-office.md) (BO34, BO35), [api-design.md](../api-design.md) (§3.1 two permission rows, §6 resource rows, a new §7.18 Valuations, a §7.6 note on `valuedThrough` and the two account routes, change log), [domain-model.md](../domain-model.md) (§8.5 `ValuedThrough`, §8.23 the stored valuation and the run), [database-design.md](../database-design.md) (§11.22 and the change log), [architecture.md](../architecture.md) (§10 the `worker` job and queue), [function-plan.md](../function-plan.md) §5.4 ("daily snapshots" is no longer open), [glossary.md](../glossary.md) (the review terms become accepted; "Funds under management" gains its past-day reading; "Final row" and "Valuation" point at the stored valuation), [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §1 (step 3 is done when this lands; step 4 can open), and [valuation-roadmap.md](../valuation-roadmap.md) (Q5 reworded by point 1, §5 V3, §8).
 
 ---
 

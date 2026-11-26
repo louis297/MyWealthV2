@@ -57,7 +57,7 @@ Two endpoints: a firm / adviser list and a single-Customer read. Both return the
 
 **Out**
 
-- Daily snapshots, historical series, “vs yesterday”
+- Daily snapshots, historical series, “vs yesterday”. The daily stored valuations of Custodial accounts are [valuation-run.md](valuation-run.md); the series is valuation roadmap V4
 - FX fold to one number
 - Live vendor prices or live FX
 - Credit / Property as selectable types
@@ -205,7 +205,7 @@ No new ADR.
 
 Still open, not this slice:
 
-- Daily snapshots and historical series
+- Daily snapshots and historical series (stored valuations: [valuation-run.md](valuation-run.md); series: valuation roadmap V4)
 - Live market data
 - Portal page implementation (Dashboard and ledger pages)
 - Top-N limits for breakdowns (sort is locked; limit is not)
@@ -222,3 +222,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-10 | [leg-accounts.md](leg-accounts.md) | Cash per Account from the legs on that Account |
 | 2026-11-18 | [custody-mode-grouping.md](custody-mode-grouping.md) | `breakdowns.byCustodyMode` |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
+| 2026-11-26 | [valuation-run.md](valuation-run.md) | Out: daily snapshots point at the stored valuations |

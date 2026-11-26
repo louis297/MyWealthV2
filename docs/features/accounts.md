@@ -141,6 +141,7 @@ Confirmed 2026-09-21: (1) Adviser may read / open / rename / close / reopen acco
 | `closure` | The latest account closure as `{ id, status, payoutAmount, withdrawalId, requestedAt, completedAt }`, or `null` | `null` | account-closure §4.6 |
 | `accruedInterest` | The sum of the account's daily accrual rows not yet posted, 8 decimals | `0` | interest-run R35 |
 | `interestAccruedThrough` | The last UTC day its daily accrual was worked out for; `null` before the first time. It only moves forward | `null` | interest-run R19 |
+| `valuedThrough` | The last UTC day a stored valuation exists for; `null` before the first, and always `null` on an External account. It only moves forward, one day at a time | `null` | valuation-run R5, R20 |
 | `reinvestDividends` | `false` when opened; set by `PUT /accounts/{accountId}/dividend-reinvestment`, with who last changed it and when | `false` | dividends R17 |
 | `pendingDividends` | The number of `Pending` dividend entitlements | `0` | dividends R52 |
 

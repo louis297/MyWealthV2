@@ -326,6 +326,7 @@ Invariants of a Custodial account ([features/custody-modes.md](features/custody-
 - An Active `AccountPortfolioAssignment` is on a Custodial account (held by Application).
 - It is closed only by an `AccountClosure` (§8.13); the plain close is refused for it in Application. While a closure is `InProgress` the Account is **closing**: it stays Open but accepts no hand write and no portfolio assignment, and deposit matching sends its receipts to suspense ([features/account-closure.md](features/account-closure.md)).
 - It has `InterestAccruedThrough` (`DateOnly?`): the last UTC day its daily accrual was worked out for. `MarkInterestAccrued(through)` only moves it forward and is refused on an External account. Only Open Custodial accounts that are not closing are accrued (§8.14, [features/interest-run.md](features/interest-run.md)).
+- It has `ValuedThrough` (`DateOnly?`): the last UTC day a stored valuation exists for. `MarkValued(day)` moves it to the day after it (or sets the first day) and nothing else, and is refused on an External account, which never has one (§8.23, [features/valuation-run.md](features/valuation-run.md)).
 - With a live order, an unsettled fill or an open in-kind transfer it is not closed, and with a live order or an open in-kind transfer it gets no portfolio assignment ([features/orders.md](features/orders.md) R47, R49; [features/in-kind-transfers.md](features/in-kind-transfers.md) R24).
 
 Figures of a Custodial account. None is stored on the Account; Application works them out under the Account lock (`AccountCash`) with the Domain statics named below. An External account has no reservation: its available and withdrawable cash are its cash `SUM`.
@@ -664,6 +665,20 @@ A read model, not an entity: nothing is stored and no event is raised. Types in 
 
 Invariants: a line has a value if and only if it is `Valued`; the total is the cash plus the value of every `Valued` line; a price or rate more than 4 days older than the day never produces a value; the quantity differs from the ledger quantity only on a day a corporate action's price is on the new basis and its entitlement is not booked yet. Field rules: [features/account-valuation.md](features/account-valuation.md).
 
+### 8.23 Stored valuation and valuation run (accepted — valuation-run slice)
+
+Types in `src/Domain/Valuations` and `src/Domain/Entities`. No domain event: a stored valuation is not posted and nothing listens to it.
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `StoredValuation` | Entity | The valuation of one Custodial account for one day as the run stored it: day, the Account's currency, `Cash`, `HoldingsValue`, `Total`, `Complete`, `UnvaluedCount`, the run that stored it, `ValuedAt` and its lines. `From(tenantId, accountId, valuation, runId, at)` copies an `AccountValuation` (§8.22); no method changes one. `long` id, no audit columns |
+| `StoredValuationLine` | Entity | One line of the valuation: Instrument, quantity, ledger quantity, status, the price row (amount, currency, date, source), market value, the rate row (rate, date, source), value |
+| `ValuationRun` | Aggregate | One execution for one Tenant and a through date: trigger, the person (none for `Scheduled`), start and end, `AccountsProcessed`, `AccountsFailed`, `DaysValued`, `DaysIncomplete`. `Start(...)`, `Complete(...)` once |
+| `ValuationRunTrigger` | Enum | `Scheduled`, `Manual` |
+| `ValuationRules.LastFinalDay` | Static | `today` minus 2 days: the latest day a stored valuation may be made for |
+
+Invariants: an `(Account, day)` has at most one stored valuation; an account's stored valuations cover every day from its first day to `ValuedThrough` without a gap; no stored valuation is of a day after the last final day of the moment it was stored; a stored valuation has the invariants of an `AccountValuation` and is never changed; only Custodial accounts have stored valuations. Field rules: [features/valuation-run.md](features/valuation-run.md).
+
 ## 9. Value objects (Domain assembly; may exist in Phase 1)
 
 | Object | Rules |
@@ -704,6 +719,7 @@ One row per change. The text of each change is in git (`git log -p -- docs/domai
 | 2026-11-25 | Adjustment review (§8.21, §8.6). Market data history: `MarketDataRow.IsFinal`, `MarketDataHistoryWindow` (§7) |
 | 2026-11-26 | The amendments were folded into §4–§8. No rule changed |
 | 2026-11-26 | Account valuation: `LedgerDay`, `AccountPosition`, `ValuationRules`, `ValuationLineStatus`, `BasisChange`, `AccountValuation` (§8.22). No entity or event. [features/account-valuation.md](features/account-valuation.md) |
+| 2026-11-26 | Valuation run: `StoredValuation`, `StoredValuationLine`, `ValuationRun`, `ValuationRunTrigger`, `ValuationRules.LastFinalDay` (§8.23); `Account.ValuedThrough` and `MarkValued` (§8.5). No event. [features/valuation-run.md](features/valuation-run.md) |
 
 ---
 

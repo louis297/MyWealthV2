@@ -386,6 +386,7 @@ Beyond PK / unique constraints already listed:
 0056_custodian_reconciliations.sql          -- CustodianReconciliations, CustodianReconciliationLines
 0057_dividends.sql                          -- dividend terms, receipt, payment and election on CorporateActions and the terms on CorporateActionAnnouncements (ratio nullable, kind 3); dividend fields on CorporateActionEntitlements; TransactionDividendDetails; cash leg role 3, tax kind 2; Accounts.ReinvestDividends; BankStatementLines.CorporateActionId, match method 7, unmatched reason 14; reconciliation item kinds 20–21
 0058_adjustment_requests.sql                -- AdjustmentRequests; source kind 11 (AdjustmentRequest)
+0059_stored_valuations.sql                  -- ValuationRuns, StoredValuations, StoredValuationLines; Accounts.ValuedThrough
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -448,6 +449,7 @@ Columns added by later scripts, each forward only (`0012` is not edited):
 | `DepositReference char(9) NULL` | `0039` | `CK_Accounts_DepositReference`: not null iff `CustodyMode = 1`. Unique `UX_Accounts_DepositReference` WHERE not null. The script gave every existing Custodial row a reference (random, Luhn mod 32 check symbol, redrawn while used). [features/client-money-accounts.md](features/client-money-accounts.md) §6.2 |
 | `InterestAccruedThrough date NULL` | `0048` | The last UTC day the account was accrued through, set under the Account lock (§11.14). No index, no back-fill. [features/interest-run.md](features/interest-run.md) §6.2 |
 | `ReinvestDividends bit NOT NULL` | `0057` | Default 0. `CK_Accounts_ReinvestDividends`: 1 only on a Custodial account. With `ReinvestDividendsChangedByUserId` (tenant composite FK → `Users`) and `ReinvestDividendsChangedAt`. [features/dividends.md](features/dividends.md) §6.1 |
+| `ValuedThrough date NULL` | `0059` | The last UTC day a stored valuation exists for, set under the Account lock one day at a time (§11.22). `CK_Accounts_ValuedThrough`: null unless `CustodyMode = 1`. No index, no back-fill. [features/valuation-run.md](features/valuation-run.md) §6.1 |
 
 The closures of an Account are rows of `AccountClosures` (§11.13), not a column; the account item's `closure` is the latest of them.
 
@@ -722,6 +724,16 @@ Feature spec: [features/adjustment-review.md](features/adjustment-review.md) (ac
 
 No back-fill.
 
+### 11.22 Stored valuations and valuation runs (accepted)
+
+Feature spec: [features/valuation-run.md](features/valuation-run.md) (accepted 2026-11-26) §6. Script `0059_stored_valuations.sql`:
+
+- `ValuationRuns` — `Id`, `PublicId` (unique), `TenantId`, `ThroughDate date`, `Trigger` (CHECK 0–1), `RanByUserId NULL` (null iff `Trigger = 0`; FK → `Users (Id)`, no composite key because a SystemAdmin has no tenant), `StartedAt`, `CompletedAt NULL`, `AccountsProcessed`, `AccountsFailed`, `DaysValued`, `DaysIncomplete` (CHECK ≥ 0, `DaysIncomplete ≤ DaysValued`), audit. Unique `(TenantId, Id)`. Index `(TenantId, StartedAt DESC)`.
+- `StoredValuations` — `Id bigint`, `TenantId`, `AccountId`, `ValuationDate date`, `Currency char(3)`, `Cash`, `HoldingsValue`, `Total` (`decimal(18,4)`; CHECK `Total = Cash + HoldingsValue`), `Complete bit`, `UnvaluedCount` (CHECK complete iff the count is 0), `ValuationRunId`, `ValuedAt`. No audit columns. Unique `(AccountId, ValuationDate)` and `(TenantId, Id)`. FKs with `TenantId` to `Accounts` and `ValuationRuns`; `Currency` → `Currencies`; RESTRICT. Index `(TenantId, ValuationDate)` INCLUDE `(AccountId, Currency, Total, Complete)` for funds under management of a past day.
+- `StoredValuationLines` — `Id bigint`, `TenantId`, `StoredValuationId`, `InstrumentId`, `Quantity`, `LedgerQuantity` (`decimal(18,8)`), `Status` (CHECK 0–6), `PriceAmount decimal(18,8)`, `PriceCurrency char(3)`, `PriceDate date`, `PriceSource nvarchar(50)` (all four set or all null), `MarketValue decimal(18,4) NULL`, `FxRate decimal(18,8)`, `FxDate date`, `FxSource nvarchar(50)` (all three set or all null), `Value decimal(18,4) NULL` (set iff `Status = 0`). Unique `(StoredValuationId, InstrumentId)`. FKs with `TenantId` to `StoredValuations` and `Instruments`; `PriceCurrency` → `Currencies`; RESTRICT.
+
+No back-fill: `ValuedThrough` starts null and the first run values the past. No row is updated or deleted by the platform.
+
 ## 12. Still not a schema decision
 
 These stay open in the function plan and do not change tables:
@@ -754,6 +766,7 @@ One row per change. §9 lists what each script did. The text of each change is i
 | 2026-11-24 | `0054`–`0057` | Migration batches; the custodian tables and reconciliations; dividends |
 | 2026-11-25 | `0058` | Adjustment requests |
 | 2026-11-26 | — | The amendments were folded into §6.5, §11 and §14. No table changed |
+| 2026-11-26 | `0059` | Stored valuations and valuation runs (§11.22); `Accounts.ValuedThrough` (§11.3) |
 
 ---
 
