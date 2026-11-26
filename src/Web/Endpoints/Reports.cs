@@ -7,6 +7,7 @@ using MyWealthV2.Application.Reports.Commands.RequestReport;
 using MyWealthV2.Application.Reports.Commands.UpdateReportCatalog;
 using MyWealthV2.Application.Reports.Commands.UpdateReportSchedule;
 using MyWealthV2.Application.Reports.Queries.DownloadReportResult;
+using MyWealthV2.Application.Reports.Queries.GetReportExecution;
 using MyWealthV2.Application.Reports.Queries.GetReportExecutions;
 using MyWealthV2.Application.Reports.Queries.GetReportSchedules;
 using MyWealthV2.Application.Reports.Queries.GetReportCatalog;
@@ -51,6 +52,7 @@ public class Reports : IEndpointGroup
         groupBuilder.MapPost(DisableSchedule, "schedules/{id}/disable").RequireAuthorization(CreateReports);
         groupBuilder.MapPost(RequestReport, "request").RequireAuthorization(CreateReports);
         groupBuilder.MapGet(GetExecutions, "executions").RequireAuthorization(ReadReports);
+        groupBuilder.MapGet(GetExecution, "executions/{id}").RequireAuthorization(ReadReports);
         groupBuilder.MapGet(DownloadReport, "executions/{id}/download").RequireAuthorization(ReadReports);
     }
 
@@ -137,6 +139,14 @@ public class Reports : IEndpointGroup
         Guid? reportId = null)
     {
         var result = await sender.Send(new GetReportExecutionsQuery(page, pageSize, scope, reportId));
+        return TypedResults.Ok(result);
+    }
+
+    [EndpointSummary("Get a report execution")]
+    [EndpointDescription("Returns one report execution the caller can read, in the same shape as a list item. Used to poll a requested run.")]
+    public static async Task<Ok<ReportExecutionDto>> GetExecution(ISender sender, Guid id)
+    {
+        var result = await sender.Send(new GetReportExecutionQuery(id));
         return TypedResults.Ok(result);
     }
 
