@@ -4,7 +4,7 @@ status: accepted
 phase: 3
 language: en
 created: 2026-10-14
-updated: 2026-11-26
+updated: 2026-11-27
 related:
   - adviser-portal.md
   - adviser-portal-dashboard.md
@@ -30,7 +30,7 @@ Backend prerequisites (landed):
 - Report catalog, TenantReports grants, ReportSchedule, ReportExecution (`0019_reports.sql`).
 - Shared pipeline + generators for Customer Transactions and Adviser Balances.
 - Hangfire worker (ADR 0017). PDF via QuestPDF. Shared volume for result files.
-- Policies: `reports.customer.read` / `reports.customer.create` and `reports.book.read` / `reports.book.create`. Customer has only the customer read policy. TenantAdmin and Adviser have all four. SystemAdmin has none of them.
+- Policies: `reports.customer.read` / `reports.customer.create` and `reports.book.read` / `reports.book.create`. Customer has the customer read and create policies (create is a request for self only; reports R5). TenantAdmin and Adviser have all four; TenantAdmin also has `reports.tenant.read` / `reports.tenant.create`. SystemAdmin has none of them.
 - TestSeed grants both seeded reports to the demo tenant.
 - Seeded PublicIds (stable):
   - Customer Transactions: `8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11` (code `customer-transactions`, scope `Customer`).
@@ -322,3 +322,4 @@ What changed in this file after it was accepted. Each row is a section above. Th
 | 2026-11-21 | [bank-reconciliation](../features/bank-reconciliation.md) | Tenant-scoped reports |
 | 2026-11-26 | [valuation-history](../features/valuation-history.md) | Adviser Balances for a past date |
 | 2026-11-26 | — | The amendments became the sections above. No behaviour changed |
+| 2026-11-27 | — | Backend prerequisites: the Customer's `reports.customer.create` and the Tenant policies. No behaviour changed |

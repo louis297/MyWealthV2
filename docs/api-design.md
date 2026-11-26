@@ -634,7 +634,7 @@ Bank reconciliation (accepted, [features/bank-reconciliation.md](features/bank-r
 | GET | `/reports/executions/{id}` | by that execution’s report scope | 200 |
 | GET | `/reports/executions/{id}/download` | by that execution’s report scope | 200 `application/pdf` |
 
-Customer has `reports.customer.read` only. TenantAdmin and Adviser have all four. SystemAdmin has none of the four and cannot call `GET /reports`, request, schedule, or download. Bad parameters → 400. Unknown report, not granted, inactive catalog row, or out of scope → 404 on those firm routes. Policy fail → 403.
+Customer has `reports.customer.read` and `reports.customer.create`: `POST /reports/request` for their own Customer-scoped report only, and the schedule verbs stay 403 (reports R5). TenantAdmin and Adviser have the four Customer and Book policies; only TenantAdmin has the two Tenant policies (reports R6, §3.1). SystemAdmin has none of the six and cannot call `GET /reports`, request, schedule, or download. Bad parameters → 400. Unknown report, not granted, inactive catalog row, or out of scope → 404 on those firm routes. Policy fail → 403.
 
 `GET /reports/catalog` is `tenants.manage`. It returns every catalog row, ordered by code, including inactive rows, with no `granted`. Other roles → 403. It is not `GET /reports`.
 
@@ -894,4 +894,4 @@ One row per change. The text of each change is in git (`git log -p -- docs/api-d
 | 2026-11-26 | Account valuation (§6, §7.6): `GET /accounts/{id}/valuation?date=` with `accounts.read`. No new permission or problem code |
 | 2026-11-26 | Valuation run (§3.1, §6, §7.6, §7.18): `valuation-runs.read` and `valuation-runs.start`; `/valuation-runs`; `GET /accounts/{id}/valuations[/{date}]`; `valuedThrough` on the account item. No problem code |
 | 2026-11-26 | Valuation history (§6, §7.18): `GET /net-worth/funds-under-management`; `folded` on the net-worth reads; `date` of the Adviser Balances Report. No permission or problem code |
-| 2026-11-27 | Docs caught up with the code: §1 diagram shows the BFF between the browser and `webapi`; §2 CORS is none on `webapi`; §4 login failures are uniform (`Invalid login.`), no longer open |
+| 2026-11-27 | Docs caught up with the code: §1 diagram shows the BFF between the browser and `webapi`; §2 CORS is none on `webapi`; §4 login failures are uniform (`Invalid login.`), no longer open; §7.8 the Customer's `reports.customer.create` and the Tenant pair |

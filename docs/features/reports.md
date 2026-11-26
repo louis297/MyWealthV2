@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-10-12
-last_updated: 2026-11-26
+last_updated: 2026-11-27
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -47,7 +47,7 @@ Policies are split by scope:
 - `reports.customer.read` / `reports.customer.create`
 - `reports.book.read` / `reports.book.create`
 
-Customer receives only `reports.customer.read`. TenantAdmin and Adviser receive all four. SystemAdmin receives none of them. Grant and revoke use `tenants.manage`.
+Customer receives `reports.customer.read` and `reports.customer.create`, the create for requesting their own report only (R5). TenantAdmin and Adviser receive all four; TenantAdmin also holds `reports.tenant.read` / `reports.tenant.create` (R6). SystemAdmin receives none of them. Grant and revoke use `tenants.manage`.
 
 A shared request pipeline checks the coarse policy, the tenant grant, and allowed triggers, then delegates parameter and scope validation to the specific report. The frontend sends `reportId` plus a free-form `parameters` object; it never sends a class or method name. A registry maps `ReportId` to an `IReportGenerator`. Generation runs on the worker via Hangfire. Results are stored and downloadable.
 
@@ -101,7 +101,7 @@ Note: Customer has `reports.customer.read` but no first-phase UI. The policy exi
 1. As an Adviser I open a Customer and see the Customer-scoped reports I can run for them; I can generate now or create a schedule.
 2. As an Adviser I open the Reports tab and see Book-scoped reports; I can generate now or create a schedule for my own book.
 3. As a TenantAdmin I can do the same, and on Book-scoped reports I can select a subordinate Adviser.
-4. As a Customer (API) I can list and download Customer-scoped executions that target me; I cannot create or schedule.
+4. As a Customer I can list and download Customer-scoped executions that target me, and request one for myself; I cannot schedule (R5).
 5. As a SystemAdmin I see every active catalog report for a tenant and enable or disable each one. A platform-inactive report is not on that list. Platform catalog configuration is the Back Office `/reports` page (`GET /reports/catalog`, `PUT /reports/{id}`). Scalar calls the same verbs.
 6. As any allowed caller I can change or disable a schedule; the next Hangfire run uses the new definition.
 7. As the system, when a registered event occurs, I can enqueue an execution for a report that allows it and that the tenant has been granted.
@@ -510,8 +510,8 @@ No new ADR beyond [0017](../adr/0017-background-worker.md).
 | Catalog list | `GET /reports/catalog` (`tenants.manage`) returns every catalog row, including inactive. No `granted`. Not `GET /reports` |
 | Schedule / request | Must name ReportId; parameters are a free-form JSON object per report |
 | Generator | Registry: ReportId → IReportGenerator. Hangfire entry point is fixed (`Execute(executionId)`) |
-| Policies | `reports.customer.read/create`, `reports.book.read/create` |
-| Roles | Customer: `reports.customer.read` only. TenantAdmin and Adviser: all four. SystemAdmin: none of the four; catalog list, grant, and revoke use `tenants.manage` |
+| Policies | `reports.customer.read/create`, `reports.book.read/create`, `reports.tenant.read/create` |
+| Roles | Customer: `reports.customer.read` and `reports.customer.create` (request for self only, R5). TenantAdmin: all six. Adviser: the Customer and Book four. SystemAdmin: none; catalog list, grant, and revoke use `tenants.manage` |
 | First reports | Customer Transactions Report + Adviser Balances Report |
 | PDF | QuestPDF. No MD→PDF. No template files |
 | Result storage | Aspire-mounted volume shared by worker and webapi. `ResultStorageKey` stores relative key including file name: `{tenantPublicId}/{executionPublicId}.pdf` |
@@ -525,7 +525,6 @@ No new ADR beyond [0017](../adr/0017-background-worker.md).
 Still open:
 
 - Concrete events
-- Whether Customer will ever get `reports.customer.create`
 - Exact reversal mark in the PDF (type label vs also flag the original)
 - Hangfire Dashboard auth beyond Development
 - Overlapping runs of the same schedule (allowed for now)
@@ -550,3 +549,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-24 | [dividends.md](dividends.md) | §9.1: a `Dividend` row |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
 | 2026-11-26 | [valuation-history.md](valuation-history.md) | R14, §7.1, §9.2: the optional `date` of the Adviser Balances Report; Out: historical as-of snapshots point there |
+| 2026-11-27 | — | §1, story 4, §12: the Customer's `reports.customer.create` (R5) and the Tenant policies (R6) stated where the old "read only" text remained; the open question on Customer create is closed. No rule changed |
