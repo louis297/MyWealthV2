@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-17
-last_updated: 2026-11-17
+last_updated: 2026-11-26
 related:
   - accounts.md
   - posting.md
@@ -26,13 +26,11 @@ related:
 
 Structural amendment to the Account container on `webapi` ([accounts.md](accounts.md)). Every Account gains a **custody mode**: `External` or `Custodial`. It is chosen when the account is opened and never changes. The decision and the rejected options are in [ADR 0020](../adr/0020-account-custody-mode.md).
 
-This slice adds the attribute and carries it through every layer: Domain, database, the create body, the account item, a list filter, both portals and the seeds. It adds **no rule that depends on the mode**. Only `External` can be selected; `Custodial` exists as a reserved value, the same way the `Property` and `Credit` account types are reserved. After this slice every account is `External` and the system behaves as it does today.
+This slice added the attribute and carried it through every layer: Domain, database, the create body, the account item, a list filter, both portals and the seeds. It added **no rule that depends on the mode**: when it landed only `External` could be selected and every account was `External`.
 
-The rules for Custodial accounts are the **next** increment and are not specified here. No new route, no new policy, no new `TransactionType`, no problem code. Script `0031_accounts_custody_mode.sql`.
+The rules for Custodial accounts are [custody-modes.md](custody-modes.md), which lets a caller select `Custodial` and replaced R4, R5, R9 and R11 here. This file states what is still in force: the attribute, its immutability, the item field and the filter (R2, R3, R6–R8, R10) and script `0031_accounts_custody_mode.sql`. No new route, no new policy, no new `TransactionType`, no problem code.
 
 **Status is `accepted` (2026-11-17) and landed** on branch `feature/account-custody-mode`: script `0031_accounts_custody_mode.sql`, `Account.CustodyMode`, the create / PUT / item / filter rules, both portals and the seeds. ADR 0020 is accepted with it. The amendments to accounts, ADR 0011, domain-model, database-design, api-design, smoke-test, the glossary and the two portal page contracts landed with the implementation.
-
-**Amendment 2026-11-17 (custody modes, accepted, landed):** the next increment is specified in [custody-modes.md](custody-modes.md). It supersedes these parts of this file: R4, R5 and R11 (`Custodial` can be selected, as a `Brokerage` account only, and the Domain holds that pairing), R9 (rules then read the custody mode), the last sentence of R8 (the `Custodial` filter returns rows), the invariant "this slice adds no rule that combines them" in §5, and the New account form without a custody control in §9. R2, R3, R6, R7, R10 and script `0031` are unchanged.
 
 ---
 
@@ -100,14 +98,14 @@ Why the attribute comes first: it is one change with no behaviour, like [leg-acc
 | R1 | Unchanged from accounts R1–R6: 401 / 403 / 404, PublicId only, `/accounts` root, `tenantId` rules for TenantAdmin / Adviser / SystemAdmin, Customer and tenant state. Customer scope is unchanged: reads of own accounts only (accounts amendment 2026-11-02). |
 | R2 | Every Account has a custody mode, `External` or `Custodial`. It is set on create and is immutable. Rename, close and reopen do not change it. |
 | R3 | `POST /accounts` requires `custodyMode`. Missing or `null` → 400 with `errors.CustodyMode`. There is no default. The value is the exact enum name, matched the same way as `type`: `external` is not `External`. |
-| R4 | In this slice only `External` can be selected. `Custodial` → 400 with `errors.CustodyMode`, the same treatment as `Property` and `Credit` in accounts R8. Any other value → 400. Nothing is written. |
-| R5 | R3 and R4 apply to every caller that can create an account: TenantAdmin, Adviser, and SystemAdmin with `tenantId`. No tenant restricts the value in this slice. |
+| R4 | Removed 2026-11-17 (custody-modes R2, R3): only `External` could be selected. `Custodial` can now be selected, as a `Brokerage` account only. Any value other than the two names → 400. Nothing is written. |
+| R5 | R3 applies to every caller that can create an account: TenantAdmin, Adviser, and SystemAdmin with `tenantId`. A Tenant may restrict the value (tenant-custody-modes R7). |
 | R6 | `PUT /accounts/{id}` with `custodyMode` in the body → 400, also when the value equals the stored one. Same rule as `type` and `currency` (accounts R8, R9, R14). The name is not changed. |
 | R7 | The list and get item include `custodyMode` as the enum name. A Customer reading an own account receives it too. |
-| R8 | `GET /accounts` takes an optional `custodyMode` query: the exact enum name, `External` or `Custodial`. Any other value → 400. It combines with `customerId`, `type`, `enabledOnly` and `search` (all must match) and is applied before `totalCount`. `Custodial` is a valid filter and returns no rows in this slice. Sort is unchanged (accounts R17). |
-| R9 | No other behaviour reads the custody mode in this slice. Every transaction type, the cash and holdings rules, close and reopen, portfolio assignment and rebalance, trade fees, net worth and both reports treat an External account exactly as they treat an account today. |
+| R8 | `GET /accounts` takes an optional `custodyMode` query: the exact enum name, `External` or `Custodial`. Any other value → 400. It combines with `customerId`, `type`, `enabledOnly` and `search` (all must match) and is applied before `totalCount`. `Custodial` is a valid filter. Sort is unchanged (accounts R17). |
+| R9 | Removed 2026-11-17 (custody-modes §4): no behaviour read the custody mode. The rules that read it are in [custody-modes.md](custody-modes.md). |
 | R10 | Every Account that exists when script `0031` runs becomes `External`. Its transactions are not touched. |
-| R11 | The Domain accepts both values on `Account.Create`. Application refuses `Custodial` (R4). This is the same split as `AccountType`: all names exist in the Domain so a later slice does not reshape the type. |
+| R11 | The Domain accepts both values on `Account.Create` and holds the pairing of `Custodial` with `Brokerage` (custody-modes R3). |
 
 Policies: none added. `accounts.read` / `accounts.create` / `accounts.manage` as in [api-design.md](../api-design.md) §3.1.
 
@@ -124,7 +122,7 @@ Policies: none added. `accounts.read` / `accounts.create` / `accounts.manage` as
 Invariants:
 
 - `CustodyMode` is set on create, then immutable, like `Type` and `Currency`.
-- `Type` and `CustodyMode` are independent. This slice adds no rule that combines them.
+- A Custodial account is a `Brokerage` account (custody-modes R3). No other rule combines `Type` and `CustodyMode`.
 
 ```text
 Create(tenantId, customerId, name, type, custodyMode, currency)
@@ -247,7 +245,7 @@ Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-d
 
 **Adviser Portal**
 
-- New account form (`/customers/:id/accounts/new`): no custody control in this slice. The form always sends `custodyMode: "External"`. The selector arrives with the increment that opens Custodial accounts.
+- New account form (`/customers/:id/accounts/new`): the Custody choice is custody-modes §9 and adviser-portal-dashboard D17.
 - A "Custody" value is shown next to "Type" wherever a page shows an account's type: the accounts list (`/accounts`), the accounts table on the customer page (`/customers/:id`) and the account page (`/accounts/:id`). The text is the enum name, as for Type.
 - No filter control for custody mode in this slice.
 
@@ -267,17 +265,13 @@ Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-d
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `Create` stores the given custody mode, for each of the two values; rename, close and reopen leave it unchanged |
-| Application.FunctionalTests | Create with `External` → 201, and get returns `custodyMode: "External"`; create without `custodyMode` → 400 with `errors.CustodyMode` and no account is written; `Custodial` → 400; an unknown value and `external` (wrong case) → 400; SystemAdmin create follows the same rules; PUT with `custodyMode` → 400 (also with the stored value) and the name is unchanged; list items carry `custodyMode`; `?custodyMode=External` returns the caller's accounts, `?custodyMode=Custodial` returns an empty page with `totalCount` 0, `?custodyMode=nope` → 400; the filter combines with `customerId` and `type`; a Customer reading an own account gets `custodyMode`; every existing suite still passes once its account opening sends `External` |
-| Infrastructure.IntegrationTests | `Accounts.CustodyMode` is `int NOT NULL`; the CHECK refuses 2; the column has no default (an insert that omits it fails); `0031` turns an account row that existed before it into `External` (scratch database, as for `0024`); two-tenant fixture: the `custodyMode` filter used by tenant A's TenantAdmin returns no account of tenant B; `TestSeed` still creates the four demo accounts, all `External`, and is idempotent on a second run |
-| Adviser Portal | The New account form posts `custodyMode: "External"`; the accounts list, the customer page and the account page render the custody mode |
-| Customer Portal | The accounts list and the account page render the label for the custody mode |
-
-Where the two-tenant test lives: the `custodyMode` filter is applied in the `GetAccounts` handler, so the two-tenant case is proved over HTTP in Application.FunctionalTests (`AccountCustodyModeReadTests`), next to the other account isolation tests, not in Infrastructure.IntegrationTests.
-
-Fan-out in the functional tests. Twenty-eight test files post to `/accounts`, and sixteen of them have their own `OpenAccountAsync`. Before the field becomes required, one test-only commit moves plain account opening to a single shared method on `AccountHttp` (§12, commit 1). That commit is a pure refactor and passes on its own. Tests that assert on the create request itself (`CreateAccountTests` and similar) keep their own bodies and add the field when R3 lands.
+| Domain.UnitTests | `Entities/AccountTests.cs` |
+| Application.FunctionalTests | `Accounts/AccountCustodyMode*Tests.cs` |
+| Infrastructure.IntegrationTests | `AppliedSchema/CustodyModeSchemaTests.cs` |
 
 ---
 
@@ -314,17 +308,12 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
+## 12. History
 
-Only after `accepted`. The repository should build after each commit. Agents split each behaviour into red then green.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/account-custody-mode.md`).
 
-1. Test-only refactor: `AccountHttp.OpenAccountAsync` replaces the private account-opening helpers and the plain `POST /accounts` calls in the functional tests. No production change. Passes on its own.
-2. `0031_accounts_custody_mode.sql` + EF mapping + `CustodyMode` enum + `Account.CustodyMode` + the `Account.Create` parameter, with Domain unit tests and the integration tests for the column, the CHECK, the missing default and the back-fill. `CreateAccount`, `TestSeed` and the Development smoke seed pass `External` in the same commit so the tree builds; existing functional tests stay green.
-3. Account item carries `custodyMode`; `GET /accounts` takes the `custodyMode` filter (R7, R8) + functional tests and the two-tenant test.
-4. Adviser Portal: the form sends `External`; the three pages show the custody mode + frontend tests. `webapi` ignores a body field it does not know, so the form may send the field before commit 6 requires it.
-5. Customer Portal: the two pages show the label + frontend tests.
-6. `POST /accounts` requires `custodyMode` and accepts only `External` (R3–R5) + functional tests. The shared test method from commit 1 starts sending `External`.
-7. `PUT /accounts/{id}` refuses `custodyMode` (R6) + functional tests.
-8. Repo docs: mark this file landed (done 2026-11-17). (This file, ADR 0020 and the amendments in accounts, the portal specs, ADR 0011, domain-model, database-design, api-design, smoke-test and the glossary were accepted on 2026-11-17, before commit 1.)
-
-Do not put any Custodial rule, tenant setting or read-model grouping in these commits.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-17 | [custody-modes.md](custody-modes.md) | R4, R5, R8, R9, R11, §5, §9: `Custodial` can be selected, and rules read the custody mode |
+| 2026-11-18 | [tenant-custody-modes.md](tenant-custody-modes.md) | R5: a Tenant may restrict the value |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
