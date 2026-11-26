@@ -3,7 +3,7 @@ title: Database design
 status: draft
 language: en
 created: 2026-09-11
-updated: 2026-11-25
+updated: 2026-11-26
 related:
   - README.md
   - glossary.md
@@ -22,7 +22,7 @@ This document owns **accepted tables, keys, indexes, constraints, and script ord
 
 Phase 1 scripts create the platform base. Phase 2 accepted and landed: `Instruments` (`0010`), `Accounts` (`0012`), posting (`0013_transactions.sql`, `79129eb`), holdings (`0014`, `0015`), the StockIn / StockOut type check (`0016`), and the Split / Bonus / Scrip type check (`0017`). Do **not** create a second Journal / CashLedger table. There is no custom `RefreshTokens` table; refresh lives in the OpenIddict token store. Demo rows are `TestSeed`, not the schema script.
 
-**Amendment 2026-11-13 (tenant composite keys, accepted, landed):** [fixes/tenant-composite-keys.md](fixes/tenant-composite-keys.md) proposes scripts `0027_child_tenant_ids.sql` (`TenantId` on cash legs, security legs, `TransactionFxDetails`, `PortfolioLines`) and `0028_tenant_composite_keys.sql` (tenant composite FKs replace single-column FKs between tenant rows). §3, §6.6, §7, §9, §11.4 and §11.6 are updated when it is.
+Every tenant-scoped child row carries its own `TenantId`, and FKs between tenant rows are tenant composite keys `(TenantId, <column>)` → `(TenantId, Id)` ([fixes/tenant-composite-keys.md](fixes/tenant-composite-keys.md), scripts `0027_child_tenant_ids.sql` and `0028_tenant_composite_keys.sql`).
 
 ---
 
@@ -218,12 +218,13 @@ Client seed: SQL insert or startup seed. Both are allowed.
 | Code | nvarchar(50) | no | Login code, unique CI, `[a-z0-9-]{2,50}` |
 | ReportingCurrency | char(3) | no | Added by the currencies slice (`0009`). FK → `Currencies.Code`. No column default after apply |
 | IsActive | bit | no | Default 1. Renamed from `IsEnabled` in `0011`. |
+| AllowsExternalAccounts | bit | no | Named DEFAULT 1, kept (`0033`). [features/tenant-custody-modes.md](features/tenant-custody-modes.md) §6 |
+| AllowsCustodialAccounts | bit | no | Named DEFAULT 1, kept (`0033`). `CK_Tenants_AllowedCustodyModes`: at least one of the two is 1 |
+| BrokerConnection | nvarchar(50) | yes | The name of the Tenant's broker connection in configuration (`0051`, existing rows `'simulator'`). No FK: the name is checked against configuration when it is set. [features/orders.md](features/orders.md) §6.1 |
 | RowVersion | rowversion | no | |
 | Created / CreatedBy / LastModified / LastModifiedBy | audit | | |
 
-Amendment 2026-11-18 (tenant custody modes, accepted, landed; [features/tenant-custody-modes.md](features/tenant-custody-modes.md) §6): script `0033_tenants_allowed_custody_modes.sql` adds `AllowsExternalAccounts bit NOT NULL` and `AllowsCustodialAccounts bit NOT NULL`, each with a named DEFAULT 1 that stays after the script, and `CK_Tenants_AllowedCustodyModes` (at least one is 1). Existing rows allow both. No index and no FK; no rule ties `Accounts.CustodyMode` to these columns, because narrowing the setting leaves existing accounts alone.
-
-Amendment 2026-11-23 (orders and settlement, accepted; [features/orders.md](features/orders.md) §6.1): script `0051_orders.sql` adds `BrokerConnection nvarchar(50) NULL`, the name of the Tenant's broker connection in configuration, and sets `'simulator'` on every existing row. No FK: the name is checked against configuration when it is set.
+No rule ties `Accounts.CustodyMode` to the two allowed-mode columns, because narrowing the setting leaves existing accounts alone.
 
 `Code` is treated as immutable after create by the Tenants slice (no update API). The column itself is ordinary.
 
@@ -437,53 +438,63 @@ People list items may include `isActive` alongside `status` after `0011`. Filter
 
 ### 11.3 Accounts (accepted)
 
-Script `0012_accounts.sql`. Columns: [features/accounts.md](features/accounts.md) §6. `Status` Open=0 / Closed=1. `IsActive` persisted computed (`Status = 0` → 1). No balance or institution columns. Landed in the repo 2026-09-21. No seed in the script — `TestSeed` only.
+Script `0012_accounts.sql`. Columns: [features/accounts.md](features/accounts.md) §6. `Status` Open=0 / Closed=1. `IsActive` persisted computed (`Status = 0` → 1). No balance, institution or account-number column. No seed in the script — `TestSeed` only.
 
-Amendment 2026-11-17 (account custody mode, accepted; [features/account-custody-mode.md](features/account-custody-mode.md) §6): script `0031_accounts_custody_mode.sql` adds `CustodyMode int NOT NULL` to `Accounts` (0 External, 1 Custodial) with CHECK 0–1. The script adds the column with a default of 0 so that existing rows become External, then drops the default: an insert that does not name the column fails. No new index and no FK. Forward only; `0012` is not edited.
+Columns added by later scripts, each forward only (`0012` is not edited):
 
-Amendment 2026-11-20 (client money accounts, accepted, landed; [features/client-money-accounts.md](features/client-money-accounts.md) §6.2): script `0039_accounts_deposit_reference.sql` adds `DepositReference char(9) NULL`, gives every existing Custodial row a reference in the same script (random, Luhn mod 32 check symbol, redrawn while used), then adds `CK_Accounts_DepositReference` (not null iff `CustodyMode = 1`) and unique `UX_Accounts_DepositReference` WHERE not null. Still no institution or account-number column on `Accounts`.
+| Column | Script | Notes |
+| --- | --- | --- |
+| `CustodyMode int NOT NULL` | `0031` | 0 External, 1 Custodial; CHECK 0–1. Existing rows became External. No default is left: an insert that does not name the column fails. No index, no FK. [features/account-custody-mode.md](features/account-custody-mode.md) §6 |
+| `DepositReference char(9) NULL` | `0039` | `CK_Accounts_DepositReference`: not null iff `CustodyMode = 1`. Unique `UX_Accounts_DepositReference` WHERE not null. The script gave every existing Custodial row a reference (random, Luhn mod 32 check symbol, redrawn while used). [features/client-money-accounts.md](features/client-money-accounts.md) §6.2 |
+| `InterestAccruedThrough date NULL` | `0048` | The last UTC day the account was accrued through, set under the Account lock (§11.14). No index, no back-fill. [features/interest-run.md](features/interest-run.md) §6.2 |
+| `ReinvestDividends bit NOT NULL` | `0057` | Default 0. `CK_Accounts_ReinvestDividends`: 1 only on a Custodial account. With `ReinvestDividendsChangedByUserId` (tenant composite FK → `Users`) and `ReinvestDividendsChangedAt`. [features/dividends.md](features/dividends.md) §6.1 |
 
-Amendment 2026-11-22 (account closure, accepted; [features/account-closure.md](features/account-closure.md) §6): no column on `Accounts`. The closures of an Account are rows of `AccountClosures` (§11.13); the account item's `closure` is the latest of them.
-
-Amendment 2026-11-22 (interest run, accepted; [features/interest-run.md](features/interest-run.md) §6.2): script `0048_interest.sql` adds `InterestAccruedThrough date NULL` to `Accounts` (no index, no back-fill): the last UTC day the account was accrued through, set under the Account lock (§11.14).
+The closures of an Account are rows of `AccountClosures` (§11.13), not a column; the account item's `closure` is the latest of them.
 
 ### 11.4 Transactions (accepted spec; landed)
 
-Script `0013_transactions.sql`. Columns and rules: [features/posting.md](features/posting.md) §6. Header `Transactions` plus child `TransactionCashLegs` (one cash leg per header this increment). Idempotency table in the same script ([ADR 0015](adr/0015-idempotency-keys.md)). No `Accounts.Balance`. No seed in the script — `TestSeed` only.
+Rules: [features/posting.md](features/posting.md) §6. Idempotency table in `0013` ([ADR 0015](adr/0015-idempotency-keys.md)). No `Accounts.Balance`. No seed in the scripts — `TestSeed` only. Every script below is forward only and edits no earlier script.
 
-Amendment 2026-11-10 (leg accounts, [features/leg-accounts.md](features/leg-accounts.md)): script `0024_leg_accounts.sql` adds `AccountId int NOT NULL` (FK → `Accounts` RESTRICT) to `TransactionCashLegs` and `TransactionSecurityLegs`, back-fills it from the header, then drops `Transactions.AccountId` with its FK and index. The header keeps `TenantId` and has no Account or Customer. Cash legs are unique per `(TransactionId, AccountId)`; security legs per `(TransactionId, AccountId, InstrumentId)`. Forward only; `0013` / `0014` are not edited.
+`Transactions` (`0013`) — the header. It has `TenantId` and no Account or Customer: `0024` dropped `AccountId` with its FK and index, and the header index is `(TenantId, BookedAt)`.
 
-Amendment 2026-10-13: script `0018_transaction_reversed_by.sql` adds nullable `ReversedByTransactionId` (FK → `Transactions` RESTRICT, unique filtered index `WHERE ReversedByTransactionId IS NOT NULL`). Forward ALTER only. Do not edit `0013`. The original stores `ReversedByTransactionId`; the Reversal stores `OriginalTransactionId`.
+| Column or constraint | Script | Notes |
+| --- | --- | --- |
+| `ReversedByTransactionId` NULL | `0018` | FK → `Transactions` RESTRICT; unique filtered index `WHERE ReversedByTransactionId IS NOT NULL`. The original stores it; the Reversal stores `OriginalTransactionId` |
+| `CK_Transactions_Type` | `0037` | 0–17. Widened by `0015` (9), `0016` (11), `0017` (14), `0025` (15), `0026` (16) and `0037` (17) |
+| `UNIQUE (TenantId, Id)` | `0028` | The target of every tenant composite FK from a leg or a detail |
+| `BookedAt` | `0029` | Every row holds `+00:00` |
+| `SourceKind int NOT NULL` | `0035` | `CK_Transactions_SourceKind` 0–11, widened by `0041` (3), `0043` (4), `0046` (5), `0048` (6), `0050` (7), `0051` (8), `0054` (9), `0055` (10) and `0058` (11). No default is left. [features/transaction-source.md](features/transaction-source.md) §6 |
+| `SourcePublicId uniqueidentifier NULL` | `0035` | No FK, no index. `CK_Transactions_SourcePublicId`: null for kinds 0 and 1 (`Manual`, `Seed`), set for kinds 2–11 |
 
-Amendment 2026-11-11 (FX conversions, [features/fx-conversions.md](features/fx-conversions.md) §6): script `0026_fx_conversions.sql` widens `CK_Transactions_Type` to 0–16 for `FxConversion` and adds `TransactionFxDetails`: `TransactionId int` (PK and FK → `Transactions` RESTRICT; at most one row per Transaction), `BaseCurrency char(3)` and `QuoteCurrency char(3)` (FK → `Currencies.Code` RESTRICT; CHECK `BaseCurrency <> QuoteCurrency`), `Rate decimal(18,8)` (CHECK `> 0`), `RateAsOfDate date`, `RateSource nvarchar(50)`. No `TenantId`, `PublicId` or `RowVersion`: the row is part of an immutable Transaction. Leg shape is enforced in Domain and Application.
+`0035` back-filled the source once: rebalance trades (reference `rb:{32 hex}:{B|S}:{digits}`) became `Rebalance` with the parsed handle and a null `Reference`, rows with a listed seed reference became `Seed`, the rest `Manual`. No later script back-fills a source: an adjustment posted before `0058` keeps `SourceKind` 0.
 
-Amendment 2026-11-13 (tenant composite keys, [fixes/tenant-composite-keys.md](fixes/tenant-composite-keys.md)): script `0027_child_tenant_ids.sql` adds `TenantId int NOT NULL` (FK → `Tenants` RESTRICT) to `TransactionCashLegs`, `TransactionSecurityLegs` and `TransactionFxDetails`, back-filled from the header. The header's `TenantId` is copied onto every leg and the FX detail by the Domain. Forward only; `0013`, `0014`, `0024` and `0026` are not edited.
+`TransactionCashLegs` (`0013`):
 
-Amendment 2026-11-15 (trade fees, [features/trade-fees.md](features/trade-fees.md) §6): script `0030_trade_fees.sql` adds `Role int NOT NULL` (default 0 = `Principal`, CHECK 0–1) to `TransactionCashLegs`, replaces the unique `(TransactionId, AccountId)` with a filtered unique index `WHERE Role = 0`, adds `UNIQUE (TenantId, Id)` on `TransactionCashLegs`, and adds `TransactionFeeDetails`: one row per `Fee` cash leg (PK and FK `CashLegId`), `TenantId`, `TransactionId`, `Kind int` (CHECK 0–0, `Brokerage`), `TradeFeeScheduleId` (FK RESTRICT; required for `Brokerage`), `BasisAmount` and `FeeAmount decimal(18,4)` (CHECK `> 0`), `Currency char(3)`; UQ `(TransactionId, Kind)`. No `PublicId` or `RowVersion`. Forward only.
+| Column or constraint | Script | Notes |
+| --- | --- | --- |
+| `AccountId int NOT NULL` | `0024` | FK → `Accounts` RESTRICT, back-filled from the header |
+| `TenantId int NOT NULL` | `0027` | FK → `Tenants` RESTRICT, back-filled from the header; the Domain copies the header's `TenantId` onto every leg and detail. `UNIQUE (TenantId, Id)` (`0030`) |
+| `Role int NOT NULL` | `0030` | Default 0 = `Principal`. `CK_TransactionCashLegs_Role` 0–3: `Fee` (`0030`), `Tax` (`0048`), `Reinvestment` (`0057`) |
+| Unique `(TransactionId, AccountId) WHERE Role = 0` | `0030` | Replaces the unique `(TransactionId, AccountId)` of `0024` |
 
-Amendment 2026-11-18 (External caller numbers, accepted, landed; [features/external-caller-numbers.md](features/external-caller-numbers.md) §6): script `0034_entered_trade_fees.sql` drops `CK_TransactionFeeDetails_BrokerageSchedule`. A `Brokerage` row with `TradeFeeScheduleId` NULL is a fee the caller entered on an External account; every existing row keeps its schedule. No CHECK replaces it, because which fees may lack a schedule depends on the Account. `TransactionFxDetails` does not change; a rate the caller entered has `RateSource = 'Caller'`.
+`TransactionSecurityLegs` (`0014`, §11.5) has the same `AccountId` (`0024`) and `TenantId` (`0027`); unique `(TransactionId, AccountId, InstrumentId)`.
 
-Amendment 2026-11-19 (transaction source, accepted; [features/transaction-source.md](features/transaction-source.md) §6): script `0035_transaction_source.sql` (not written yet) adds `SourceKind int NOT NULL` (CHECK 0–2: `Manual`, `Seed`, `Rebalance`; temporary default 0, dropped at the end) and `SourcePublicId uniqueidentifier NULL` (no FK, no index) to `Transactions`, with a CHECK that `Manual` and `Seed` have no id and `Rebalance` has one. Back-fill: rebalance trades (reference `rb:{32 hex}:{B|S}:{digits}`, `Buy` / `Sell` only, else the script stops) become `Rebalance` with the parsed handle and a null `Reference`; rows with one of the listed seed references become `Seed`; the rest `Manual`. Forward only.
+Detail tables. Each row is part of an immutable Transaction: no `PublicId`, no `RowVersion`, no back-fill, all FKs RESTRICT. Unless the row says otherwise the key is `TransactionId` (PK; at most one row per Transaction) with `TenantId` and FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)`. Which Transactions carry a detail is held by the Domain ([domain-model.md](domain-model.md) §8.6).
 
-Amendment 2026-11-19 (adjustments, accepted; [features/adjustments.md](features/adjustments.md) §6): script `0037_adjustments.sql` widens `CK_Transactions_Type` to 0–17 for `Adjustment` and adds `TransactionAdjustmentDetails`: `TransactionId int` (PK; at most one row per Transaction), `TenantId int` (FK → `Tenants` RESTRICT; index), `Reason int` (CHECK 0–3: `EntryError`, `CorporateAction`, `ReconciliationBreak`, `Other`); FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT, as `TransactionFxDetails`. No `PublicId` or `RowVersion`: the row is part of an immutable Transaction. One row on every `Adjustment` and on its Reversal, held by the Domain. No back-fill. Forward only.
-
-Amendment 2026-11-20 (bank feed and deposit matching, accepted; [features/deposit-matching.md](features/deposit-matching.md) §6.2): script `0041_bank_statement_lines.sql` widens `CK_Transactions_SourceKind` to 0–3 (`BankFeed`) and requires a `SourcePublicId` for kinds 2 and 3. It adds `TransactionBankReceiptDetails`: `TransactionId int` (PK), `TenantId int` (FK → `Tenants`; index), FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT, as `TransactionFxDetails`, `ValueDate date`, `Reference nvarchar(140) NULL`, `PayerName nvarchar(140) NULL`, `PayerAccount nvarchar(40) NULL` (masked). One row on every deposit and on its Reversal, held by the Domain. No back-fill. Forward only.
-
-Amendment 2026-11-20 (withdrawals, accepted, landed; [features/withdrawals.md](features/withdrawals.md) §6.2): script `0043_withdrawals.sql` widens `CK_Transactions_SourceKind` to 0–4 (`Payment`) and requires a `SourcePublicId` for kinds 2, 3 and 4. It adds `TransactionPaymentDetails`: `TransactionId int` (PK), `TenantId int NOT NULL`, FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT, as `TransactionBankReceiptDetails`; `ValueDate date NOT NULL`, `Reference nvarchar(18) NULL`, `PayeeName nvarchar(140) NULL`, `PayeeAccount nvarchar(40) NULL` (masked). 0..1 per Transaction, on a payout and its Reversal only. No back-fill.
-
-Amendment 2026-11-22 (account closure, accepted; [features/account-closure.md](features/account-closure.md) §6): script `0046_account_closures.sql` widens `CK_Transactions_SourceKind` to 0–5 (`AccountClosure`) and requires a `SourcePublicId` for kinds 2–5. No back-fill.
-
-Amendment 2026-11-22 (interest run, accepted; [features/interest-run.md](features/interest-run.md) §6.2): script `0048_interest.sql` widens `CK_TransactionCashLegs_Role` to 0–2 (`Tax`), `CK_Transactions_SourceKind` to 0–6 (`InterestRun`) and requires a `SourcePublicId` for kinds 2–6. It adds `TransactionTaxDetails`: one row per `Tax` cash leg (PK `CashLegId`, FK `(TenantId, CashLegId)` → `TransactionCashLegs`), `TenantId`, `TransactionId` (FK `(TenantId, TransactionId)` → `Transactions`), `Kind int` (CHECK 0–1: `Rwt`, `Nrwt`), `RatePercent decimal(5,2)` (CHECK `> 0` and `≤ 100`), `BasisAmount` and `TaxAmount decimal(18,4)` (CHECK `> 0`), `Currency char(3)` (FK); UQ `(TransactionId, Kind)`. And `TransactionInterestDetails`: `TransactionId` (PK), `TenantId`, FK `(TenantId, TransactionId)` → `Transactions`, `PeriodFrom` and `PeriodTo date` (CHECK from `≤` to), `Days int` (CHECK `≥ 1`), `AccruedAmount decimal(18,8)` and `GrossAmount decimal(18,4)` (CHECK `> 0`). No `PublicId` or `RowVersion`: both are part of an immutable Transaction. All FKs RESTRICT. No back-fill.
-
-Amendment 2026-11-22 (corporate actions, accepted; [features/corporate-actions.md](features/corporate-actions.md) §6.1): script `0050_corporate_actions.sql` widens `CK_Transactions_SourceKind` to 0–7 (`CorporateAction`) and requires a `SourcePublicId` for kinds 2–7, and adds `TransactionCorporateActionDetails`: `TransactionId` (PK; at most one row per Transaction), `TenantId`, `Kind int` (CHECK 0–2), `RatioNew int`, `RatioHeld int` (CHECK `≥ 1`), `ExDate date`, `RecordDate date NULL`, `PaymentDate date NULL`, `QuantityBefore decimal(18,8)`, `QuantityAfter decimal(18,8)` (CHECK both `> 0`); FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT. No `PublicId` or `RowVersion`: the row is part of an immutable Transaction. One row on every entitlement posting and on its Reversal, held by the Domain. No back-fill.
-
-Amendment 2026-11-23 (orders and settlement, accepted; [features/orders.md](features/orders.md) §6.1): script `0051_orders.sql` widens `CK_Transactions_SourceKind` to 0–8 (`OrderFill`) and requires a `SourcePublicId` for kinds 2–8, and adds `TransactionExecutionDetails`: `TransactionId` (PK; at most one row per Transaction), `TenantId`, `FillPublicId uniqueidentifier`, `Price decimal(18,8)` (CHECK `> 0`), `TradeDate date`, `SettlementDate date` (CHECK `≥ TradeDate`), `BrokerReference nvarchar(50) NULL`; FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT. No `PublicId` or `RowVersion`: the row is part of an immutable Transaction. One row on every Transaction with source `OrderFill` and on its Reversal, held by the Domain. No back-fill: no `Buy` or `Sell` posted before `0051` gets a row.
-
-Amendment 2026-11-24 (migration batches, accepted; [features/migration-batches.md](features/migration-batches.md) §6): script `0054_migration_batches.sql` widens `CK_Transactions_SourceKind` to 0–9 (`Migration`) and requires a `SourcePublicId` for kinds 2–9, and adds `TransactionMigrationDetails`: `TransactionId` (PK; at most one row per Transaction), `TenantId`, `AsOfDate date`, `PreviousProvider nvarchar(100)`; FK `(TenantId, TransactionId)` → `Transactions (TenantId, Id)` RESTRICT. No `PublicId` or `RowVersion`. No back-fill.
-
-Amendment 2026-11-24 (in-kind transfers, accepted; [features/in-kind-transfers.md](features/in-kind-transfers.md) §6.1): script `0055_custodian.sql` widens `CK_Transactions_SourceKind` to 0–10 (`InKindTransfer`) and requires a `SourcePublicId` for kinds 2–10, and adds `TransactionInKindTransferDetails`: `TransactionId` (PK), `TenantId`, `TransferPublicId`, `CounterpartyName nvarchar(100)`, `CounterpartyAccountMasked nvarchar(34)`, `ChangesBeneficialOwner bit`, `AcquiredOn date NULL`, `SettlementDate date`, `CustodianReference nvarchar(100)`; FK `(TenantId, TransactionId)` → `Transactions` RESTRICT; no `PublicId`, `RowVersion` or audit columns.
-
-Amendment 2026-11-25 (adjustment review, accepted; [features/adjustment-review.md](features/adjustment-review.md) §6): script `0058_adjustment_requests.sql` (not written yet) widens `CK_Transactions_SourceKind` to 0–11 (`AdjustmentRequest`) and requires a `SourcePublicId` for kinds 2–11. `TransactionAdjustmentDetails` does not change. No back-fill: adjustments posted before keep `SourceKind` 0.
+| Table | Script | Columns and CHECKs |
+| --- | --- | --- |
+| `TransactionFxDetails` | `0026` | `BaseCurrency char(3)` and `QuoteCurrency char(3)` (FK → `Currencies.Code`; CHECK `BaseCurrency <> QuoteCurrency`), `Rate decimal(18,8)` (CHECK `> 0`), `RateAsOfDate date`, `RateSource nvarchar(50)` (`'Caller'` for a rate the caller entered). `TenantId` from `0027`. [features/fx-conversions.md](features/fx-conversions.md) §6 |
+| `TransactionFeeDetails` | `0030` | One row per `Fee` cash leg: PK and FK `CashLegId`. `TenantId`, `TransactionId`, `Kind int` (CHECK 0–0, `Brokerage`), `TradeFeeScheduleId NULL` (FK; null on a fee the caller entered on an External account: `0034` dropped `CK_TransactionFeeDetails_BrokerageSchedule`, and no CHECK replaces it, because which fees may lack a schedule depends on the Account), `BasisAmount` and `FeeAmount decimal(18,4)` (CHECK `> 0`), `Currency char(3)`. UQ `(TransactionId, Kind)`. [features/trade-fees.md](features/trade-fees.md) §6 |
+| `TransactionAdjustmentDetails` | `0037` | `Reason int` (CHECK 0–3: `EntryError`, `CorporateAction`, `ReconciliationBreak`, `Other`). Index on `TenantId`. [features/adjustments.md](features/adjustments.md) §6 |
+| `TransactionBankReceiptDetails` | `0041` | `ValueDate date`, `Reference nvarchar(140) NULL`, `PayerName nvarchar(140) NULL`, `PayerAccount nvarchar(40) NULL` (masked). [features/deposit-matching.md](features/deposit-matching.md) §6.2 |
+| `TransactionPaymentDetails` | `0043` | `ValueDate date NOT NULL`, `Reference nvarchar(18) NULL`, `PayeeName nvarchar(140) NULL`, `PayeeAccount nvarchar(40) NULL` (masked). [features/withdrawals.md](features/withdrawals.md) §6.2 |
+| `TransactionTaxDetails` | `0048` | One row per `Tax` cash leg: PK `CashLegId`, FK `(TenantId, CashLegId)` → `TransactionCashLegs`. `TenantId`, `TransactionId`, `Kind int` (CHECK 0–2: `Rwt`, `Nrwt`, and `ForeignWithholding` from `0057`), `RatePercent decimal(5,2)` (CHECK `> 0` and `≤ 100`), `BasisAmount` and `TaxAmount decimal(18,4)` (CHECK `> 0`), `Currency char(3)` (FK). UQ `(TransactionId, Kind)`. [features/interest-run.md](features/interest-run.md) §6.2 |
+| `TransactionInterestDetails` | `0048` | `PeriodFrom` and `PeriodTo date` (CHECK from `≤` to), `Days int` (CHECK `≥ 1`), `AccruedAmount decimal(18,8)` and `GrossAmount decimal(18,4)` (CHECK `> 0`) |
+| `TransactionCorporateActionDetails` | `0050` | `Kind int` (CHECK 0–2), `RatioNew int`, `RatioHeld int` (CHECK `≥ 1`), `ExDate date`, `RecordDate date NULL`, `PaymentDate date NULL`, `QuantityBefore decimal(18,8)`, `QuantityAfter decimal(18,8)` (CHECK both `> 0`). [features/corporate-actions.md](features/corporate-actions.md) §6.1 |
+| `TransactionExecutionDetails` | `0051` | `FillPublicId uniqueidentifier`, `Price decimal(18,8)` (CHECK `> 0`), `TradeDate date`, `SettlementDate date` (CHECK `≥ TradeDate`), `BrokerReference nvarchar(50) NULL`. No `Buy` or `Sell` posted before `0051` has a row. [features/orders.md](features/orders.md) §6.1 |
+| `TransactionMigrationDetails` | `0054` | `AsOfDate date`, `PreviousProvider nvarchar(100)`. [features/migration-batches.md](features/migration-batches.md) §6 |
+| `TransactionInKindTransferDetails` | `0055` | `TransferPublicId`, `CounterpartyName nvarchar(100)`, `CounterpartyAccountMasked nvarchar(34)`, `ChangesBeneficialOwner bit`, `AcquiredOn date NULL`, `SettlementDate date`, `CustodianReference nvarchar(100)`. No audit columns. [features/in-kind-transfers.md](features/in-kind-transfers.md) §6.1 |
+| `TransactionDividendDetails` | `0057` | `InstrumentId` (tenant composite FK), `Quantity decimal(18,8)` and `AmountPerShare decimal(18,8)` (CHECK `> 0` each), `Currency char(3)` (FK), `TaxSource int`, `ImputationCredit decimal(18,4)`, `ReinvestedQuantity` and `ReinvestmentPrice decimal(18,8) NULL`, `ExDate date`, `RecordDate date NULL`, `PaymentDate date NULL`. [features/dividends.md](features/dividends.md) §6.1 |
 
 ### 11.5 Holdings (accepted, landed)
 
@@ -500,13 +511,11 @@ Script `0023_portfolios.sql`:
 
 - `Portfolios` — TenantId, Name, BaseCurrency (immutable), IsActive, drift / minimum-trade / cash-residual settings, PublicId, audit, RowVersion
 - `PortfolioLines` — PortfolioId, InstrumentId, TargetWeight (decimal 2 places), SortOrder. `TenantId` (copied from the Portfolio) since `0027_child_tenant_ids.sql`, [fixes/tenant-composite-keys.md](fixes/tenant-composite-keys.md).
-- `AccountPortfolioAssignments` — TenantId, AccountId, PortfolioId, Status (Active/Removed), AssignedAt, AssignedBy, LastRebalanceAt, LastRebalanceStatus, LastRebalanceMessage; filtered unique on AccountId where Status = Active
+- `AccountPortfolioAssignments` — TenantId, AccountId, PortfolioId, Status (Active/Removed), AssignedAt, AssignedBy; filtered unique on AccountId where Status = Active; `UQ_AccountPortfolioAssignments_TenantId_Id` on `(TenantId, Id)` for the tenant composite FK from `Rebalances` (`0053`). The outcome of a rebalance is on its `Rebalances` row (§11.18): `0053` dropped `LastRebalanceAt`, `LastRebalanceStatus` and `LastRebalanceMessage` with no back-fill ([features/rebalances.md](features/rebalances.md) §6).
 
-No seed in the script. Development / TestAppHost `TestSeed` adds one demo portfolio and one assignment, and does not post rebalance trades.
+No seed in the script. Development / TestAppHost `TestSeed` adds one demo portfolio and one assignment, on the Custodial demo account, and posts no rebalance trades.
 
-Amendment 2026-11-17 (custody modes, accepted, landed; [features/custody-modes.md](features/custody-modes.md) §6): script `0032_remove_external_portfolio_assignments.sql` changes data only. Every `AccountPortfolioAssignments` row with `Status = 0` (Active) whose Account has `CustodyMode = 0` (External) gets `Status = 1` (Removed), with `LastModified` and `LastModifiedBy` filled. No table, column, index or constraint changes; holdings and transactions are not touched. One `UPDATE`, safe to run again. After it, an Active assignment exists only on a Custodial account; that is kept by Application, not by a constraint. `TestSeed` then puts the demo assignment on a Custodial demo account.
-
-Amendment 2026-11-23 (rebalance through orders, accepted; [features/rebalances.md](features/rebalances.md) §6): script `0053_rebalances.sql` drops `CK_AccountPortfolioAssignments_LastRebalanceStatus`, then `LastRebalanceAt`, `LastRebalanceStatus` and `LastRebalanceMessage`, with no back-fill, and adds `UQ_AccountPortfolioAssignments_TenantId_Id` on `(TenantId, Id)` for the tenant composite FK from `Rebalances`. The outcome of a rebalance is on its `Rebalances` row (§11.18).
+An Active assignment exists only on a Custodial account. That is kept by Application, not by a constraint. Script `0032_remove_external_portfolio_assignments.sql` changed data only: every row with `Status = 0` (Active) whose Account had `CustodyMode = 0` (External) got `Status = 1` (Removed), with `LastModified` and `LastModifiedBy` filled. One `UPDATE`, safe to run again; holdings and transactions were not touched ([features/custody-modes.md](features/custody-modes.md) §6).
 
 ### 11.7 Trade fee schedules (accepted)
 
@@ -521,35 +530,40 @@ No seed in the script. Development / TestAppHost `TestSeed` adds one schedule.
 
 Feature spec: [features/client-money-accounts.md](features/client-money-accounts.md) (accepted, landed 2026-11-20). Script `0038_client_money_accounts.sql`:
 
-- `ClientMoneyAccounts` — TenantId (FK `Tenants`), PublicId (unique), Currency (FK `Currencies`), BankName `nvarchar(100)`, AccountName `nvarchar(140)`, AccountNumber `nvarchar(34)`, IsActive, audit, RowVersion. Unique `(TenantId, Currency)` WHERE `IsActive = 1`; unique `(AccountNumber)` WHERE `IsActive = 1`; index `(TenantId)`. No column changes after insert except `IsActive`.
+- `ClientMoneyAccounts` — TenantId (FK `Tenants`), PublicId (unique), Currency (FK `Currencies`), BankName `nvarchar(100)`, AccountName `nvarchar(140)`, AccountNumber `nvarchar(34)`, `BankConnection nvarchar(50) NOT NULL` (the name of a bank connection in configuration; `0040_client_money_accounts_bank_connection.sql`, existing rows `'simulator'`; [features/deposit-matching.md](features/deposit-matching.md) §6.1), IsActive, audit, RowVersion. Unique `(TenantId, Currency)` WHERE `IsActive = 1`; unique `(AccountNumber)` WHERE `IsActive = 1`; index `(TenantId)`. No column changes after insert except `IsActive`.
 
 No seed in the script. Development / TestAppHost `TestSeed` adds a USD and an NZD row per firm.
 
-Amendment 2026-11-20 (bank feed and deposit matching, accepted; [features/deposit-matching.md](features/deposit-matching.md) §6.1): script `0040_client_money_accounts_bank_connection.sql` adds `BankConnection nvarchar(50) NOT NULL`, the name of a bank connection in configuration, `'simulator'` on every existing row through a temporary default that the script drops. It never changes after insert.
-
 ### 11.9 Bank statement lines (accepted)
 
-Feature spec: [features/deposit-matching.md](features/deposit-matching.md) (accepted 2026-11-20, landed 2026-11-20) §6.2. Script `0041_bank_statement_lines.sql`:
+Feature spec: [features/deposit-matching.md](features/deposit-matching.md) (accepted and landed 2026-11-20) §6.2. Script `0041_bank_statement_lines.sql`, with columns and CHECKs from the later scripts named below.
 
-- `BankFeedCursors` — PK and FK `ClientMoneyAccountId` → `ClientMoneyAccounts` RESTRICT; `Cursor nvarchar(500) NULL` (opaque); `LastSucceededAt`, `LastFailedAt`; `LastFailure int NULL` (CHECK 0–6); RowVersion. One row per client money account, written by the `worker` only.
-- `BankStatementLines` — the bank's inbound records ([ADR 0021](adr/0021-outside-parties-behind-ports.md) rule 7). TenantId, PublicId (unique), ClientMoneyAccountId, `Connection nvarchar(50)`, `OutsideId nvarchar(100)`; unique `(Connection, OutsideId)`. ValueDate, Direction (CHECK 0–1), `Amount decimal(18,4)` (CHECK `> 0`), Currency (FK), PayerName, `PayerAccountMasked nvarchar(40)`, ReferenceText, ReceivedAt. Status (CHECK 0–4), UnmatchedReason (CHECK 0–6), the match columns (account, transaction, method, time; all set iff `Status = 1`, CHECK), the last action columns (action, note, person, time), audit, RowVersion. FKs RESTRICT. Indexes `(TenantId, Status, ReceivedAt DESC)` and `(Connection, Status, ReceivedAt)`. The economic columns never change after insert.
+- `BankFeedCursors` — PK and FK `ClientMoneyAccountId` → `ClientMoneyAccounts` RESTRICT; `Cursor nvarchar(500) NULL` (opaque); `LastSucceededAt`, `LastFailedAt`; `LastFailure int NULL` (CHECK 0–6); RowVersion. One row per client money account, written by the `worker` only. From `0045` ([features/bank-reconciliation.md](features/bank-reconciliation.md) §6.1): `Balance decimal(18,4) NULL` and `BalanceAt datetimeoffset NULL` (both null or both set, `CK_BankFeedCursors_Balance`) and `OpeningBalance decimal(18,4) NULL` (set whenever `Balance` is, `CK_BankFeedCursors_Opening`). No back-fill: the first page after the script set them.
+- `BankStatementLines` — the bank's inbound records ([ADR 0021](adr/0021-outside-parties-behind-ports.md) rule 7). TenantId, PublicId (unique), ClientMoneyAccountId, `Connection nvarchar(50)`, `OutsideId nvarchar(100)`; unique `(Connection, OutsideId)`. ValueDate, Direction (CHECK 0–1), `Amount decimal(18,4)` (CHECK `> 0`), Currency (FK), PayerName, `PayerAccountMasked nvarchar(40)`, ReferenceText, ReceivedAt. Status, UnmatchedReason, the match columns, the last action columns (action, note, person, time), audit, RowVersion. FKs RESTRICT. Indexes `(TenantId, Status, ReceivedAt DESC)` and `(Connection, Status, ReceivedAt)`. The columns from the port never change after insert.
 - `TransactionBankReceiptDetails` — §11.4.
 
+Columns of `BankStatementLines` added after `0041`. Existing lines kept null, or the default, in each:
+
+| Column | Script | Notes |
+| --- | --- | --- |
+| `EndToEndId nvarchar(100) NULL`, `ReturnOfOutsideId nvarchar(100) NULL`, `ReturnReason nvarchar(140) NULL` | `0043` | From the port. Filtered indexes on `(Connection, EndToEndId)` and `(Connection, ReturnOfOutsideId)`. [features/withdrawals.md](features/withdrawals.md) §6.2 |
+| `RelatedLineId int NULL` | `0043` | FK `(TenantId, RelatedLineId)` → `BankStatementLines` RESTRICT |
+| `WithdrawalId int NULL` | `0043` | FK `(TenantId, WithdrawalId)` → `Withdrawals` RESTRICT |
+| `Kind int NOT NULL` | `0048` | Default 0 `Transfer`; 1 is `Interest`; CHECK 0–1. [features/interest-run.md](features/interest-run.md) §6.2 |
+| `TradeSettlementId int NULL` | `0052` | FK `(TenantId, TradeSettlementId)` → `TradeSettlements` RESTRICT. [features/trade-settlement.md](features/trade-settlement.md) §6.1 |
+| `MigrationBatchId int NULL` | `0054` | FK `(TenantId, MigrationBatchId)` → `MigrationBatches` RESTRICT; filtered index where set. [features/migration-batches.md](features/migration-batches.md) §6 |
+| `CorporateActionId int NULL` | `0057` | The dividend a line is the receipt of. [features/dividends.md](features/dividends.md) §6.1 |
+
+CHECKs of `BankStatementLines` as they are now:
+
+| CHECK | Range or rule | Last widened by |
+| --- | --- | --- |
+| `Status` | 0–6 | `0044` ([features/bank-returns.md](features/bank-returns.md) §6.1) |
+| `UnmatchedReason` | 0–14 | `0057`; before it `0043` (7), `0044` (11), `0046` (12), `0052` (13) |
+| `MatchMethod` | 0–7 | `0057`; before it `0043` (3), `0044` (4), `0052` (5), `0054` (6) |
+| `CK_BankStatementLines_Match` | `Status = 1` needs `MatchMethod`, `MatchedAt` and exactly one of five targets: an Account and a Transaction; a related line with no Account; a trade settlement; a migration batch; a corporate action. Any other status has no match column | `0057`; replaced before by `0044`, `0052` and `0054` |
+
 Unmatched receipts are not in any ledger table (roadmap D7). No seed.
-
-Amendment 2026-11-20 (withdrawals, accepted, landed; [features/withdrawals.md](features/withdrawals.md) §6.2): script `0043_withdrawals.sql` adds to `BankStatementLines` `EndToEndId nvarchar(100) NULL`, `ReturnOfOutsideId nvarchar(100) NULL`, `ReturnReason nvarchar(140) NULL`, `RelatedLineId int NULL` (FK `(TenantId, RelatedLineId)` → `BankStatementLines` RESTRICT) and `WithdrawalId int NULL` (FK `(TenantId, WithdrawalId)` → `Withdrawals` RESTRICT); widens the `UnmatchedReason` CHECK to 0–7 and the `MatchMethod` CHECK to 0–3; filtered indexes on `(Connection, EndToEndId)` and `(Connection, ReturnOfOutsideId)`. The Matched CHECK is unchanged. Existing lines keep null in the new columns.
-
-Amendment 2026-11-21 (bank returns, accepted; [features/bank-returns.md](features/bank-returns.md) §6.1): script `0044_bank_returns.sql` widens the `Status` CHECK of `BankStatementLines` to 0–6, `UnmatchedReason` to 0–11 and `MatchMethod` to 0–4, and replaces the Matched CHECK: `Status = 1` needs `MatchMethod` and `MatchedAt`, and either both `MatchedAccountId` and `MatchedTransactionId`, or both null with `RelatedLineId` set; any other status has no match columns. No back-fill.
-
-Amendment 2026-11-21 (bank reconciliation, accepted; [features/bank-reconciliation.md](features/bank-reconciliation.md) §6.1): script `0045_bank_reconciliations.sql` adds to `BankFeedCursors` `Balance decimal(18,4) NULL`, `BalanceAt datetimeoffset NULL` (both null or both set, `CK_BankFeedCursors_Balance`) and `OpeningBalance decimal(18,4) NULL` (set whenever `Balance` is, `CK_BankFeedCursors_Opening`). No back-fill: the first page after the script sets them.
-
-Amendment 2026-11-22 (account closure, accepted; [features/account-closure.md](features/account-closure.md) §6): script `0046_account_closures.sql` widens the `UnmatchedReason` CHECK of `BankStatementLines` to 0–12 (`AccountClosing`). No back-fill.
-
-Amendment 2026-11-22 (interest run, accepted; [features/interest-run.md](features/interest-run.md) §6.2): script `0048_interest.sql` adds `Kind int NOT NULL` (default 0 `Transfer`, CHECK 0–1; `1` is `Interest`) to `BankStatementLines`. Existing lines are `Transfer`.
-
-Amendment 2026-11-23 (trade settlement and broken trades, accepted; [features/trade-settlement.md](features/trade-settlement.md) §6.1): script `0052_trade_settlement.sql` adds `TradeSettlementId int NULL` (FK `(TenantId, TradeSettlementId)` → `TradeSettlements` RESTRICT) to `BankStatementLines`, widens `MatchMethod` to 0–5 and `UnmatchedReason` to 0–13, and replaces the Matched CHECK: `Status = 1` needs `MatchMethod`, `MatchedAt` and exactly one of (an Account and a Transaction), (a related line with no Account) and (a trade settlement).
-
-Amendment 2026-11-24 (migration batches, accepted; [features/migration-batches.md](features/migration-batches.md) §6): script `0054_migration_batches.sql` adds `MigrationBatchId int NULL` (FK `(TenantId, MigrationBatchId)` → `MigrationBatches` RESTRICT; filtered index where set) to `BankStatementLines`, widens `MatchMethod` to 0–6, and replaces the Matched CHECK with a fourth arm (a migration batch).
 
 ### 11.10 Nominated bank accounts (accepted)
 
@@ -562,30 +576,35 @@ Feature spec: [features/withdrawals.md](features/withdrawals.md) (accepted 2026-
 Feature spec: [features/withdrawals.md](features/withdrawals.md) (accepted 2026-11-20, landed 2026-11-21) §6.2. Script `0043_withdrawals.sql`:
 
 - `Withdrawals` — TenantId, PublicId (unique), AccountId, NominatedBankAccountId, `Amount decimal(18,4)` (CHECK `> 0`), Currency, `Reference nvarchar(18)`, `Memo nvarchar(200) NULL`, `Status int` (CHECK 0–7), requested by and at, decision (action CHECK 0–2, by, at, note; all null or all but the note set), `PayoutTransactionId` (set iff `Status IN (3, 7)`), `ReturnTransactionId` (set iff `Status = 7`), `FailureReason` (set iff `Status = 6`), `ReturnReason nvarchar(140) NULL`, audit, RowVersion. Tenant composite FKs, RESTRICT. Index `(TenantId, AccountId, Status)` for reserved cash.
-- `OutgoingPayments` — TenantId, PublicId (unique), ClientMoneyAccountId, `Connection nvarchar(50)`, `InstructionPublicId uniqueidentifier` (unique), WithdrawalId, Amount, Currency, `Reference nvarchar(18) NULL`, `Status int` (CHECK 0–5), `Attempts int`, `LastAttemptAt`, `LastFailure int NULL` (CHECK 0–5), `BankPaymentId nvarchar(100) NULL`, `AcceptedAt`, `RejectReason int NULL` (CHECK 0–3), audit, RowVersion. Index `(Connection, Status, Id)` for the send step.
+- `OutgoingPayments` — TenantId, PublicId (unique), ClientMoneyAccountId, `Connection nvarchar(50)`, `InstructionPublicId uniqueidentifier` (unique), `Kind int NOT NULL` (CHECK 0–2: `Withdrawal`, `ReceiptReturn`, `TradeSettlement`), the target, Amount, Currency, `Reference nvarchar(18) NULL`, `Status int` (CHECK 0–5), `Attempts int`, `LastAttemptAt`, `LastFailure int NULL` (CHECK 0–5), `BankPaymentId nvarchar(100) NULL`, `AcceptedAt`, `RejectReason int NULL` (CHECK 0–4), audit, RowVersion. Index `(Connection, Status, Id)` for the send step.
 - `TransactionPaymentDetails` — §11.4. The `BankStatementLines` columns — §11.9.
 
+The target of an `OutgoingPayments` row is one of three nullable columns, and `CK_OutgoingPayments_Target` requires exactly the one of its `Kind`:
+
+| Kind | Column | Script | Notes |
+| --- | --- | --- | --- |
+| 0 `Withdrawal` | `WithdrawalId` | `0043` | NULL since `0044` |
+| 1 `ReceiptReturn` | `ReturnOfLineId` | `0044` | FK `(TenantId, ReturnOfLineId)` → `BankStatementLines` RESTRICT. Unique filtered `UX_OutgoingPayments_ReturnOfLineId_Open` on `ReturnOfLineId WHERE Kind = 1 AND Status IN (0, 1)`. [features/bank-returns.md](features/bank-returns.md) §6.1 |
+| 2 `TradeSettlement` | `TradeSettlementId` | `0052` | FK → `TradeSettlements` RESTRICT. Filtered unique `WHERE Kind = 2 AND Status IN (0, 1)`. [features/trade-settlement.md](features/trade-settlement.md) §6.1 |
+
 Reserved cash is computed from `Withdrawals`, not stored. No seed in the script.
-
-Amendment 2026-11-21 (bank returns, accepted; [features/bank-returns.md](features/bank-returns.md) §6.1): script `0044_bank_returns.sql` adds to `OutgoingPayments` `Kind int NOT NULL` (CHECK 0–1; existing rows get 0 through a temporary default, then the default is dropped) and `ReturnOfLineId int NULL` (FK `(TenantId, ReturnOfLineId)` → `BankStatementLines` RESTRICT); `WithdrawalId` becomes NULL; CHECK exactly one of `WithdrawalId` and `ReturnOfLineId` by kind; the `RejectReason` CHECK widens to 0–4; unique filtered `UX_OutgoingPayments_ReturnOfLineId_Open` on `ReturnOfLineId WHERE Kind = 1 AND Status IN (0, 1)`.
-
-Amendment 2026-11-23 (trade settlement and broken trades, accepted; [features/trade-settlement.md](features/trade-settlement.md) §6.1): script `0052_trade_settlement.sql` adds `TradeSettlementId int NULL` to `OutgoingPayments` (FK → `TradeSettlements` RESTRICT; filtered unique `WHERE Kind = 2 AND Status IN (0, 1)`), widens `Kind` to 0–2 and replaces `CK_OutgoingPayments_Target` with three arms, by kind.
 
 ### 11.12 Bank reconciliations (accepted)
 
 Feature spec: [features/bank-reconciliation.md](features/bank-reconciliation.md) (accepted 2026-11-21) §6.1. Script `0045_bank_reconciliations.sql`:
 
 - The database allows `SNAPSHOT` isolation (`ALTER DATABASE CURRENT SET ALLOW_SNAPSHOT_ISOLATION ON`); only the reconciliation read uses it. Existing reads keep `READ COMMITTED`.
-- `BankReconciliations` — one stored run: TenantId, PublicId (unique), ClientMoneyAccountId (FK RESTRICT), Currency, `Trigger int` (CHECK 0–1), RanAt, `RanByUserId` (FK `(TenantId, RanByUserId)` → `Users`; null iff `Trigger = 0`), `Status int` (CHECK 0–2), `BankBalance`, `BalanceAt`, `OpeningBalance`, `StatementLinesTotal`, `Difference` (all null iff `Status = 2`), `CustodialCash`, counts and totals per class, `ReservedCash`, payments in flight, feed status; audit, written once. Unique `(TenantId, Id)`. Indexes `(TenantId, ClientMoneyAccountId, RanAt DESC)` and `(TenantId, RanAt DESC)`.
-- `BankReconciliationItems` — `(TenantId, ReconciliationId)` FK → `BankReconciliations`, `Position` (unique with the run), `Kind int` (CHECK 0–11), `Class int` (CHECK 0–2), signed `Amount decimal(18,4)`, `Count`; the line snapshot (`StatementLineId` FK `(TenantId, StatementLineId)` → `BankStatementLines`, set iff a line kind; `Direction`, `LineStatus`, `UnmatchedReason`, `ValueDate`, `Note`); `OtherClientMoneyAccountId` (FK, set iff `Kind = 11`).
+- `BankReconciliations` — one stored run: TenantId, PublicId (unique), ClientMoneyAccountId (FK RESTRICT), Currency, `Trigger int` (CHECK 0–1), RanAt, `RanByUserId` (FK `(TenantId, RanByUserId)` → `Users`; null iff `Trigger = 0`), `Status int` (CHECK 0–2), `BankBalance`, `BalanceAt`, `OpeningBalance`, `StatementLinesTotal`, `Difference` (all null iff `Status = 2`), `CustodialCash`, counts and totals per class, `ReservedCash`, payments in flight, feed status, `OpenSettlementsCount int NOT NULL` and `OpenSettlementsAmount decimal(18,4) NOT NULL` (`0052`, default 0 for existing rows); audit, written once. Unique `(TenantId, Id)`. Indexes `(TenantId, ClientMoneyAccountId, RanAt DESC)` and `(TenantId, RanAt DESC)`.
+- `BankReconciliationItems` — `(TenantId, ReconciliationId)` FK → `BankReconciliations`, `Position` (unique with the run), `Kind int`, `Class int` (CHECK 0–2), signed `Amount decimal(18,4)`, `Count`; the line snapshot (`StatementLineId` FK `(TenantId, StatementLineId)` → `BankStatementLines`; `Direction`, `LineStatus`, `UnmatchedReason`, `ValueDate`, `Note`); `OtherClientMoneyAccountId` (FK, set iff `Kind = 11`).
+
+CHECKs of `BankReconciliationItems` as they are now:
+
+| CHECK | Rule | Widened by |
+| --- | --- | --- |
+| `CK_BankReconciliationItems_Kind` | 0–21 | `0048` (14), `0052` (18), `0054` (19), `0057` (21) |
+| `CK_BankReconciliationItems_Line` | The line snapshot is set iff `Kind IN (2, 3, 4, 6, 12, 19)` | `0048` (12), `0054` (19) |
 
 No back-fill. A run and its items are never updated or deleted; no purge.
-
-Amendment 2026-11-22 (interest run, accepted; [features/interest-run.md](features/interest-run.md) §6.2): script `0048_interest.sql` widens `CK_BankReconciliationItems_Kind` to 0–14 (`BankInterest`, `InterestCredited`, `TaxWithheld`) and `CK_BankReconciliationItems_Line` to the kinds `2, 3, 4, 6, 12` as the kinds with a line. No back-fill.
-
-Amendment 2026-11-23 (trade settlement and broken trades, accepted; [features/trade-settlement.md](features/trade-settlement.md) §6.1): script `0052_trade_settlement.sql` widens `CK_BankReconciliationItems_Kind` to 0–18 and adds `OpenSettlementsCount int NOT NULL` and `OpenSettlementsAmount decimal(18,4) NOT NULL` (default 0 for existing rows) to `BankReconciliations`.
-
-Amendment 2026-11-24 (migration batches, accepted; [features/migration-batches.md](features/migration-batches.md) §6): script `0054_migration_batches.sql` widens `CK_BankReconciliationItems_Kind` to 0–19 (`MigrationNotPosted`) and adds 19 to the kinds with a line in `CK_BankReconciliationItems_Line`.
 
 ### 11.13 Account closures (accepted)
 
@@ -619,7 +638,12 @@ Feature spec: [features/corporate-actions.md](features/corporate-actions.md) (ac
 
 No back-fill: no corporate action exists before `0050`.
 
-Amendment 2026-11-24 (dividends, accepted; [features/dividends.md](features/dividends.md) §6.1, script `0057_dividends.sql`): `CorporateActions` and `CorporateActionAnnouncements` get nullable ratios, `Kind` 0–3 and the five term columns (`AmountPerShare`, `TaxSource`, `ImputationCreditPerShare`, `ForeignTaxRatePercent`, `ReinvestmentPrice`); a dividend has terms and no ratio, any other kind a ratio and no terms. `CorporateActions` also gets the receipt (`ReceiptLineId`, filtered unique; `ReceivedAmount`), `PaidAt` and the election columns (status, quantity, safekeeping account, attempts, reason, shares movement and quantity, release). `CorporateActionEntitlements` gets `EntitledQuantity`, `GrossAmount`, `ImputationCredit`, `ForeignTax`, `Reinvests`, `ParticipatingQuantity`, `ReinvestedQuantity`, `NetAmount`, `NetCurrency`, reason 0–2, and a `Posted` CHECK that takes either both quantities or the dividend's net. New `TransactionDividendDetails` (§11.4). `Accounts.ReinvestDividends` (Custodial only) with who and when. `BankStatementLines.CorporateActionId` as a fifth match target.
+Dividends ([features/dividends.md](features/dividends.md) §6.1, script `0057_dividends.sql`) changed the three tables:
+
+- `CorporateActions` and `CorporateActionAnnouncements` have nullable ratios, `Kind` 0–3 and the five term columns (`AmountPerShare`, `TaxSource`, `ImputationCreditPerShare`, `ForeignTaxRatePercent`, `ReinvestmentPrice`); a dividend has terms and no ratio, any other kind a ratio and no terms.
+- `CorporateActions` also has the receipt (`ReceiptLineId`, filtered unique; `ReceivedAmount`), `PaidAt` and the election columns (status, quantity, safekeeping account, attempts, reason, shares movement and quantity, release).
+- `CorporateActionEntitlements` has `EntitledQuantity`, `GrossAmount`, `ImputationCredit`, `ForeignTax`, `Reinvests`, `ParticipatingQuantity`, `ReinvestedQuantity`, `NetAmount`, `NetCurrency`, `Reason` 0–2, and a `Posted` CHECK that takes either both quantities or the dividend's net.
+- `TransactionDividendDetails` (§11.4), `Accounts.ReinvestDividends` (§11.3) and `BankStatementLines.CorporateActionId` (§11.9).
 
 ### 11.16 Orders and execution reports (accepted)
 
@@ -633,11 +657,16 @@ Feature spec: [features/orders.md](features/orders.md) (accepted 2026-11-23) §6
 
 Reserved cash, reserved quantity, unsettled cash and withdrawable cash of an Account are sums over `Orders`, `OrderFills` and `Withdrawals`; no column on `Accounts` or `Holdings` stores them. No back-fill: no order exists before `0051`.
 
-Amendment 2026-11-23 (trade settlement and broken trades, accepted; [features/trade-settlement.md](features/trade-settlement.md) §6.1): script `0052_trade_settlement.sql` adds to `Orders` `ClientMoneyAccountId` and `SettlementAccountNumber` (both or neither); to `OrderFills` the broker settlement id, the trade settlement and the break columns, widens `Status` to 0–2 and replaces the `TransactionId` CHECK; to `ExecutionReports` the five settlement fields, and widens `Kind` to 0–5 and `SkipReason` to 0–7. No back-fill.
+Columns added after `0051`. No back-fill; existing orders have none of them:
 
-Amendment 2026-11-23 (rebalance through orders, accepted; [features/rebalances.md](features/rebalances.md) §6): script `0053_rebalances.sql` adds `RebalanceId int NULL` to `Orders` (FK `(TenantId, RebalanceId)` → `Rebalances` RESTRICT; filtered index `WHERE RebalanceId IS NOT NULL`). Existing orders have no rebalance.
-
-Amendment 2026-11-24 (in-kind transfers, accepted; [features/in-kind-transfers.md](features/in-kind-transfers.md) §6.1): script `0055_custodian.sql` adds `Orders.SafekeepingAccountId int NULL` and `SafekeepingAccountNumber nvarchar(34) NULL` (CHECK both or neither; FK `(TenantId, SafekeepingAccountId)` → `SafekeepingAccounts` RESTRICT) and `UQ_OrderFills_TenantId_Id`.
+| Table | Script | Columns |
+| --- | --- | --- |
+| `Orders` | `0052` | `ClientMoneyAccountId` and `SettlementAccountNumber` (both or neither). [features/trade-settlement.md](features/trade-settlement.md) §6.1 |
+| `OrderFills` | `0052` | The broker settlement id, the trade settlement and the break columns; `Status` CHECK 0–2; the `TransactionId` CHECK replaced |
+| `ExecutionReports` | `0052` | The five settlement fields; `Kind` CHECK 0–5; `SkipReason` CHECK 0–7 |
+| `Orders` | `0053` | `RebalanceId int NULL`: FK `(TenantId, RebalanceId)` → `Rebalances` RESTRICT; filtered index `WHERE RebalanceId IS NOT NULL`. [features/rebalances.md](features/rebalances.md) §6 |
+| `Orders` | `0055` | `SafekeepingAccountId int NULL` and `SafekeepingAccountNumber nvarchar(34) NULL` (CHECK both or neither; FK `(TenantId, SafekeepingAccountId)` → `SafekeepingAccounts` RESTRICT). [features/in-kind-transfers.md](features/in-kind-transfers.md) §6.1 |
+| `OrderFills` | `0055` | `UQ_OrderFills_TenantId_Id` |
 
 ### 11.17 Trade settlements (accepted)
 
@@ -705,68 +734,26 @@ Locked in identity-auth (do not reopen here): `AspNetUsers.UserName` = Domain `U
 
 ## 13. Change log
 
-| Date | Change |
-| --- | --- |
-| 2026-09-11 | First English draft. Align with function-plan: OpenIddict stores in, custom RefreshTokens out; AspNetUsers.TenantId column no FK; no DomainUserId / Role / DisplayName on Identity; UserTokens seam keyed by hash + optional IdentityUserId, no FK; no ledger tables |
-| 2026-09-12 | identity-auth lands Tenants without ReportingCurrency and does not create Currencies. Catalog + ReportingCurrency FK are the currencies slice (`0008+`). |
-| 2026-09-13 | Currencies spec: `0008` + `0009`. `IsEnabled` is platform-wide. `DecimalPlaces` is minor units, not `decimal(18,4)` scale. |
-| 2026-09-20 | `Instruments` (`0010`). Tenant catalog. Unique `(TenantId, Symbol)`. FK QuoteCurrency → Currencies. Landed in repo `9ea2f2a`. |
-| 2026-09-21 | Boolean flags unified to `IsActive`. Script `0011` landed `bbd0f26`. Accounts spec accepted. |
-| 2026-09-21 | `Accounts` (`0012`). Container under a Customer. Derived `IsActive`. Landed in the repo. |
-| 2026-09-25 | `Transactions` + `TransactionCashLegs` + idempotency table (`0013`). Spec accepted and landed (`79129eb`). |
-| 2026-10-11 | Holdings (`0014`, `0015`) and `CK_Transactions_Type` widened to 0–11 (`0016`) for StockIn / StockOut. |
-| 2026-11-02 | Portfolios accepted. Script `0023_portfolios.sql`: `Portfolios`, `PortfolioLines`, `AccountPortfolioAssignments`. |
-| 2026-10-12 | `CK_Transactions_Type` widened to 0–14 (`0017`) for Split / Bonus / Scrip. No new table. |
-| 2026-10-13 | `Transactions.ReversedByTransactionId` (`0018`). Bidirectional reverse link. Forward ALTER only. |
-| 2026-11-10 | Leg accounts (`0024`): `AccountId` moves from `Transactions` onto both leg tables, back-filled. Header index becomes `(TenantId, BookedAt)`. |
-| 2026-11-11 | FX conversions (`0026`): `CK_Transactions_Type` widened to 0–16 for `FxConversion`. New table `TransactionFxDetails` (0..1 per Transaction; copied to a Reversal) ([features/fx-conversions.md](features/fx-conversions.md) §6). |
-| 2026-11-13 | Child tenant ids (`0027`): `TenantId` on `TransactionCashLegs`, `TransactionSecurityLegs`, `TransactionFxDetails` and `PortfolioLines`, back-filled from the parent. The tenant query filter now covers them ([fixes/tenant-composite-keys.md](fixes/tenant-composite-keys.md) B1). |
-| 2026-11-13 | Tenant composite keys (`0028`): `UNIQUE (TenantId, Id)` on `Users`, `Accounts`, `Instruments`, `Transactions`, `Portfolios`, `ReportSchedules`. 18 single-column FKs between tenant rows replaced by `(TenantId, XId)` → `(TenantId, Id)`. The script stops before any change if a reference crosses tenants ([fixes/tenant-composite-keys.md](fixes/tenant-composite-keys.md) B2). |
-| 2026-11-14 | UTC instants (`0029`): every `datetimeoffset` holds `+00:00`. Existing `Transactions.BookedAt` rows with another offset are switched to UTC, instant unchanged ([fixes/utc-instants.md](fixes/utc-instants.md) B5). |
-| 2026-11-10 | Internal transfers (`0025`): `CK_Transactions_Type` widened to 0–15 for `InternalTransfer`. No new table or index. The two-leg shape is enforced in Domain and Application ([features/internal-transfers.md](features/internal-transfers.md) §6). |
-| 2026-11-15 | Trade fees (`0030`): `TransactionCashLegs.Role`, filtered unique `(TransactionId, AccountId) WHERE Role = 0`, `TradeFeeSchedules`, `TradeFeeBands`, `TransactionFeeDetails` ([features/trade-fees.md](features/trade-fees.md) §6). |
-| 2026-11-17 | Account custody mode in `review` (`0031`, not written yet): `Accounts.CustodyMode int NOT NULL`, existing rows back-filled to 0, CHECK 0–1, no default left ([features/account-custody-mode.md](features/account-custody-mode.md) §6). |
-| 2026-11-17 | Account custody mode accepted. `0031` is a build contract. |
-| 2026-11-17 | Account custody mode landed: `0031_accounts_custody_mode.sql` written and applied. |
-| 2026-11-17 | Custody modes in `review` (`0032`, not written yet): data-only script that sets Active portfolio assignments on External accounts to Removed. No schema change ([features/custody-modes.md](features/custody-modes.md) §6). |
-| 2026-11-17 | Custody modes accepted. `0032` is a build contract. |
-| 2026-11-17 | Custody modes landed: `0032_remove_external_portfolio_assignments.sql` written and applied. |
-| 2026-11-18 | Tenant custody modes in `review` (`0033`, not written yet): two bit columns on `Tenants` for the allowed custody modes, existing rows allow both, defaults kept, CHECK at least one ([features/tenant-custody-modes.md](features/tenant-custody-modes.md) §6). |
-| 2026-11-18 | Tenant custody modes accepted. `0033` is a build contract. |
-| 2026-11-18 | Tenant custody modes landed: `0033_tenants_allowed_custody_modes.sql` written and applied. |
-| 2026-11-18 | External caller numbers in `review` (`0034`, not written yet): drop `CK_TransactionFeeDetails_BrokerageSchedule` so a caller-entered fee needs no schedule ([features/external-caller-numbers.md](features/external-caller-numbers.md) §6). |
-| 2026-11-18 | External caller numbers accepted. `0034` is a build contract. |
-| 2026-11-18 | External caller numbers landed: `0034_entered_trade_fees.sql` written and applied. |
-| 2026-11-19 | Transaction source in `review` (`0035`, not written yet): `Transactions.SourceKind` and `SourcePublicId`, back-filled; existing rebalance trades lose their `rb:` reference ([features/transaction-source.md](features/transaction-source.md) §6). |
-| 2026-11-19 | Transaction source accepted. `0035` is a build contract. |
-| 2026-11-19 | Simulator accepted ([features/simulator.md](features/simulator.md) §6). `0036` widens `CK_Users_RoleShape` for Role 4; no data change. Second database `MyWealthSimulatorDb` with its own scripts (§15). |
-| 2026-11-19 | ADR 0008 amendment: `worker` also runs the applicator at start-up (matches the code since `26fb489`). |
-| 2026-11-19 | Adjustments accepted and landed (`0037`): `CK_Transactions_Type` widened to 0–17; new `TransactionAdjustmentDetails` (reason per adjustment and its Reversal). `0037` is a build contract. |
-| 2026-11-20 | Client money accounts accepted (`0038`, `0039`, not written yet): `ClientMoneyAccounts` (§11.8) and `Accounts.DepositReference` with its back-fill (§11.3). Both are build contracts. |
-| 2026-11-20 | Client money accounts landed: `0038` and `0039` written. The back-fill and the C# `DepositReference.IsValid` agree (integration test). |
-| 2026-11-20 | Bank feed and deposit matching accepted (`0040`, `0041`, not written yet): `ClientMoneyAccounts.BankConnection` (§11.8), `BankFeedCursors` and `BankStatementLines` (§11.9), `TransactionBankReceiptDetails` and source kind 3 (§11.4). Simulator script `0003_bank.sql` (§15). All are build contracts. |
-| 2026-11-20 | Bank feed and deposit matching landed: `0040`, `0041` and simulator `0003` written. `TransactionBankReceiptDetails` has a `TenantId` and the tenant composite key, and the match and last-action keys of `BankStatementLines` are tenant composite keys (§11.4, §11.9). |
-| 2026-11-20 | Withdrawals accepted (`0042`, `0043`, not written yet): `NominatedBankAccounts` (§11.10), `Withdrawals` and `OutgoingPayments` (§11.11), `TransactionPaymentDetails` and source kind 4 (§11.4), the payout columns of `BankStatementLines` (§11.9). Simulator script `0004_bank_payments.sql` (§15). All are build contracts. |
-| 2026-11-21 | Withdrawals landed: `0042`, `0043` and simulator `0004` written. `NominatedBankAccounts`, `Withdrawals` and `BankStatementLines` gained a unique `(TenantId, Id)` key for the composite FKs; the statements on new columns run inside `EXEC` (§11.4, §11.9–§11.11, §15). |
-| 2026-11-21 | Bank returns accepted (`0044`, not written yet): `OutgoingPayments` kind and returned line (§11.11), the widened checks and the new Matched CHECK of `BankStatementLines` (§11.9). Simulator script `0005_bank_returns.sql` (§15). All are build contracts. |
-| 2026-11-21 | Bank returns landed: `0044` and simulator `0005` written. `0044` drops and adds again the `WithdrawalId` FK and index around the `ALTER COLUMN`; simulator `BankPayments` also keeps `ReturnOf`, the outside id as sent (§11.11, §15). |
-| 2026-11-21 | Bank reconciliation accepted (`0045`, not written yet): `BankReconciliations` and `BankReconciliationItems` (§11.12), the balance columns of `BankFeedCursors` (§11.9), snapshot isolation, report scope `Tenant` and the third catalog row (§14). Simulator script `0006_bank_balances.sql` (§15). §9 lists `0044` and `0045`. All are build contracts. |
-| 2026-11-21 | Bank reconciliation landed: `0045` and simulator `0006` written. `0045` names the composite FKs `FK_<child>_<parent>_TenantId_<column>`, adds `UX_BankReconciliationItems_ReconciliationId_Position` and the item CHECKs `CK_BankReconciliationItems_Line`, `_UnmatchedReason`, `_OtherClientMoneyAccount`, `_Position`, `_Count` (§11.12). |
-| 2026-11-22 | Account closure accepted (`0046`, not written yet): `AccountClosures` (§11.13), `UnmatchedReason` 0–12 (§11.9), `CK_Transactions_SourceKind` 0–5 (§11.4). §9 lists `0046`. All are build contracts. |
-| 2026-11-22 | Account closure landed: `0046` written. It names the CHECKs `CK_AccountClosures_Status`, `_CancelReason`, `_CashBalanceAtRequest`, `_PayoutAmount`, `_WriteOffAmount`, `_Cancel`, `_Completed`, `_Ended`, `_Payout`, `_WriteOff`, the composite FKs `FK_AccountClosures_<parent>_TenantId_<column>` and the index `IX_AccountClosures_TenantId_Status_RequestedAt` (§11.13). |
-| 2026-11-22 | Interest run accepted (`0047`, `0048`, not written yet): `CustomerTaxProfiles` and the interest tables (§11.14), `Accounts.InterestAccruedThrough` (§11.3), `TransactionTaxDetails`, `TransactionInterestDetails`, role 0–2 and source kind 0–6 (§11.4), `BankStatementLines.Kind` (§11.9), item kinds 0–14 (§11.12). Simulator script `0007_bank_line_kind.sql` (§15). §9 lists `0047` and `0048`. All are build contracts. |
-| 2026-11-22 | Interest run landed: `0047`, `0048` and simulator `0007` written. `0048` names the CHECKs `CK_InterestRateBands_FromAmount`, `_RatePercent`, `CK_InterestAccruals_Balance`, `_Amount`, `_EffectiveRatePercent`, `CK_InterestRuns_Trigger`, `_RanBy`, `_Account`, `_Counts`, `CK_TransactionTaxDetails_Kind`, `_RatePercent`, `_BasisAmount`, `_TaxAmount`, `CK_TransactionInterestDetails_Period`, `_Days`, `_AccruedAmount`, `_GrossAmount` and `CK_BankStatementLines_Kind`, and the unique keys `UQ_InterestAccruals_AccountId_AccrualDate` and `UQ_TransactionTaxDetails_TransactionId_Kind` (§11.14). `0047` adds `IX_CustomerTaxProfiles_TenantId`. |
-| 2026-11-22 | Simulated instruments accepted (`0049`, not written yet): `MarketDataFeeds` and the `Simulator` source on `InstrumentPrices` (§14.3); simulator `0008_market.sql` (§15). §9 lists `0049`. |
-| 2026-11-22 | Simulated instruments landed: `0049` and simulator `0008` written. `0049` names `PK_MarketDataFeeds`, `CK_MarketDataFeeds_Kind` and `CK_MarketDataFeeds_LastFailure`; `0008` names `UX_MarketInstruments_Symbol`, `CK_MarketInstruments_DailyMovePercent`, `CK_MarketInstruments_Price`, `CK_MarketPrices_Price` and `FK_MarketPrices_MarketInstruments_InstrumentId`. |
-| 2026-11-22 | Corporate actions accepted (`0050`, not written yet): `CorporateActionAnnouncements`, `CorporateActions`, `CorporateActionEntitlements` (§11.15), `TransactionCorporateActionDetails` and `CK_Transactions_SourceKind` 0–7 (§11.4), `MarketDataFeeds` Kind 0–1 and LastFailure 0–5; simulator `0009_market_corporate_actions.sql` (§15). §9 lists `0050`. |
-| 2026-11-22 | Corporate actions landed: `0050` and simulator `0009` written. `0050` names `UX_CorporateActionAnnouncements_Connection_OutsideId`, `UX_CorporateActions_InstrumentId_Connection_PartyActionId`, `UX_CorporateActions_InstrumentId_Kind_ExDate`, `UQ_CorporateActionEntitlements_CorporateActionId_AccountId` and the set-iff CHECKs (`CK_CorporateActionAnnouncements_Skipped`, `CK_CorporateActions_Feed`, `_EffectiveAt`, `_AppliedAt`, `_CancelledAt`, `CK_CorporateActionEntitlements_NotApplied`, `_Posted`, `_PostedAt`); `0009` names `UX_MarketCorporateActions_Number` and `UX_MarketCorporateActionVersions_ActionId_Version`. |
-| 2026-11-23 | Orders and settlement accepted (`0051`, not written yet): `Orders`, `OrderFills`, `ExecutionReports`, `BrokerFeeds` (§11.16), `TransactionExecutionDetails` and `CK_Transactions_SourceKind` 0–8 (§11.4), `Tenants.BrokerConnection` (§6.5); simulator `0010_broker.sql` (§15). §9 lists `0051`. |
+One row per change. §9 lists what each script did. The text of each change is in git (`git log -p -- docs/database-design.md`); the last commit of the amendment form is the tag `docs-pre-consolidation`.
 
-| 2026-11-23 | Trade settlement and broken trades accepted (`0052`, not written yet): `TradeSettlements` (§11.17); columns on `Orders`, `OrderFills`, `ExecutionReports` (§11.16), `OutgoingPayments` (§11.11), `BankStatementLines` (§11.9) and `BankReconciliations` (§11.12); simulator `0011_broker_settlement.sql` (§15). |
-| 2026-11-23 | Rebalance through orders accepted (`0053`, not written yet): `Rebalances`, `RebalanceTargets`, `RebalanceLines` (§11.18); `Orders.RebalanceId` (§11.16); the three `LastRebalance…` columns of `AccountPortfolioAssignments` dropped and `UQ_AccountPortfolioAssignments_TenantId_Id` added (§11.6). No simulator script. §9 lists `0053`. |
-| 2026-11-24 | In-kind transfers accepted (`0055`, `0056`, not written yet): `SafekeepingAccounts`, `CustodianFeedCursors`, `CustodianPositions`, `CustodyMovements`, `InKindTransfers`, `CustodianReconciliations`, `CustodianReconciliationLines` (§11.20); `TransactionInKindTransferDetails` and `CK_Transactions_SourceKind` 0–10 (§11.4); `Orders` safekeeping account columns (§11.16); simulator `0012_custodian.sql` (§15). §9 lists `0055` and `0056`. |
-| 2026-11-24 | Dividends accepted (`0057`): dividend terms, receipt, payment and election on `CorporateActions`; terms on `CorporateActionAnnouncements`; dividend fields on `CorporateActionEntitlements`; `TransactionDividendDetails`; cash leg role `Reinvestment` (3), tax kind `ForeignWithholding` (2); `Accounts.ReinvestDividends`; `BankStatementLines.CorporateActionId`, match method 7, unmatched reason 14; reconciliation item kinds 20–21 (§9, §11.4, §11.15). Simulator `0014_dividends.sql` (§15) |
-| 2026-11-25 | Adjustment review accepted (`0058`, not written yet): `AdjustmentRequests` (§11.21); `CK_Transactions_SourceKind` widened to 0–11 (§9, §11.4) |
+| Date | Scripts | Change |
+| --- | --- | --- |
+| 2026-09-11 – 09-13 | `0001`–`0009` | First draft: identity and OpenIddict stores, `Tenants`, `Users`, `UserTokens`; currencies |
+| 2026-09-20 – 09-21 | `0010`–`0012` | `Instruments`; `IsEnabled` → `IsActive`; `Accounts` |
+| 2026-09-25 | `0013` | `Transactions`, `TransactionCashLegs`, the idempotency table |
+| 2026-10-11 – 10-13 | `0014`–`0018` | Holdings; the type checks for the security types; the reverse link |
+| 2026-11-02 | `0023` | Portfolios |
+| 2026-11-10 – 11-11 | `0024`–`0026` | Leg accounts; `InternalTransfer`; FX conversions |
+| 2026-11-13 – 11-14 | `0027`–`0029` | Child tenant ids and tenant composite keys; UTC instants |
+| 2026-11-15 | `0030` | Trade fees |
+| 2026-11-17 – 11-18 | `0031`–`0034` | Account custody mode; custody modes; tenant custody modes; entered trade fees |
+| 2026-11-19 | `0035`–`0037` | Transaction source; role `SimulatorOperator` and the simulator database (§15); adjustments. `worker` also runs the applicator (ADR 0008) |
+| 2026-11-20 – 11-21 | `0038`–`0045` | Client money accounts; bank statement lines; nominated bank accounts and withdrawals; bank returns; bank reconciliations |
+| 2026-11-22 | `0046`–`0050` | Account closures; tax profiles and interest; market data feeds; corporate actions |
+| 2026-11-23 | `0051`–`0053` | Orders; trade settlements; rebalances |
+| 2026-11-24 | `0054`–`0057` | Migration batches; the custodian tables and reconciliations; dividends |
+| 2026-11-25 | `0058` | Adjustment requests |
+| 2026-11-26 | — | The amendments were folded into §6.5, §11 and §14. No table changed |
 
 ---
 
@@ -787,7 +774,7 @@ Hangfire tables are created by Hangfire in schema `Hangfire` (documented excepti
 
 ### 14.1 Outbox (accepted — ADR 0018, features/outbox.md)
 
-Script `0020_outbox.sql` (not yet landed). Table `OutboxMessages` in the application schema (not `Hangfire`).
+Script `0020_outbox.sql`. Table `OutboxMessages` in the application schema (not `Hangfire`).
 
 | Column | Notes |
 | --- | --- |
@@ -837,9 +824,9 @@ PK `(InstrumentId, AsOfDate)`. Index on `FetchedAt`. No PublicId. No RowVersion.
 
 Daily Hangfire job at 12:00 UTC fetches EOD prices from EODHD for instruments that are active in at least one tenant when today's UTC date is not already stored for every active instrument. Same symbol + quote currency across tenants is fetched once and written to every matching `InstrumentId`. On the same `AsOfDate`, update `Price` and `FetchedAt`. Fetch failure logs and leaves previous rows. `IMarketData` reads the table: latest row with `AsOfDate` ≤ requested date (or today if omitted); no row → empty (not 0).
 
-Amendment 2026-11-25 (market data history, accepted; [features/market-data-history.md](features/market-data-history.md) §6): `InstrumentPrices` and `FxRates` hold a row for every source date from the history floor date (`MarketDataHistory:FloorDate` on `worker`), not only from the first run. A row whose `AsOfDate` is two or more days before the platform's UTC date is final: it is never updated or deleted, and a missing one may be inserted. `FetchedAt` of a final row is the time it was last written. No script; both primary keys serve the range reads. Growth: about 250 price rows per instrument and 365 rate rows per directed pair a year.
+History ([features/market-data-history.md](features/market-data-history.md) §6): `InstrumentPrices` and `FxRates` hold a row for every source date from the history floor date (`MarketDataHistory:FloorDate` on `worker`), not only from the first run. A row whose `AsOfDate` is two or more days before the platform's UTC date is final: it is never updated or deleted, and a missing one may be inserted. `FetchedAt` of a final row is the time it was last written. No script; both primary keys serve the range reads. Growth: about 250 price rows per instrument and 365 rate rows per directed pair a year.
 
-Amendment 2026-11-22 (simulated instruments, accepted; [features/simulated-instruments.md](features/simulated-instruments.md) §6.1): an instrument whose symbol ends with a market data connection's suffix gets its rows from that connection's `worker` job, not from EODHD: `Source` = the adapter name (`Simulator`), `AsOfDate` = the platform's UTC date at the run (never the party's date). The table does not change. Script `0049_market_data_feeds.sql` adds `MarketDataFeeds`, platform data with no `TenantId`:
+Simulated instruments ([features/simulated-instruments.md](features/simulated-instruments.md) §6.1): an instrument whose symbol ends with a market data connection's suffix gets its rows from that connection's `worker` job, not from EODHD: `Source` = the adapter name (`Simulator`), `AsOfDate` = the platform's UTC date at the run (never the party's date). The table does not change. Script `0049_market_data_feeds.sql` adds `MarketDataFeeds`, platform data with no `TenantId`:
 
 | Column | Notes |
 | --- | --- |
@@ -868,7 +855,7 @@ PK `(Connection, Kind)`. No FK: a connection lives in configuration.
 | 2026-11-08 | Instrument price sync runs daily at 12:00 UTC. |
 | 2026-11-02 | `0022_instrument_prices.sql` landed. No seed rows in the script. TestSeed writes the fake prices. |
 | 2026-11-21 | `CK_Reports_Scope` accepts `Tenant`; `0045` inserts the third catalog row `bank-reconciliation` ([features/bank-reconciliation.md](features/bank-reconciliation.md)). |
-| 2026-11-22 | Simulated instruments accepted (`0049`, not written yet): `MarketDataFeeds`; `InstrumentPrices.Source` also holds `Simulator` ([features/simulated-instruments.md](features/simulated-instruments.md)). |
+| 2026-11-22 | Simulated instruments (`0049`): `MarketDataFeeds`; `InstrumentPrices.Source` also holds `Simulator` ([features/simulated-instruments.md](features/simulated-instruments.md)). |
 
 ---
 
