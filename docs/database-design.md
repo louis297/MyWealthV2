@@ -302,9 +302,9 @@ Why no FK on `IdentityUserId` / `TenantId`: this is a seam table. A reverse or e
 | `Users` → `Users` | `TenantId`, `AdviserId` (tenant composite FK since `0028`) | RESTRICT |
 | `AspNetUsers` → `Users` | `IdentityUserId` | RESTRICT |
 | OpenIddict package FKs | as shipped | as shipped |
+| Identity package FKs | as shipped | as shipped |
 
 Since `0028`, every FK from one tenant row to another is a tenant composite FK. The full list is in [fixes/tenant-composite-keys.md](fixes/tenant-composite-keys.md). FKs to `Tenants`, `Currencies`, `Reports` and `AspNetUsers` stay single-column.
-| Identity package FKs | as shipped | as shipped |
 
 No FK:
 
