@@ -20,6 +20,16 @@ public static class ReturnUrls
             return false;
         }
 
-        return !returnUrl.Contains('\\');
+        // Printable ASCII only. Browsers drop a tab or line break from a URL, so "/\t/host"
+        // would become "//host"; a character outside ASCII cannot go into the Location header.
+        foreach (var c in returnUrl)
+        {
+            if (c == '\\' || c < ' ' || c > '~')
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

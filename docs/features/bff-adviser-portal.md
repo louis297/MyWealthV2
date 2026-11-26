@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-01
-last_updated: 2026-11-26
+last_updated: 2026-11-27
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -105,7 +105,7 @@ The Adviser Portal browser talks only to the BFF origin: login/logout on the BFF
 | R14 | SPA `fetch` / RTK Query uses `credentials: 'include'` and base URL `/api`. It does not set `Authorization`. Mutating calls send `X-MyWealth-Request: 1` (R18). |
 | R15 | Cross-origin browser calls to `webapi` are not part of the product path after this slice. Scalar may keep calling `webapi` directly with Bearer. The BFF does not enable credentialed CORS for a foreign `Origin`. |
 | R16 | The BFF does not run the schema applicator and does not reference `Application` handlers. |
-| R17 | `/callback` on the SPA is retired. OIDC callback is `/signin-oidc` on the BFF. Deep-link return uses the OIDC handler `state`, still only in-app paths (adviser-portal C14). `returnUrl` must be a relative path: starts with `/`, must not start with `//` or `/\`, must not contain `\`. Redirect URIs registered on the client are exact. A `*.dev.localhost` alias may be upserted only when that host is a browser entry. Do not register a wildcard, the BFF http endpoint, or the Vite origin. `https://localhost:7190` is the current Development dashboard link, not a locked port. |
+| R17 | `/callback` on the SPA is retired. OIDC callback is `/signin-oidc` on the BFF. Deep-link return uses the OIDC handler `state`, still only in-app paths (adviser-portal C14). `returnUrl` must be a relative path: starts with `/`, must not start with `//` or `/\`, must not contain `\`, and every character is printable ASCII (U+0020 to U+007E). Browsers drop a tab or line break from a URL, so `/<TAB>/host` would become `//host`. Redirect URIs registered on the client are exact. A `*.dev.localhost` alias may be upserted only when that host is a browser entry. Do not register a wildcard, the BFF http endpoint, or the Vite origin. `https://localhost:7190` is the current Development dashboard link, not a locked port. |
 | R18 | Mutating browser calls (`POST` / `PUT` / `PATCH` / `DELETE` under `/api`, and `POST /bff/logout`) require header `X-MyWealth-Request: 1`. Missing header → **400**, do not proxy. GET does not require it. This is not a second CSRF token. SameSite=Lax stays. |
 | R19 | Do not proxy `/connect/*` to the browser. The SPA has no identity origin in env for protocol calls. |
 | R20 | Proxy only the `webapi` prefixes on the allow-list of §8.3: the six of the first slice (`/users`, `/tenants`, `/currencies`, `/accounts`, `/instruments`, `/transactions`) and the prefixes later slices added. Any other `/api/*` path → **404**, not forwarded. Do not forward `/scalar`, `/openapi`, `/health`, `/connect`. Destination is Aspire `webapi` only. A slice that needs a new prefix adds it to the list in `ApiProxy` and to the table in §8.3. |
@@ -405,3 +405,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-13 | — | §4.1: refresh single-flight (RF1–RF8) |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
 | 2026-11-26 | [valuation-history.md](valuation-history.md) | §8.3: `/net-worth/funds-under-management` is under the existing prefix. The allow-list does not change |
+| 2026-11-27 | — | R17: a return URL with a control character or a character outside ASCII is rejected |
