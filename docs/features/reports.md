@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-10-12
-last_updated: 2026-11-22
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -35,19 +35,6 @@ First phase ships two reports and both UI entry points:
 Both support manual trigger and editable recurring schedules in the first phase. Event plumbing is present; concrete events are not locked.
 
 **Status is `accepted`.** Implementation follows this file.
-
-
-**Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md) R20. The Customer Transactions report has one row per leg account of the Customer: a transaction appears in each of the Customer's accounts it books into, with that account's cash and security legs. The closed-account filter and the reversal-after-original ordering apply per account row.
-
-**Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md) R22. In the Customer Transactions report, the cash amount of an account row is the sum of that account's cash legs, and a new Fee column shows the sum of its `Fee` legs (empty when none). The Adviser Balances report is unchanged: it already sums every cash leg.
-
-**Amendment 2026-11-18 (grouping by custody mode, accepted, landed):** [custody-mode-grouping.md](custody-mode-grouping.md) R10–R16. Adviser Balances: every cash and holding line has a "Custody" column (enum name) after "Type"; the line order is unchanged; the subtotals become one block per custody mode present (`Custodial`, then `External`) followed by an "All accounts" block with today's per-currency totals. Customer Transactions: a "Custody" column after "Account" with the labels "Held on platform" / "Held elsewhere", and, when any row is on an External account, the note "Held elsewhere: recorded by your adviser from outside statements. The platform has not checked these figures." under the table. Parameters, scope rules and routes do not change.
-
-**Amendment 2026-11-19 (adjustments, accepted):** [adjustments.md](adjustments.md) R22, R23. Customer Transactions: an `Adjustment` row shows the type cell `Adjustment (<reason label>)` (labels: Entry error, Corporate action, Reconciliation, Other) and its memo; its Reversal shows `Reversal`. Adviser Balances is unchanged: it already sums every leg.
-
-**Amendment 2026-11-21 (bank reconciliation, accepted):** [bank-reconciliation.md](bank-reconciliation.md) R22–R25. A third scope, `Tenant`: a report that runs across the whole Tenant, with policies `reports.tenant.read` and `reports.tenant.create`, which only TenantAdmin holds (R4, R6: Adviser and Customer → 403 on a Tenant-scoped request, schedule or execution; SystemAdmin still has no `reports.*` policy). The `scope` filter of `GET /reports`, `GET /reports/schedules` and `GET /reports/executions` takes `Tenant`; a Tenant-scoped execution is visible to every TenantAdmin of the Tenant. `CK_Reports_Scope` accepts `Tenant` (script `0045`). A third catalog row (§6.1): `bank-reconciliation` (PublicId `3e7b9d14-6c2a-4f58-b0e1-9a4d2c7f8e33`, scope `Tenant`, `manual` and `scheduled`), parameters `{ clientMoneyAccountId, reconciliationId? }`, which renders a stored bank reconciliation. `webapi --seed-demo` and `TestSeed` grant it to the demo tenant with the other two.
-
-**Amendment 2026-11-22 (interest run, accepted):** [interest-run.md](interest-run.md) R38. Customer Transactions: a new Tax column after the Fee column shows the sum of the row's `Tax` legs, empty when there is none; the cash amount column stays the sum of the account's cash legs, so an interest row shows the net. Adviser Balances is unchanged: it already sums every cash leg. No interest report in this slice.
 
 ---
 
@@ -107,8 +94,6 @@ A shared request pipeline checks the coarse policy, the tenant grant, and allowe
 
 Note: Customer has `reports.customer.read` but no first-phase UI. The policy exists so a later Customer Portal (or other client) can list and download without a policy change.
 
-**Amendment for Customer Portal (accepted 2026-11-02).** Supersedes R5 for request only. Grant Customer `reports.customer.create` in addition to `reports.customer.read`. `POST /reports/request` succeeds only when `parameters.customerId` is the caller (else 404). `POST /reports/schedules` and other schedule verbs stay 403 for Customer. Book-scoped routes stay 403. See [../customer-portal/customer-portal.md](../customer-portal/customer-portal.md) for the UI contract.
-
 ---
 
 ## 3. Stories
@@ -130,9 +115,9 @@ Note: Customer has `reports.customer.read` but no first-phase UI. The policy exi
 | R1 | Missing / dead Bearer → 401, never 302. Policy fail → 403. |
 | R2 | Path `{id}` and JSON `id` are PublicId. Internal ints never appear. |
 | R3 | A schedule or manual request must name a ReportId. The report must exist, be granted to the tenant, and allow the requested trigger. Otherwise 404. |
-| R4 | Coarse policy is required before report-specific checks: Customer-scoped mutations need `reports.customer.create`; Book-scoped mutations need `reports.book.create`. Reads follow the same split. |
-| R5 | Customer role has only `reports.customer.read`. Customer may read executions targeted at self. Customer cannot create or schedule. |
-| R6 | TenantAdmin and Adviser have all four policies. SystemAdmin has none of them and cannot call `GET /reports`, request, schedule, or download. Listing the catalog for a tenant, granting, and revoking use `tenants.manage`. |
+| R4 | Coarse policy is required before report-specific checks: Customer-scoped mutations need `reports.customer.create`; Book-scoped mutations need `reports.book.create`. Reads follow the same split. Tenant-scoped mutations need `reports.tenant.create`. The `scope` filter of `GET /reports`, `GET /reports/schedules` and `GET /reports/executions` takes `Customer`, `Book` and `Tenant`. |
+| R5 | Customer role has `reports.customer.read` and `reports.customer.create`. A Customer may read executions targeted at self, and `POST /reports/request` succeeds only when `parameters.customerId` is the caller (else 404). `POST /reports/schedules` and the other schedule verbs stay 403 for a Customer, and so do Book-scoped and Tenant-scoped routes ([../customer-portal/customer-portal.md](../customer-portal/customer-portal.md)). |
+| R6 | TenantAdmin and Adviser have the four Customer and Book policies. Only TenantAdmin holds `reports.tenant.read` and `reports.tenant.create`: Adviser and Customer → 403 on a Tenant-scoped request, schedule or execution, and a Tenant-scoped execution is visible to every TenantAdmin of the Tenant (bank-reconciliation R22–R25). SystemAdmin has none of the `reports.*` policies and cannot call `GET /reports`, request, schedule, or download. Listing the catalog for a tenant, granting, and revoking use `tenants.manage`. |
 | R7 | Adviser on a Book-scoped report may only target self. TenantAdmin may target any Adviser in the same tenant. Cross-tenant or unknown → 404. |
 | R8 | Adviser on a Customer-scoped report may only target an assigned Customer. TenantAdmin may target any Customer in the tenant. Customer (read) only self. |
 | R9 | Each report declares its required parameters and performs its own scope validation after the shared pipeline. |
@@ -193,9 +178,10 @@ Seed the two first-phase reports (by Code) in `0019_reports.sql`. Development / 
 
 These are ordinary `nvarchar` columns on `Reports`, not extra tables and not integer enums. Strings keep later value changes free of a schema rewrite.
 
-- `Scope`: `"Customer"` or `"Book"`. Selects which policy pair applies (`reports.customer.*` vs `reports.book.*`) and which parameter set the generator expects.
+- `Scope`: `"Customer"`, `"Book"` or `"Tenant"` (`CK_Reports_Scope`; `Tenant` from script `0045`). Selects which policy pair applies (`reports.customer.*`, `reports.book.*` or `reports.tenant.*`) and which parameter set the generator expects. A `Tenant` report runs across the whole Tenant.
 - `AllowedTriggers`: which of manual / scheduled / event this report accepts. Stored as a JSON array, for example `["manual","scheduled"]`. The pipeline rejects a trigger the report does not allow.
-- Seeded codes: `customer-transactions` (PublicId `8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11`, scope `Customer`) and `adviser-balances` (PublicId `5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22`, scope `Book`). Both allow `manual` and `scheduled` only.
+- Seeded codes: `customer-transactions` (PublicId `8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11`, scope `Customer`), `adviser-balances` (PublicId `5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22`, scope `Book`) and `bank-reconciliation` (PublicId `3e7b9d14-6c2a-4f58-b0e1-9a4d2c7f8e33`, scope `Tenant`). All allow `manual` and `scheduled` only.
+- Grants: `webapi --seed-demo` and `TestSeed` grant the three reports to the demo tenant; `--seed-demo` does it in any environment, does not grant a platform-inactive report, and is idempotent on `(TenantId, ReportId)` ([demo-tenant-seed.md](demo-tenant-seed.md)). Other tenants are not auto-granted.
 
 No separate lookup table in this phase.
 
@@ -429,7 +415,11 @@ Rules:
 - Filter on `bookedAt`: `from` ≤ `bookedAt` < `to` (`from` and `to` are UTC days, [utc-instants](../fixes/utc-instants.md)).
 - Include all transaction types in range.
 - Reversals are marked (type or flag) and listed immediately after their original transaction.
-- Suggested columns: bookedAt, account, type, cash amount, fee, instrument, quantity, memo (fee column: trade-fees R22).
+- One row per leg account of the Customer: a transaction appears in each of the Customer's accounts it books into, with that account's cash and security legs. The closed-account filter and the reversal-after-original ordering apply per account row (leg-accounts R20).
+- Columns: bookedAt, account, custody, type, cash amount, fee, tax, instrument, quantity, memo.
+- Cash amount is the sum of that account's cash legs, so an interest row and a `Dividend` row show the net. Fee is the sum of the row's `Fee` legs and Tax the sum of its `Tax` legs, each empty when there is none (trade-fees R22, interest-run R38). A reinvested dividend also shows its quantity (dividends R53).
+- Custody shows "Held on platform" or "Held elsewhere". When any row is on an External account, the note "Held elsewhere: recorded by your adviser from outside statements. The platform has not checked these figures." stands under the table (custody-mode-grouping R10–R16).
+- An `Adjustment` row shows the type cell `Adjustment (<reason label>)` (labels: Entry error, Corporate action, Reconciliation, Other) and its memo; a Reversal shows `Reversal` (adjustments R23).
 - Empty range still produces a PDF that states there are no rows.
 - Closed-account filter uses the account’s status at generation time.
 
@@ -453,8 +443,12 @@ Rules:
 - Closed accounts excluded unless `includeClosedAccounts` is true.
 - No FX fold.
 - Sort: customer, then account, then cash line (if any) then holding lines.
-- PDF ends with per-currency subtotals (cash total and market-value total).
+- Every cash and holding line has a "Custody" column (enum name) after "Type"; the line order does not depend on it. The PDF ends with subtotals: one block per custody mode present (`Custodial`, then `External`), then an "All accounts" block with the per-currency totals (cash total and market-value total) (custody-mode-grouping R10–R16).
 - Header includes report name, tenant, Adviser, `asOf`, and `includeClosedAccounts`.
+
+### 9.2a Bank Reconciliation Report
+
+Scope: `Tenant`. Parameters `{ clientMoneyAccountId, reconciliationId? }`. It renders a stored bank reconciliation. Field rules: [bank-reconciliation.md](bank-reconciliation.md) R22–R25.
 
 ### 9.3 PDF
 
@@ -467,7 +461,6 @@ Rules:
 ---
 
 ## 10. UI
-
 
 Adviser Portal only in this phase.
 
@@ -493,21 +486,14 @@ Catalog `IsActive` and `AllowedTriggers` are managed by SystemAdmin on the Back 
 
 ## 11. Tests
 
-- Customer has only `reports.customer.read`; create and all book routes → 403.
-- Adviser and TenantAdmin have all four policies. SystemAdmin has none of them and cannot call `GET /reports`.
-- `GET /reports/catalog` returns every catalog row ordered by code, including inactive rows, with no `granted`. SystemAdmin → 200. Other roles → 403.
-- `GET /tenants/{tenantId}/reports` returns active catalog rows ordered by code, each with `granted`. Inactive catalog rows are omitted. A new tenant has every `granted` false. Grant or revoke flips only that item and leaves the row in the list. Unknown tenant → 404. Other roles → 403. Another tenant’s grant does not appear.
-- `POST /tenants/{tenantId}/reports` for a platform-inactive report is 404 and inserts no row. A repeat grant of an active report is 204.
-- `PUT /reports/{id}` with `isActive: false` revokes every TenantReports row for that report and removes the related Hangfire recurring jobs. Schedule and execution rows stay. A subsequent `isActive: true` restores no grants. Unknown report → 404. Other roles → 403.
-- `PUT /reports/{id}` with `allowedTriggers` that omits `"scheduled"` disables every ReportSchedule for that report (IsActive false + Hangfire RemoveIfExists). Rows stay. No grants are revoked. Adding `"scheduled"` does not re-enable those schedules.
-- `GET /reports/executions` accepts optional `reportId`. When present, `totalCount` and `items` are limited to that report after the caller scope filter.
-- Tenant without grant cannot see or run the report.
-- `TestSeed` grants both seeded reports to the demo tenant. A second run keeps the same rows. Another tenant is not granted.
-- Customer Transactions rejects an unassigned Customer for an Adviser; requires from/to; default excludes Closed; reversal sits next to original.
-- Adviser Balances: non-Adviser omitting adviserId → 400; zero cash accounts omitted; quantity ≤ 0 holdings omitted; asOf set server-side; subtotals present.
-- Schedule update changes the Hangfire recurring definition.
-- Both reports can be scheduled and run manually.
-- Generation rules for each report (includeClosedAccounts default false, missing price 0, no FX).
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
+| --- | --- |
+| Domain.UnitTests | `Entities/ReportExecutionTests.cs`, `Entities/ReportScheduleTests.cs` |
+| Application.UnitTests | Folder `Reports/` |
+| Application.FunctionalTests | Folder `Reports/` |
+| Infrastructure.IntegrationTests | Folder `Reports/`; `AppliedSchema/ReportsSchemaTests.cs`, `TestSeedReportsTests.cs`; `Data/ReportJobTenantScopeTests.cs` |
 
 ---
 
@@ -545,33 +531,19 @@ Still open:
 
 ---
 
-## 13. Suggested commits
+## 13. History
 
-1. Schema + catalog + TenantReports + seed both reports
-2. Policies + role map + list granted reports
-3. Shared pipeline + Customer Transactions generation + manual + schedule
-4. Adviser Balances generation + manual + schedule
-5. Executions list + download
-6. Event enqueue hook
-7. Adviser Portal: Customer page section + Reports tab
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/reports.md`).
 
----
-
-## Amendment 2026-11-14 (demo tenant grants in production)
-
-Accepted with [demo-tenant-seed.md](demo-tenant-seed.md). Narrows the seed paragraph "Not Production".
-
-- `webapi --seed-demo` grants `customer-transactions` and `adviser-balances` to tenant `demo` in any environment. A platform-inactive report is not granted. Idempotent on `(TenantId, ReportId)`.
-- Other tenants are still not auto-granted.
-
-## Amendment 2026-11-14 (UTC instants)
-
-Accepted with [utc-instants](../fixes/utc-instants.md). Report days are UTC days; the open timezone item is closed. Instants in responses use `Z`.
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R53 lives there; this section records what changes here.
-
-- Customer Transactions Report: a `Dividend` row shows the net in the cash amount column and the sum of its `Tax` legs in the Tax column; a reinvested dividend also shows its quantity.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-02 | [customer-portal.md](../customer-portal/customer-portal.md) | R5: a Customer requests their own Customer-scoped report |
+| 2026-11-10 | [leg-accounts.md](leg-accounts.md) | §9.1: one row per leg account |
+| 2026-11-14 | [demo-tenant-seed.md](demo-tenant-seed.md), [utc-instants](../fixes/utc-instants.md) | §6.1: demo tenant grants in any environment. §9.1: report days are UTC days |
+| 2026-11-15 | [trade-fees.md](trade-fees.md) | §9.1: the Fee column |
+| 2026-11-18 | [custody-mode-grouping.md](custody-mode-grouping.md) | §9.1, §9.2: the Custody column and the subtotal blocks |
+| 2026-11-19 | [adjustments.md](adjustments.md) | §9.1: the type cell of an `Adjustment` |
+| 2026-11-21 | [bank-reconciliation.md](bank-reconciliation.md) | R4, R6, §6.1, §9.2a: scope `Tenant` and the report `bank-reconciliation` |
+| 2026-11-22 | [interest-run.md](interest-run.md) | §9.1: the Tax column |
+| 2026-11-24 | [dividends.md](dividends.md) | §9.1: a `Dividend` row |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
