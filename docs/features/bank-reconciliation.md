@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-21
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -103,7 +103,7 @@ The rule that distinguishes this slice: every run's items add up exactly to the 
 **Out**
 
 - A balance as of a past date, or a closing balance by value date (§11 point 1)
-- A position reconciliation against a custodian (roadmap T3)
+- The position reconciliation against a custodian: [in-kind-transfers.md](in-kind-transfers.md) §4.11. It reuses `ReconciliationTrigger`, the SNAPSHOT read of R6 and the date filters of R20, and runs daily at 17:10 UTC, after this run
 - Settling trades or FX conversions through the trust account (roadmap O1, O2, O5). Until then they are known differences (R10)
 - Interest the bank pays on the trust account as its own item. A TenantAdmin ignores such a receipt (deposit-matching R27); it is then an `Ignored` known difference (roadmap B7 "Open", I2). Amended 2026-11-22: it is the item `BankInterest` of [interest-run.md](interest-run.md) R41
 - A client money surplus or shortfall figure (what the firm must top up), and the firm's own money as a separate figure
@@ -154,7 +154,7 @@ Amendment to [deposit-matching.md](deposit-matching.md) R7–R10, R44, R45 and R
 | R6 | **What a run is.** A bank reconciliation of one client money account (account A, Tenant T, currency K) at one instant: a stored record of the bank side, the platform side and the items between them. It reads local tables only and calls no outside party (ADR 0021 rule 4), so it can run on `webapi` as well as on `worker`. Every input is read in one database transaction at `SNAPSHOT` isolation, so a line's status and the Transaction its flow wrote are seen together or not at all; the run is then stored in its own transaction (§11 point 7). |
 | R7 | **Bank side.** `bankBalance` = the stored statement balance of A (R3), with its `balanceAt`. `openingBalance` = the stored opening balance (R4). `statementLinesTotal` = the signed sum of every statement line stored for A, whatever its status. |
 | R8 | **Platform side.** `custodialCash` = the sum of every cash leg, of every role, on every Custodial account of Tenant T in currency K, whatever the account's status. External accounts are never counted. `difference` = `bankBalance − custodialCash`. |
-| R9 | **Statement line items.** One item per statement line of A in one of the statuses below, with `amount` = the line's amount, positive for a credit and negative for a debit. Lines in `Matched` and `Returned` are not items: a matched line is in the ledger through its flow, and a returned receipt and the debit line that returned it cancel out (bank-returns R3, R7). |
+| R9 | **Statement line items.** One item per statement line of A in one of the statuses below, with `amount` = the line's amount, positive for a credit and negative for a debit. Lines in `Matched` and `Returned` are not items: a matched line is in the ledger through its flow, and a returned receipt and the debit line that returned it cancel out (bank-returns R3, R7). Statement lines classified by later specs: an `Ignored` **credit** line of kind `Interest` is an item of kind `BankInterest` (Known) with the line's amount, in place of the `Ignored` item (interest-run R41). A line `Matched` to a trade settlement, to a `Posted` migration batch or to a dividend is not an item, like every matched line; a `SettlementMismatch` line is a `Suspense` break (trade-settlement R22). A line `Matched` with method `Migration` to a batch that is not `Posted` is an item of kind `MigrationNotPosted` (Timing) with the line's amount (migration-batches R32). `DividendsNotPosted` (Timing): the dividends received on the account with an entitlement still `Pending` (dividends R44). |
 
 | Line status | Item kind | Class |
 | --- | --- | --- |
@@ -165,10 +165,10 @@ Amendment to [deposit-matching.md](deposit-matching.md) R7–R10, R44, R45 and R
 
 | ID | Rule |
 | --- | --- |
-| R10 | **Ledger items.** The cash legs of R8 are split by the source of their Transaction. Legs of a Transaction with source `BankFeed` or `Payment` whose source belongs to A (the statement line of A named by a `BankFeed` source id; the withdrawal whose outgoing payment is from A, named by a `Payment` source id) are in the ledger through a line of A and make no item. Legs whose `BankFeed` or `Payment` source belongs to another client money account make one item `OtherClientMoneyAccount` (Known) per such account. Every other leg is cash that never passed through the trust account, grouped by the type of the Transaction (for a Reversal, the type of its original): `Buy`, `Sell` → `Trades`; `FxConversion` → `FxConversions`; `Adjustment` → `Adjustments`; any other type → `OtherLedgerCash`; all Known. A ledger item's `amount` is minus the sum of its legs (a `Buy` lowers Custodial cash and leaves the bank balance as it was, so it explains a positive difference) and its `count` is the number of Transactions. A ledger item whose sum is `0` (for example `InternalTransfer` between two Custodial accounts) is left out. |
+| R10 | **Ledger items.** The cash legs of R8 are split by the source of their Transaction. Legs of a Transaction with source `BankFeed` or `Payment` whose source belongs to A (the statement line of A named by a `BankFeed` source id; the withdrawal whose outgoing payment is from A, named by a `Payment` source id) are in the ledger through a line of A and make no item. Legs whose `BankFeed` or `Payment` source belongs to another client money account make one item `OtherClientMoneyAccount` (Known) per such account. Every other leg is cash that never passed through the trust account, grouped by the type of the Transaction (for a Reversal, the type of its original): `Buy`, `Sell` → `Trades`; `FxConversion` → `FxConversions`; `Adjustment` → `Adjustments`; any other type → `OtherLedgerCash`; all Known. A ledger item's `amount` is minus the sum of its legs (a `Buy` lowers Custodial cash and leaves the bank balance as it was, so it explains a positive difference) and its `count` is the number of Transactions. A ledger item whose sum is `0` (for example `InternalTransfer` between two Custodial accounts) is left out. Ledger cash classified by later specs; none of these legs counts in `OtherLedgerCash`, an item whose amount is `0` is left out, and the items still add up to the difference. **Interest** (interest-run R41): the cash legs of Transactions with source `InterestRun` on the Tenant's Custodial accounts in the currency become `InterestCredited` (Known) = minus the sum of their `Principal` legs, `count` = the Transactions, and `TaxWithheld` (Known) = minus the sum of their `Tax` legs, `count` = the Transactions with a `Tax` leg. **Order fills** (trade-settlement R22–R25): the cash legs of a Transaction with source `OrderFill` (and of its Reversal), a rebalance order's fills included, are split by the fill's order. An order with no settlement account, a fill in a `SetAside` trade settlement and a break resolved by hand stay in `Trades`. An order that settles through another client money account → `OtherClientMoneyAccount`. An order that settles through the run's account: its `Fee` legs are `TradeFees` (Known), and its `Principal` legs are nothing once the trade settlement is `Completed`, `TradesNeedingAction` (Break) when the settlement is `PaymentFailed` or `Disputed` or the fill was broken and not reversed, and `UnsettledTrades` (Timing) otherwise; a `Pending` fill in a `Completed` settlement adds `UnbookedFills` (Break). `Trades` (Known) keeps the rebalance trades posted before rebalances went through orders (source `Rebalance`), the trades typed before orders, sells in another currency, and the fills named above. **Migration** (migration-batches R32): the cash legs of a Transaction with source `Migration` are explained by the funding lines of its batch: no item for the part funded through the run's client money account, one `OtherClientMoneyAccount` item per other client money account for the rest. **Dividends** (dividends R44, R45): `DividendDifference` (Known) is, for every dividend received on the account with no entitlement `Pending`, the received amount less the `Principal`, `Reinvestment` and `ForeignWithholding` legs of its Transactions on accounts in the currency; the `Rwt` and `Nrwt` legs of a `Dividend` count in `TaxWithheld`; the legs of a dividend paid in another currency stay in `OtherLedgerCash`, apart from their tax legs. |
 | R11 | **Checks.** `OpeningBalance` (Known) = `openingBalance`. `StatementDifference` (Break) = `bankBalance − openingBalance − statementLinesTotal`: the bank's balance moved by something the platform holds no line for (a line the feed never delivered, the same line stored for another client money account, a bank that rewrote its books, a reset of the simulator world). `Unexplained` (Break) = `difference` minus the sum of every other item: what is left when every line and every leg has been attributed. It is `0` unless a matched line and the Transaction of its flow disagree, so it is a defect to report, not a state to work with. An item of these three kinds whose amount is `0` is left out. |
 | R12 | **Status.** `Agreed` when the run has no item of class Break. `Breaks` when it has at least one. `NoBankBalance` when A's cursor has no stored balance (never read, or the last page carried none, R5): the run stores `custodialCash` and no bank figures, totals or items. By construction the items of an `Agreed` or `Breaks` run add up exactly to `difference`. |
-| R13 | **Totals and order.** A run stores the sum and the count of its items per class (`breaks`, `timing`, `known`). Items are ordered by class (Break, Timing, Known), then by kind in the order of §5, then line items by value date and line `Id`. Amounts are stored as computed (`decimal(18,4)`) and shown with the currency's `DecimalPlaces`. |
+| R13 | **Totals and order.** A run stores the sum and the count of its items per class (`breaks`, `timing`, `known`). Items are ordered by class (Break, Timing, Known), then by kind in the order of §5, then line items by value date and line `Id`. Amounts are stored as computed (`decimal(18,4)`) and shown with the currency's `DecimalPlaces`. A run also records `openSettlements` (`{ count, amount }` of the open trade settlements of its account), which is not an item. |
 | R14 | **Information, not items.** A run also records, without making them items: `reservedCash` (the reserved cash of every Custodial account of T in K, withdrawals R35); `paymentsInFlight` (count and sum of the outgoing payments of A of kind `Withdrawal` that are `Accepted`, or `Pending` with an attempt, and not yet `Paid`); and the feed status of A (`lastSucceededAt`, `lastFailedAt`, `lastFailure`, deposit-matching R4). A payment sent but not yet on the statement changes neither side, because the payout is posted only from the bank's debit line (withdrawals R40), so it is not a reconciling item (§11 point 5). |
 | R15 | **A run never changes.** A stored run and its items are never updated or deleted. A break is fixed only by its cause: a flow (match, ignore, return, the bank's own lines) or an adjustment ([adjustments.md](adjustments.md), reason `ReconciliationBreak`), never by editing a run, a line's amount or a cursor. The next run shows the result. |
 
@@ -222,6 +222,8 @@ Policies: `bank-reconciliations.manage`, `reports.tenant.read`, `reports.tenant.
 ---
 
 ## 5. Domain
+
+`ReconciliationItemKind` has 22 values today, 0–21. The kinds added after this spec: `BankInterest` (12), `InterestCredited` (13), `TaxWithheld` (14), all Known (script `0048`); `UnsettledTrades` (15, Timing), `TradesNeedingAction` (16, Break), `UnbookedFills` (17, Break), `TradeFees` (18, Known) (script `0052`, which also adds `OpenSettlementsCount` and `OpenSettlementsAmount` to `BankReconciliations`); `MigrationNotPosted` (19, Timing; an item with a line; script `0054`); `DividendsNotPosted` (20, Timing) and `DividendDifference` (21, Known) (script `0057`). `ReconciliationInputs` carries the sums each of them needs. The kinds with a line snapshot are `2, 3, 4, 6, 12, 19` ([domain-model.md](../domain-model.md) §8.12, [database-design.md](../database-design.md) §11.12).
 
 | Type | Kind | Change |
 | --- | --- | --- |
@@ -490,13 +492,14 @@ Customer Portal: none. Back Office: none.
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `BankReconciliation.Compute`: every line status gives its kind and class (R9), `Matched` and `Returned` give none; each R10 group; Reversals counted under their original's type; zero-sum ledger groups left out; `OpeningBalance`, `StatementDifference` and `Unexplained` (R11); the items always add up to the difference; status `Agreed` / `Breaks` / `NoBankBalance`; totals and order (R13). `BankFeedCursor.StorePage`: balance stored, opening set once and never again, a `null` balance clears balance and `BalanceAt` and keeps the opening |
-| Application.FunctionalTests | With fakes for `IBankFeed` and `IBankPayments`, the fake page carrying a balance. A matched deposit and a paid withdrawal → `Agreed`, no items. An unmatched receipt → `Suspense` break; matched by hand and run again → `Agreed`. A `Received` line → `NotProcessed`; a receipt return requested and sent → `ReturnInProgress`, then nothing once `Returned`. A recall reversed → no item; a `RecallNotCovered` → `Suspense`; after an adjustment (`ReconciliationBreak`) and ignore → `Ignored` and `Adjustments`, `Agreed`. A bank fee debit ignored → `Ignored` (negative). A Custodial `Buy` with fee → `Trades`; a Custodial `FxConversion` → `FxConversions` on both currencies' runs; a seeded or hand-entered `TransferIn` → `OtherLedgerCash`; an `InternalTransfer` → no item. A balance that includes a line the fake never delivers → `StatementDifference`. A replacement client money account → `OtherClientMoneyAccount` on the new one. The first balanced page after older lines sets the opening balance. A page without a balance → `NoBankBalance`. A payment `Accepted` but not paid → `paymentsInFlight`, no item. External accounts never counted. `POST /bank-reconciliations` → 201 and the stored run; Adviser, Customer, SystemAdmin → 403; no token → 401; an inactive client money account → 201. Reads, filters, overview with a client money account that has no run. Daily job: every active account, inactive skipped, one failing account does not stop the next. Report: request and schedule for a TenantAdmin, 403 for an Adviser, renders the newest run, fails without a run, `reconciliationId` of another account → 404. Two-tenant: tenant B's TenantAdmin → 404 on tenant A's run, client money account and report parameters; tenant B's Custodial accounts in the same currency and its lines on the shared connection never appear in tenant A's run |
-| Infrastructure.IntegrationTests | `0045`: snapshot isolation on; the cursor CHECKs; the run CHECKs (bank figures null iff `NoBankBalance`, `RanByUserId` null iff `Scheduled`, item line columns iff a line kind); scope CHECK accepts `Tenant`; the catalog row. `SimulatorBankFeed`: reads `balance`, `null`; a string → `BadResponse`; five decimals → `BadResponse`. A SNAPSHOT read does not see a statement line and its deposit written by a concurrent transaction until both are committed |
-| Simulator.Tests | `0006` applies. `balance` on the feed: after receipts, payments, returns and recalls; a line delivered twice counted once; before the first place `0`; on an empty page the balance at the cursor. Charge → debit line with no payee or ids, in suspense on the platform side by its shape. `omitFromFeed` → never in `items`, counted in `balance`; with `deliverTwice` → 400. `statementBalance` on the account list. Control log row for a charge; a 400 writes none |
-| Adviser Portal | D51: nav item for TenantAdmin only, the 403 sentence, overview columns and labels, Run now, the run page groups and labels, links to statement lines, the feed failing note, history. D52: "Firm reports" for TenantAdmin only, the client money account picker |
+| Domain.UnitTests | `Entities/BankReconciliationTests.cs`, `BankReconciliationTradeSettlementTests.cs` |
+| Application.FunctionalTests | Folder `BankReconciliations/`; `Interest/ReconciliationInterestTests.cs` |
+| Infrastructure.IntegrationTests | `AppliedSchema/BankReconciliationsSchemaTests.cs`, `BankReconciliationJobTests.cs` |
+| Simulator.Tests | The simulator bank: balances |
 
 ---
 
@@ -539,93 +542,26 @@ Still open, not this slice:
 
 - A client money surplus or shortfall figure, and what the firm must top up
 - The bank's interest on the trust account as its own item (roadmap I2, D12). Answered 2026-11-22 by [interest-run.md](interest-run.md) R39–R42
-- A position reconciliation against the custodian (roadmap T3)
+- None of the above is open any more: the position reconciliation is [in-kind-transfers.md](in-kind-transfers.md) §4.11
 - A real bank adapter, and whether it can send a statement balance per page
 
 ---
 
-## 12. Suggested commits
-
-The repository should build after each commit. Agents split each behaviour into red then green. Start after [bank-returns.md](bank-returns.md) has landed (it has, 2026-11-21).
-
-1. Script `0045`, the reconciliation enums, `BankFeedCursor` balance and opening (R3–R5) + Domain unit tests and the `0045` integration tests.
-2. The statement balance on the feed: `BankFeedPage.Balance`, `SimulatorBankFeed` (R31), `PullBankStatements` (R2–R5) + functional and integration tests.
-3. `BankReconciliation.Compute` (R9–R13) + Domain unit tests.
-4. `ReconcileClientMoneyAccount` at SNAPSHOT, `POST /bank-reconciliations`, the reads, the permission (R1, R6–R8, R14, R15, R17–R21) + functional tests, two-tenant.
-5. The daily job (R16) + functional tests.
-6. Report scope `Tenant`, its policies, the `bank-reconciliation` report (R22–R25) + functional tests.
-7. Simulator: script `0006`, the balance, charges, `omitFromFeed`, `statementBalance` (R26–R29) + `Simulator.Tests`.
-8. BFF prefix, Adviser Portal D51 and D52 + frontend tests.
-9. Repo docs: mark this file landed; roadmap §13 step 7.
-
-### Docs amended when this spec was accepted
+## 12. Docs changed when this spec was accepted
 
 [deposit-matching.md](deposit-matching.md) (R7, R8: the balance stored with the page; R44, R45: `balance` on the page; R49: the adapter reads it), [simulator.md](simulator.md) (R26–R29, script `0006`), [reports.md](reports.md) (scope `Tenant`, its policies in R4–R6 and §8, the third catalog row in §6.1), [api-design.md](../api-design.md) (§3.1 three permissions, §6 resource row, §7.8 scope `Tenant`, change log), [domain-model.md](../domain-model.md) (§8.9, new §8.12, §11 report scope), [database-design.md](../database-design.md) (§9, §11.9, new §11.12, §14, §15), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D51), [adviser-portal-reports.md](../adviser-portal/adviser-portal-reports.md) (D52), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix), [glossary.md](../glossary.md) (status of the terms added in review; Report and Book gain the third scope), [features/README.md](README.md) row status, [function-plan.md](../function-plan.md) §5, [architecture.md](../architecture.md) (the `worker` job), and the roadmap §5 B7, §11 S1 and §13 status.
 
 ---
 
-## Amendment 2026-11-22 (interest run) — accepted
+## 13. History
 
-Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rules R41 and R42 live there; this section records what changes here.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/bank-reconciliation.md`).
 
-- R9: an `Ignored` **credit** line of kind `Interest` is an item of the new kind `BankInterest` (Known) with the line's amount, in place of the `Ignored` item.
-- R10: the cash legs of Transactions with source `InterestRun` on the Tenant's Custodial accounts in the currency become two items: `InterestCredited` (Known) = minus the sum of their `Principal` legs, `count` = the Transactions; `TaxWithheld` (Known) = minus the sum of their `Tax` legs, `count` = the Transactions with a `Tax` leg. These legs no longer count in `OtherLedgerCash`. An item whose amount is `0` is left out; the items still add up to the difference.
-- §5: `ReconciliationItemKind` gains `BankInterest = 12`, `InterestCredited = 13`, `TaxWithheld = 14`; `ReconciliationInputs` gains the two ledger sums with their counts and each line's kind. `0048` widens `CK_BankReconciliationItems_Kind` to 0–14 and `CK_BankReconciliationItems_Line` to the kinds `2, 3, 4, 6, 12`.
-- §2 Out and "Still open": the bank's interest on the trust account as its own item is no longer out; it is `BankInterest`. The platform still computes no margin (interest-run R42).
-
----
-
-## Amendment 2026-11-23 (orders and settlement) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R32 and R44 live there; this section records what changes here.
-
-- R10: the cash legs of an order's fill are legs of a `Buy` or `Sell` with source `OrderFill`. They never passed through the trust account, so they stay in the item `Trades` (Known), with rebalance trades and the trades typed before orders.
-- Settlement is a status on the fill and moves no money at the bank in that slice; unsettled cash is not a reconciliation item.
-- §11 point 6 ("until orders and settlement exist"): trades stay a known difference until settlement cash moves through the client money account, which is a later step of the roadmap (orders §11 point 1).
-
----
-
-## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement.md](trade-settlement.md). Rules R22–R25 live there; this section records what changes here.
-
-- R9: a line `Matched` to a trade settlement (method `Settlement`) is not an item, like every matched line. A `SettlementMismatch` line is a `Suspense` break.
-- R10: the cash legs of a Transaction with source `OrderFill` (and of its Reversal) are split by the fill's order. An order with no settlement account, a fill in a `SetAside` trade settlement and a break resolved by hand stay in `Trades`. An order that settles through another client money account → `OtherClientMoneyAccount`. An order that settles through the run's account: its `Fee` legs are `TradeFees` (Known), and its `Principal` legs are nothing once the trade settlement is `Completed`, `TradesNeedingAction` (Break) when the settlement is `PaymentFailed` or `Disputed` or the fill was broken and not reversed, and `UnsettledTrades` (Timing) otherwise. A `Pending` fill in a `Completed` settlement adds `UnbookedFills` (Break).
-- R13, R14: the items still add up to the difference. A run also records `openSettlements` (`{ count, amount }` of the open trade settlements of its account), which is not an item.
-- §5: `ReconciliationItemKind` gains `UnsettledTrades = 15` (Timing), `TradesNeedingAction = 16` (Break), `UnbookedFills = 17` (Break), `TradeFees = 18` (Known). `0052` widens `CK_BankReconciliationItems_Kind` to 0–18 and adds `OpenSettlementsCount` and `OpenSettlementsAmount` to `BankReconciliations`.
-- §11 point 6: trades of orders that settle through the trust account are no longer a known difference; `Trades` keeps rebalance trades, trades typed before orders, sells in another currency, and fills whose settlement was set aside or whose break was resolved by hand.
-
----
-
-## Amendment 2026-11-23 (rebalance through orders) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rule R26 lives there; this section records what changes here.
-
-- R10: the fills of a rebalance order are split by their order like any order fill (`UnsettledTrades`, `TradeFees`). `Trades` keeps only the rebalance trades posted before this slice, with source `Rebalance`.
-
----
-
-## Amendment 2026-11-24 (migration batches) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rule R32 lives there; this section records what changes here.
-
-- R9: a line `Matched` with method `Migration` to a batch that is not `Posted` is an item of the new kind `MigrationNotPosted` (Timing) with the line's amount. A line matched to a `Posted` batch is not an item.
-- R10: the cash legs of a Transaction with source `Migration` are explained by the funding lines of its batch: no item for the part funded through the run's client money account, one `OtherClientMoneyAccount` item per other client money account for the rest. They no longer count in `OtherLedgerCash`.
-- §5: `ReconciliationItemKind` gains `MigrationNotPosted = 19` (Timing), an item with a line. `0054` widens `CK_BankReconciliationItems_Kind` to 0–19 and adds 19 to `CK_BankReconciliationItems_Line`.
-
----
-
-## Amendment 2026-11-24 (in-kind transfers) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R50–R59 live there; this section records what changes here.
-
-- §2 Out and "still open": the position (custodian) reconciliation is [in-kind-transfers.md](in-kind-transfers.md) §4.11. It reuses `ReconciliationTrigger`, the SNAPSHOT read of R6 and the date filters of R20, and runs daily at 17:10 UTC, after this run.
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rules R44 and R45 live there; this section records what changes here.
-
-- R9–R11 and §5: two item kinds. `DividendsNotPosted` (20, Timing): the dividends received on the account with an entitlement still `Pending`. `DividendDifference` (21, Known): for every other dividend received on the account, the received amount less the `Principal`, `Reinvestment` and `ForeignWithholding` legs of its Transactions on accounts in the currency. These legs no longer count in `OtherLedgerCash`.
-- The `Rwt` and `Nrwt` legs of a `Dividend` count in `TaxWithheld`. The legs of a dividend paid in another currency stay in `OtherLedgerCash`, apart from their tax legs.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-22 | [interest-run.md](interest-run.md) | R9, R10, §5: `BankInterest`, `InterestCredited`, `TaxWithheld` |
+| 2026-11-23 | [orders.md](orders.md), [trade-settlement.md](trade-settlement.md), [rebalances.md](rebalances.md) | R9, R10, R13, §5: order fills are split by how their order settles; `openSettlements` |
+| 2026-11-24 | [migration-batches.md](migration-batches.md) | R9, R10, §5: `MigrationNotPosted`; migrated cash |
+| 2026-11-24 | [in-kind-transfers.md](in-kind-transfers.md) | §2: the position reconciliation |
+| 2026-11-24 | [dividends.md](dividends.md) | R9, R10, §5: `DividendsNotPosted`, `DividendDifference` |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
