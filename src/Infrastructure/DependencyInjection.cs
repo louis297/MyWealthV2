@@ -119,6 +119,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<MyWealthV2.Application.CustodianReconciliations.IReconcileSafekeepingAccount, MyWealthV2.Application.CustodianReconciliations.ReconcileSafekeepingAccount>();
         builder.Services.AddScoped<BankReconciliationJob>();
         builder.Services.AddScoped<MyWealthV2.Infrastructure.Interest.InterestRunJob>();
+        builder.Services.AddScoped<MyWealthV2.Infrastructure.Valuations.ValuationRunJob>();
         builder.Services.AddScoped<MyWealthV2.Application.Interest.Accruals.IAccountInterest, MyWealthV2.Application.Interest.Accruals.AccountInterest>();
         builder.Services.AddScoped<MyWealthV2.Application.Interest.Runs.IRunInterest, MyWealthV2.Application.Interest.Runs.RunInterest>();
         builder.Services.AddScoped<MyWealthV2.Application.Valuations.IAccountPositions, MyWealthV2.Application.Valuations.AccountPositions>();
