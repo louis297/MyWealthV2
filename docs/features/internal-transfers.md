@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-10
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 related:
   - leg-accounts.md
   - posting.md
@@ -30,10 +30,6 @@ related:
 Cash transfer between two Accounts in the same tenant, on `webapi`. One Transaction of the new type `InternalTransfer` has two cash legs: a negative leg on the source Account and a positive leg on the destination Account. The two Accounts may belong to the same Customer or to two Customers of the same tenant.
 
 This is the increment that [leg-accounts.md](leg-accounts.md) prepared (§12, §13) and [posting.md](posting.md) §13 deferred. It adds one `TransactionType`, one create route `POST /transactions/transfer`, an optional `type` filter on the transaction list, and script `0025`. No new policy. Read and reverse reuse the existing `/transactions` routes.
-
-**Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R3 and R7: `amount` has no more decimal places than the Accounts' currency's `DecimalPlaces`, else 400 `errors.Amount`. R3: a `bookedAt` later than the server clock plus 5 minutes → 400 `errors.BookedAt`.
-
-**Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). R8 gains a condition: the from Account and the to Account have the same custody mode, else 400 with `errors.ToAccountId`. A movement between a Custodial and an External account is a `TransferOut` on one and, if recorded, a `TransferIn` on the other, not linked. R3: when both Accounts are Custodial the server sets `bookedAt`, and a body that sends it → 400. §5: the factory takes both custody modes and refuses different ones. §9: the destination picker greys out an Account with a different custody mode.
 
 ---
 
@@ -87,14 +83,14 @@ A TenantAdmin or Adviser moves cash from one Open Account to another Open Accoun
 | --- | --- |
 | R1 | Unchanged from posting R1–R4a and leg-accounts R1: 401 / 403 / 404, PublicId only, `tenantId` rules for TenantAdmin / Adviser (omit) and SystemAdmin (required on create). Customer → 403. TenantAdmin / Adviser of a disabled tenant → 403 (identity-auth amendment 2026-11-13). SystemAdmin naming a disabled tenant on create → 400 `disabled` / `target=tenant`. |
 | R2 | **Route.** `POST /transactions/transfer` creates an `InternalTransfer`. `POST /transactions` with `type = InternalTransfer` → 400. There is one create route per type. |
-| R3 | **Body.** `fromAccountId` and `toAccountId` (Account PublicIds) are required. `amount` is required and `> 0`. `bookedAt`, `memo`, `reference` follow posting (R23 for memo / reference). The body has no `type`, no `accountId`, no `currency`, no legs array. Any of those present → 400. |
+| R3 | **Body.** `fromAccountId` and `toAccountId` (Account PublicIds) are required. `amount` is required and `> 0`. `bookedAt`, `memo`, `reference` follow posting (R23 for memo / reference). The body has no `type`, no `accountId`, no `currency`, no legs array. Any of those present → 400. `amount` has no more decimal places than the Accounts' currency's `DecimalPlaces`, else 400 `errors.Amount`. Between two External Accounts `bookedAt` is required and not later than the server clock plus 5 minutes (400 `errors.BookedAt`); between two Custodial Accounts the server sets it, and a body that sends it → 400 (custody-modes R10). |
 | R4 | **Legs.** Application builds exactly two cash legs: `−amount` on the from Account and `+amount` on the to Account, both in the Accounts' currency. No security leg. |
 | R5 | **Different Accounts.** `fromAccountId = toAccountId` → 400. |
 | R6 | **Same tenant.** Both Accounts are in the command's tenant. An Account in another tenant, a missing Account, or (Adviser) an Account of an unassigned Customer → 404 for the whole command (leg-accounts R6). Nothing is written. |
 | R7 | **Same currency.** `fromAccount.Currency ≠ toAccount.Currency` → 400. No FX is applied. Amount precision follows posting R8. |
-| R8 | **Account types.** Any Phase-2 type (Bank, Cash, Brokerage, Other) may send to or receive from any other Phase-2 type. |
+| R8 | **Account types.** Any Phase-2 type (Bank, Cash, Brokerage, Other) may send to or receive from any other Phase-2 type. The from Account and the to Account have the same custody mode, else 400 `errors.ToAccountId` (custody-modes R8); the factory takes both custody modes and refuses different ones. A movement between a Custodial and an External account is not a transfer: it is a withdrawal or a deposit on the Custodial side and, if recorded, a `TransferOut` or `TransferIn` on the External side, not linked. Between two Custodial accounts both must belong to the same Customer, else 400 `errors.ToAccountId` with the message `Cash can be transferred between Custodial accounts of the same customer only.` (withdrawals R47): a transfer to another Customer's Custodial account would let cash leave through that Customer's own nominated bank account, around the review of a third-party payment. Transfers made before that rule stay and can still be reversed. A closing account (an account closure `InProgress`) on either side, and the reverse of one with a leg on a closing account, → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key, directly after the Closed-account check (account-closure R12). |
 | R9 | **State.** Both Accounts must be Open (else 400). Both Customers must not be Disabled (else 400 `disabled` / `target=user`). Same rule on reverse (leg-accounts R8). |
-| R10 | **Cash `SUM`.** After insert, the from Account's `SUM ≥ 0` (else 400). Checked inside the command with both Account rows locked in ascending `Accounts.Id` order (leg-accounts R10, R11). |
+| R10 | **Cash `SUM`.** After insert, the from Account's `SUM ≥ 0` (else 400). Checked inside the command with both Account rows locked in ascending `Accounts.Id` order (leg-accounts R10, R11). On a Custodial from Account the test is stricter. Its **available cash** (cash `SUM` minus reserved cash) must stay `≥ 0` (withdrawals R36, R37). And the cash that leaves must come from its withdrawable cash: after the transfer, available cash must not be below unsettled cash, else 400 under the same key with the message `Cash from sales that have not settled cannot leave the account: 500.00 USD settles later.` (orders R45); without it, unsettled cash could move to another account of the Customer and be withdrawn there. The to side and the reverse of a transfer are not checked this way. |
 | R11 | **Opening.** An `InternalTransfer` leg counts as another transaction on both Accounts. After an Account sends or receives a transfer, cash `Opening` on it → 400 (posting R19, leg-accounts R13). No exception. |
 | R12 | **Reverse.** `POST /transactions/{id}/reverse` on an `InternalTransfer` creates one `Reversal` with `+amount` on the from Account and `−amount` on the to Account (leg-accounts R12). Every check in R6, R9, R10 applies to both Accounts. If the to Account's `SUM` would go below 0 (the cash was spent), the whole reverse → 400. No partial reverse. |
 | R13 | **Idempotency.** `Idempotency-Key` is required on `POST /transactions/transfer` (ADR 0015). Missing → 400. Same tenant + same key + same request hash → original `201 { id }`. Same key + different hash → 409. The request path is part of the hash. |
@@ -244,13 +240,13 @@ Later (not this slice): one search box that finds Accounts by Account name or Cu
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | Factory builds two cash legs, `−amount` on from and `+amount` on to; rejects same Account, different currencies, `amount ≤ 0`; Reverse of a transfer produces the opposite leg on each Account |
-| Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; happy path same Customer and two Customers (TenantAdmin, Adviser assigned to both); Adviser unassigned on either side → 404 and nothing written; same Account → 400; currency mismatch → 400; Closed from or to → 400; Disabled Customer on either side → 400 `disabled` / `target=user`; insufficient cash → 400; forbidden body fields (`type`, `accountId`, `currency`) → 400; `POST /transactions` with `InternalTransfer` → 400; missing `Idempotency-Key` → 400, replay → same id, different hash → 409; cash balances of both Accounts after create and after reverse; reverse after the to Account spent the cash → 400 and nothing written; Opening on an Account that received a transfer → 400; transfer allowed on an Account with an Active portfolio assignment and no rebalance is enqueued; list `type=InternalTransfer` with and without `accountId`; unknown `type` → 400; caller who sees one side gets one leg only |
-| Infrastructure.IntegrationTests | `CK_Transactions_Type` accepts 15 and rejects 16 |
-| Application.FunctionalTests (two tenants) | From or to Account in the other tenant → 404 and nothing written (TenantAdmin and SystemAdmin); other tenant's transfer id on get / reverse → 404. These assert HTTP status codes, so they live with the other transaction isolation tests in the functional layer (`InternalTransferIsolationTests`), not in the schema fixture |
-| Frontend | Picker defaults to the source Customer; Customer search debounced; Closed / different-currency / source Accounts are greyed out with a reason; confirm summary warns when Customers differ |
+| Domain.UnitTests | `Entities/InternalTransferTests.cs` |
+| Application.FunctionalTests | `Transactions/InternalTransfer*Tests.cs`; `Custody/CustodialSameModeTests.cs`, `Custody/CustodialTransferSameCustomerTests.cs`, `Custody/CustodialAvailableCashTests.cs`; `Portfolios/InternalTransferPortfolioTests.cs` |
+| Infrastructure.IntegrationTests | The two-tenant cases are proved over HTTP in `Transactions/InternalTransferIsolationTests.cs` |
 
 ---
 
@@ -283,51 +279,16 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
+## 12. History
 
-Only after `accepted`. The tree must build after each commit. Split each behaviour into red then green.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/internal-transfers.md`).
 
-1. `0025_transaction_type_internal_transfer.sql` + `TransactionType.InternalTransfer` + integration test that the check accepts 15.
-2. Domain factory and invariants + unit tests.
-3. `CreateInternalTransfer` + `POST /transactions/transfer` happy path, idempotency, validation (R3, R5, R7, R9, R10) + functional tests.
-4. Authority and tenant isolation (R6) + functional and two-tenant integration tests.
-5. `POST /transactions` rejects `InternalTransfer` (R2); Opening after a transfer (R11) + tests.
-6. Reverse of a transfer (R12) + tests.
-7. List `type` filter (R15) + tests.
-8. Portfolio interaction (R16) + tests.
-9. Adviser Portal Transfer form and picker + frontend tests. Customer Portal label.
-10. Repo docs: this file `accepted`; amend domain-model, database-design, api-design change log, adviser-portal-dashboard, customer-portal, features README status.
-
----
-
-## Amendment 2026-11-20 (same Customer on Custodial transfers) — accepted
-
-Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md).
-
-- New rule (roadmap D14, withdrawals R47): `POST /transactions/transfer` between two Custodial accounts of two different Customers → 400 `errors.ToAccountId` with the message `Cash can be transferred between Custodial accounts of the same customer only.` A transfer to another Customer's Custodial account would let cash leave through that Customer's own nominated bank account, around the review of a third-party payment (roadmap X4). External accounts unchanged. Existing transfers stay and can still be reversed.
-- R10 on a Custodial from Account: the from Account's **available cash** (cash `SUM` minus reserved cash) must stay `≥ 0` (withdrawals R36, R37).
-
----
-
-## Amendment 2026-11-22 (account closure) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
-
-- `POST /transactions/transfer` with a closing account (an account closure `InProgress`) on either side, and the reverse of a transfer with a leg on one, → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key, directly after the Closed-account check (account-closure R12).
-
----
-
-## Amendment 2026-11-23 (orders and settlement) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rule R45 lives there; this section records what changes here.
-
-- On `POST /transactions/transfer` from a Custodial account, the cash that leaves must come from the account's withdrawable cash: after the transfer, available cash must not be below unsettled cash. Otherwise 400 under the key the transfer uses for withdrawals R37, with the message `Cash from sales that have not settled cannot leave the account: 500.00 USD settles later.` (orders R45). Without it, unsettled cash could move to another account of the Customer and be withdrawn there.
-- External accounts, the to side and the reverse of a transfer are unchanged.
-
----
-
-## Amendment 2026-11-24 (in-kind transfers) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md).
-
-- The open item "in-kind transfer" now means only a transfer of securities between two Accounts of the firm (security legs on two Accounts). A transfer between a Custodial account and another broker or registry is [in-kind-transfers.md](in-kind-transfers.md).
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-16 | [ledger-write-guards](../fixes/ledger-write-guards.md) | R3, R7: decimal places; no future `bookedAt` |
+| 2026-11-17 | [custody-modes.md](custody-modes.md) | R3, R8: the same custody mode; server `bookedAt` between Custodial accounts |
+| 2026-11-20 | [withdrawals.md](withdrawals.md) | R8: the same Customer between Custodial accounts. R10: available cash |
+| 2026-11-22 | [account-closure.md](account-closure.md) | R8: a closing account |
+| 2026-11-23 | [orders.md](orders.md) | R10: withdrawable cash |
+| 2026-11-24 | [in-kind-transfers.md](in-kind-transfers.md) | A transfer of securities to or from another broker or registry is in-kind-transfers.md |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
