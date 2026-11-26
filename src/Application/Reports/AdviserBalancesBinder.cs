@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluentValidation.Results;
+using MyWealthV2.Application.MarketData;
 using MyWealthV2.Domain.Enums;
 using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
 
@@ -55,16 +57,60 @@ public static class AdviserBalancesBinder
         }
 
         var includeClosedAccounts = input.IncludeClosedAccounts ?? false;
+        var date = BindDate(input, mode);
         var snapshot = JsonSerializer.Serialize(
-            new AdviserBalancesSnapshot(adviserId, includeClosedAccounts),
+            new AdviserBalancesSnapshot(adviserId, includeClosedAccounts, date?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
             Options);
-        return new AdviserBalancesBinding(adviserId, includeClosedAccounts, snapshot);
+        return new AdviserBalancesBinding(adviserId, includeClosedAccounts, snapshot, date);
     }
+
+    /// <summary>Valuation-history R16, R20: the optional end of a past day. A request may name a day up to the last
+    /// final day of its moment and not include closed accounts with it; a schedule names none; a stored snapshot is
+    /// bound as it was stored.</summary>
+    private static DateOnly? BindDate(AdviserBalancesInput input, AdviserBalancesBindMode mode)
+    {
+        if (input.Date is null)
+        {
+            return null;
+        }
+
+        if (mode.Kind == AdviserBalancesBindKind.Schedule)
+        {
+            throw Invalid("date", "A schedule reports the balances at the time it runs.");
+        }
+
+        if (MarketDataDates.Parse(input.Date) is not { } date)
+        {
+            throw Invalid("date", $"date {MarketDataDates.FormatMessage}");
+        }
+
+        if (mode.Kind == AdviserBalancesBindKind.Request)
+        {
+            if (date > mode.LastFinalDay)
+            {
+                throw Invalid("date", "A report for a past date can be made up to the day before yesterday (UTC).");
+            }
+
+            if (input.IncludeClosedAccounts == true)
+            {
+                throw Invalid(
+                    "includeClosedAccounts",
+                    "A report for a past date includes every account that held cash or holdings on that day.");
+            }
+        }
+
+        return date;
+    }
+
+    private static ValidationException Invalid(string key, string message) => new([new ValidationFailure(key, message)]);
 
     private static ValidationException Unknown() =>
         new([new ValidationFailure("parameters", "unknown field.")]);
 
-    private sealed record AdviserBalancesSnapshot(Guid AdviserId, bool IncludeClosedAccounts);
+    private sealed record AdviserBalancesSnapshot(
+        Guid AdviserId,
+        bool IncludeClosedAccounts,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Date);
 
     private sealed class AdviserBalancesInput
     {
