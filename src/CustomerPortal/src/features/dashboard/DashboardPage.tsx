@@ -4,6 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { custodyLabel, externalNote } from "@/features/accounts/custodyLabel";
 import { useGetCustomerNetWorthQuery } from "@/features/dashboard/dashboardApi";
+import { FoldedTotalLine } from "@/features/dashboard/FoldedTotalLine";
+import { HeldOnPlatformChart } from "@/features/dashboard/HeldOnPlatformChart";
 
 export function DashboardPage() {
   const id = useAppSelector((state) => state.session.currentUser?.id);
@@ -56,6 +58,7 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       )}
+      {data.folded ? <FoldedTotalLine folded={data.folded} /> : null}
       <Section title="Held on platform and elsewhere">
         {custodyRows.length === 0 ? <Muted>No balances.</Muted> : (
           <Card className="gap-0 py-0">
@@ -87,6 +90,7 @@ export function DashboardPage() {
           </Card>
         )}
       </Section>
+      <HeldOnPlatformChart />
       <Section title="By account type">
         {data.breakdowns.byAccountType.length === 0 ? <Muted>No balances.</Muted> : (
           <Card className="gap-0 py-0">
