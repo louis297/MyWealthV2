@@ -53,6 +53,10 @@ public sealed class AccountDto
     /// <summary>The last UTC day the account was accrued through, or null (interest-run R35).</summary>
     public DateOnly? InterestAccruedThrough { get; init; }
 
+    /// <summary>Valuation-run R20: the last day a stored valuation exists for; null before the first and on an External
+    /// account.</summary>
+    public DateOnly? ValuedThrough { get; init; }
+
     /// <summary>Dividends R17, R52: the standing reinvestment election; <c>false</c> on an External account.</summary>
     public bool ReinvestDividends { get; init; }
 

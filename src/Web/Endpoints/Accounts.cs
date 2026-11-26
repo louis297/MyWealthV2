@@ -24,6 +24,7 @@ using MyWealthV2.Web.Infrastructure;
 using MyWealthV2.Application.Rebalances;
 using MyWealthV2.Application.Valuations;
 using MyWealthV2.Application.Valuations.Queries.GetAccountValuation;
+using MyWealthV2.Application.Valuations.Queries.GetStoredValuations;
 
 namespace MyWealthV2.Web.Endpoints;
 
@@ -43,6 +44,8 @@ public class Accounts : IEndpointGroup
         groupBuilder.MapPost(ReopenAccount, "{id}/reopen").RequireAuthorization(Policies.AccountsManage);
         groupBuilder.MapGet(GetHoldings, "{id}/holdings").RequireAuthorization(Policies.AccountsRead);
         groupBuilder.MapGet(GetValuation, "{id}/valuation").RequireAuthorization(Policies.AccountsRead);
+        groupBuilder.MapGet(GetStoredValuations, "{id}/valuations").RequireAuthorization(Policies.AccountsRead);
+        groupBuilder.MapGet(GetStoredValuation, "{id}/valuations/{date}").RequireAuthorization(Policies.AccountsRead);
         groupBuilder.MapGet(GetAccountPortfolio, "{id}/portfolio").RequireAuthorization(ReadPortfolio);
         groupBuilder.MapGet(GetDepositInstructions, "{id}/deposit-instructions").RequireAuthorization(Policies.AccountsRead);
         groupBuilder.MapGet(GetInterestAccruals, "{id:guid}/interest-accruals").RequireAuthorization(Policies.AccountsRead);
@@ -172,6 +175,23 @@ public class Accounts : IEndpointGroup
     [EndpointDescription("What the account was worth at the end of one UTC day (date=yyyy-MM-dd, required, not after today): the cash and each holding of that day at the stored price and FX rate as of the day. A holding that cannot be valued has a status and no value, and complete is false.")]
     public static async Task<Ok<AccountValuationDto>> GetValuation(ISender sender, Guid id, string? date = null) =>
         TypedResults.Ok(await sender.Send(new GetAccountValuationQuery(id, date)));
+
+    [EndpointSummary("List the stored valuations of an account")]
+    [EndpointDescription("The value of a Custodial account on each day the valuation run stored, newest day first. Filters from, to and complete.")]
+    public static async Task<Ok<PagedList<StoredValuationSummaryDto>>> GetStoredValuations(
+        ISender sender,
+        Guid id,
+        int page = 1,
+        int pageSize = 20,
+        string? from = null,
+        string? to = null,
+        bool? complete = null) =>
+        TypedResults.Ok(await sender.Send(new GetStoredValuationsQuery(id, page, pageSize, from, to, complete)));
+
+    [EndpointSummary("Get the stored valuation of an account for a day")]
+    [EndpointDescription("The valuation the valuation run stored for one day, with the price and rate each line used, the run and when it was stored.")]
+    public static async Task<Ok<StoredValuationDto>> GetStoredValuation(ISender sender, Guid id, string date) =>
+        TypedResults.Ok(await sender.Send(new GetStoredValuationQuery(id, date)));
 
     [EndpointSummary("Get the account portfolio")]
     [EndpointDescription("Returns the active portfolio assignment and the last rebalance status.")]
