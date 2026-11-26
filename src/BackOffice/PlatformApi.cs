@@ -242,6 +242,12 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         return created.Id;
     }
 
+    public Task<IReadOnlyList<ValuationRunItem>> ListValuationRunsAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
+    public Task<Guid> StartValuationRunAsync(Guid tenantId, DateOnly throughDate, CancellationToken cancellationToken = default) =>
+        throw new NotImplementedException();
+
     public Task DisableClientMoneyAccountAsync(Guid tenantId, Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
         SendExpectingSuccessAsync(
             HttpMethod.Post,

@@ -209,6 +209,18 @@ public sealed record InterestRunTotal(string Currency, int PostingCount, decimal
 
 public sealed record InterestRunPage(IReadOnlyList<InterestRunItem> Items, int Page, int PageSize, int TotalCount);
 
+/// <summary>A valuation run of a tenant (docs/features/valuation-run.md R22).</summary>
+public sealed record ValuationRunItem(
+    Guid Id,
+    DateOnly ThroughDate,
+    string Trigger,
+    int AccountsProcessed,
+    int AccountsFailed,
+    int DaysValued,
+    int DaysIncomplete);
+
+public sealed record ValuationRunPage(IReadOnlyList<ValuationRunItem> Items, int Page, int PageSize, int TotalCount);
+
 public sealed class PlatformApiException(int status, string body) : Exception(body)
 {
     public int Status { get; } = status;

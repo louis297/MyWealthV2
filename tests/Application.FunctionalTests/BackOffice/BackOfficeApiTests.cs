@@ -484,6 +484,32 @@ public class BackOfficeApiTests
     }
 
     [Test]
+    public async Task ValuationRunCalls_ReadTheNewestTenOfTheTenant_AndStartARunThroughADate()
+    {
+        var runId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, $$"""
+            {"items":[{"id":"{{runId}}","throughDate":"2026-03-04","trigger":"Scheduled","ranBy":null,
+              "startedAt":"2026-03-06T13:00:01Z","completedAt":"2026-03-06T13:00:03Z","accountsProcessed":1,"accountsFailed":0,
+              "daysValued":2,"daysIncomplete":0}],"page":1,"pageSize":10,"totalCount":1}
+            """);
+        api.Enqueue(HttpStatusCode.Created, $$"""{"id":"{{runId}}"}""");
+        var platform = Create(api);
+
+        var run = (await platform.ListValuationRunsAsync(TenantId)).ShouldHaveSingleItem();
+        var started = await platform.StartValuationRunAsync(TenantId, new DateOnly(2026, 3, 11));
+
+        run.ShouldBe(new ValuationRunItem(runId, new DateOnly(2026, 3, 4), "Scheduled", 1, 0, 2, 0));
+        started.ShouldBe(runId);
+        AssertRequest(api.Requests[0], "GET", $"/valuation-runs?tenantId={TenantId}&pageSize=10");
+        AssertRequest(api.Requests[1], "POST", "/valuation-runs");
+        var body = Body(api.Requests[1]);
+        body.GetProperty("tenantId").GetGuid().ShouldBe(TenantId);
+        body.GetProperty("throughDate").GetString().ShouldBe("2026-03-11");
+        body.EnumerateObject().Count().ShouldBe(2);
+    }
+
+    [Test]
     public async Task ReportGrantList_ReadsGranted()
     {
         var api = new ScriptedHandler();

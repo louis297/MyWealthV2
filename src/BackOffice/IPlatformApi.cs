@@ -108,6 +108,12 @@ public interface IPlatformApi
     /// <summary>Runs interest for the tenant and an as-of date at once (interest-run R32, BO21).</summary>
     Task<Guid> StartInterestRunAsync(Guid tenantId, DateOnly asOfDate, CancellationToken cancellationToken = default);
 
+    /// <summary>The tenant's newest ten valuation runs (valuation-run BO34).</summary>
+    Task<IReadOnlyList<ValuationRunItem>> ListValuationRunsAsync(Guid tenantId, CancellationToken cancellationToken = default);
+
+    /// <summary>Runs the valuations of the tenant through a date at once (valuation-run R15, BO35).</summary>
+    Task<Guid> StartValuationRunAsync(Guid tenantId, DateOnly throughDate, CancellationToken cancellationToken = default);
+
     Task<InstrumentPage> ListInstrumentsAsync(
         int page,
         int pageSize,
