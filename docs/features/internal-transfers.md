@@ -54,7 +54,7 @@ A TenantAdmin or Adviser moves cash from one Open Account to another Open Accoun
 
 - Cross-tenant transfer. A movement across tenants stays two unlinked Transactions: `TransferOut` in one tenant, `TransferIn` in the other (leg-accounts §13, posting R18)
 - Cross-currency transfer (see [future-plans.md](../future-plans.md) §3)
-- In-kind transfer (security legs on two Accounts)
+- A transfer of securities between two Accounts of the firm (security legs on two Accounts). A transfer between a Custodial account and another broker or registry is [in-kind-transfers.md](in-kind-transfers.md)
 - Fees on a transfer (decided 2026-11-15: none in [trade-fees.md](trade-fees.md); a transfer fee is a standalone fee, roadmap step 4)
 - A counterparty field on the transaction item
 - `GET /transfers` or any transfer-only read route
