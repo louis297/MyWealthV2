@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-23
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -201,7 +201,7 @@ Amendment to [portfolios.md](portfolios.md) R9, R11–R13, R15, R18, R22–R25, 
 | --- | --- |
 | R22 | **When an assignment ends.** Unassign (portfolios R15) and disabling a portfolio (R22) are never refused because of a rebalance. In the same database transaction the Account's open rebalance is cancelled by the platform with reason `Unassigned`: a `Proposed` one at once, one in progress as R19 with no person. Still no trade is made to undo anything. |
 | R23 | **Assigning another portfolio.** Assign on an Account whose rebalance is in progress → 400 `rebalance_in_progress`, and nothing is written; the refusal of an Account with a live order (orders R49) stays. Assign on an Account whose rebalance is `Proposed` replaces the assignment (portfolios R5), cancels that rebalance with reason `Unassigned` and proposes for the new portfolio. |
-| R24 | **The trade lock.** Portfolios R18 on a Custodial account now reads: on an Account with an Active assignment only its rebalance places orders. `POST /orders` stays refused (orders R8), and a hand reverse of a `Buy` or `Sell` typed before orders stays refused by the lock. "An order and an assignment never meet on one account" (orders R49) is replaced by: the only orders on an assigned Account are the orders of its rebalance. An adjustment, an entitlement posting and every cash write stay outside the lock (adjustments R16, corporate-actions R30, portfolios R18). |
+| R24 | **The trade lock.** Portfolios R18 on a Custodial account now reads: on an Account with an Active assignment only its rebalance places orders. `POST /orders` stays refused (orders R8), and a hand reverse of a `Buy` or `Sell` typed before orders stays refused by the lock. "An order and an assignment never meet on one account" (orders R49) is replaced by: the only orders on an assigned Account are the orders of its rebalance. An adjustment, an entitlement posting and every cash write stay outside the lock (adjustments R16, corporate-actions R30, portfolios R18). An in-kind transfer is refused on an assigned account, and an account with an open transfer cannot be assigned, so a rebalance never meets a transfer out's reserved quantity (in-kind-transfers R24). |
 | R25 | **The assignment item.** `GET /accounts/{id}/portfolio` loses `lastRebalanceStatus`, `lastRebalanceMessage` and `lastRebalanceAt` and gains `rebalance`: the newest rebalance of the assignment as `{ id, status, failure, proposedAt, endedAt }`, `null` when it has none. `failure` is `{ code, message }` on a `Failed` or `Incomplete` rebalance, else `null`. The three columns are dropped with no back-fill; rebalances before this slice are in the ledger as Transactions with source `Rebalance`. |
 
 ### 4.6 The ledger, the source and the reads
@@ -465,24 +465,13 @@ Page contracts amended when this spec was accepted: [adviser-portal-portfolios.m
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `Rebalance`: every move of §5 and each refused one; confirm after `ExpiresAt` throws; a sell wave only first; a third buy wave throws; a cancel request twice throws; `Cancel` of one in progress needs no live order. `RebalancePlanner`: the plan against given targets equals today's for the same inputs; each check of R8; buy sizing by reservation never exceeds the available cash, with and without a fee schedule, a minimum and a cap; a buy below the minimum trade after sizing is dropped. `CustodyRules.AllowsHandReverse(Custodial, Rebalance)` false, `(External, Rebalance)` true, `(Custodial, Manual)` true |
-| Application.FunctionalTests — proposal | No Bearer → 401; Customer and SystemAdmin → 403 on `/rebalances`; an Adviser of an unassigned Customer → 404. `POST /accounts/{id}/rebalance`: `Proposed` with the lines, the own targets and `expiresAt`, no order and no reservation; an aligned account → `NoChange`; each failure code of R6 and R8 → 400 with the code and a stored `Failed` rebalance (a price five days old; a disabled instrument; a target in another currency; a holding in another currency is proposed as a sell; no broker connection; a Disabled Customer). A second request supersedes the first (`Cancelled`, `Superseded`). Assign: the assignment and a proposal; a failed plan leaves the assignment Active. Reads and filters. Two-tenant: tenant B's rebalance id → 404 on every route |
-| Application.FunctionalTests — confirm and waves | With fakes for `IBrokerOrders` and `IBrokerFeed`. Confirm with sells: one wave of sell orders with `rebalanceId`, memo `Rebalance`, placed by the confirmer, the Tenant's connection; status `Selling`; no buy order yet. After the sell fills are posted, the advance step places the buys, sized so the reserved cash is not above the available cash; `Buying`. After those fills, a top-up wave; after it, `Completed`; no third buy wave. A plan with no sell starts `Buying`. A plan that changed to nothing at confirm → `NoChange`. An expired proposal → 400; a second confirm → 400; stale `rowVersion` → 409. The fills have source `OrderFill`, an execution detail and the fee of the order's schedule; no Transaction with source `Rebalance` is written. A sell that expires, an order the broker rejects, a fill broken in progress → `Incomplete` with `order_not_filled`, and no buy is placed. A pending fill keeps the rebalance in progress. A price that went stale before the buy wave → `Incomplete` with `stale_price`. Unsettled sale proceeds are used by the buys |
-| Application.FunctionalTests — cancel and assignment | Cancel of a proposal → `Cancelled`. Cancel in progress: an unsent order is cancelled at once, a sent one gets a cancel request, the rebalance is `Cancelled` when no order is live, a fill that crossed is booked, no further wave. `POST /orders/{id}/cancel` on a rebalance order → 400. `POST /orders` on an assigned account → 400 (unchanged). Unassign with a proposal → `Cancelled` `Unassigned`; unassign in progress → cancel requested by the platform. Disable portfolio does the same for each account. Assign another portfolio: with a proposal → replaced; in progress → 400 `rebalance_in_progress`. `POST /accounts/{id}/rebalance` in progress → 400 `rebalance_in_progress`. `GET /accounts/{id}/portfolio` carries `rebalance` and not the three old fields |
-| Application.FunctionalTests — the job | A weight change and a bulk request: 202 with handles; each job stores a proposal whose id is the handle; an Adviser's call proposes only for the Book (PB-T1 kept). An account with a proposal gets a newer one. An account in progress gets `followUp` and, when its rebalance ends, a proposal with trigger `FollowUp`; none when the assignment was removed. A failed plan is stored `Failed` and not retried |
-| Application.FunctionalTests — reverse and reconciliation | Hand reverse of an existing `Rebalance` Transaction on a Custodial account → 400 with the transaction-source R13 message; on an External account → 201. Bank reconciliation lists the fills of a rebalance order as `UnsettledTrades` and `TradeFees`, not `Trades` |
-| Infrastructure.IntegrationTests | `0053`: a second open rebalance on one Account violates, a second after the first ended does not; the status, failure, confirmed, cancel and ended CHECKs; the line CHECK; the three assignment columns are gone; existing orders have no rebalance. EF round-trips. `BrokerSyncJob` runs the sixth step after the fills are posted, and a failure in it does not stop the run being reported |
-| Adviser Portal | P14 the three outcomes; P15 the table, the sentence, the expired state; P16 confirm and the orders by wave; P17 labels; P18 cancel; P19 list and filter; P20 the portfolio page, the new confirmation copy and "Confirm proposals"; D79 the label, no Cancel, Reverse only for `Manual` |
-| Customer Portal | C37 |
-
-Fan-out in the tests:
-
-- Functional tests that rebalanced and then read `Buy` / `Sell` Transactions use a new helper `CustodialHttp.RebalanceAsync`: it proposes, confirms and feeds the fake broker a fill for each order of each wave at a price the test gives. Tests of the planner's numbers move to Domain unit tests where they only need the plan.
-- `TradeLockTests` and the reverse-by-source tests: the reverse of a `Rebalance` trade after unassign is now 400.
-- Tests that read `lastRebalanceStatus` read `rebalance.status`.
-- The Adviser Portal `Order` and account portfolio types gain and lose the fields of R25 and R27.
+| Domain.UnitTests | Folder `Rebalances/` |
+| Application.FunctionalTests | Folder `Rebalances/`; `Custody/RebalanceReferenceTests.cs`; `Portfolios/RebalanceEnqueueTests.cs` |
+| Infrastructure.IntegrationTests | `AppliedSchema/RebalancesSchemaTests.cs` |
 
 ---
 
@@ -540,35 +529,17 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
-
-The repository should build after each commit. Agents split each behaviour into red then green.
-
-1. `RebalanceRules`, the enums (with the rename to `RebalancePlanOutcome`), `Rebalance` with its targets, lines and moves (R3, R11, R14, R19) + Domain unit tests.
-2. Script `0053`, EF mappings, `Order.RebalanceId` (§6) + integration tests.
-3. `RebalancePlanner`: given targets, the checks of R8, buy sizing by reservation (R7, R8, R16) + Domain unit tests.
-4. The permissions; `ProposeRebalance` behind `POST /accounts/{id}/rebalance`; one open rebalance and supersede; the rebalance reads (R1, R4–R10, R27) + functional tests, two-tenant. The immediate-trade path stays until commit 6.
-5. Confirm and the first wave (R13–R15) + functional tests with the fake broker.
-6. The advance step in `BrokerSyncJob`: the buy wave, the top-up, `Completed`, `Incomplete` (R16–R18, R21) + functional and integration tests. Remove the posting half of `AccountRebalancer`, with the test helper `CustodialHttp.RebalanceAsync`.
-7. Cancel, and the refusal to cancel a rebalance order (R19, R20) + functional tests.
-8. Assign proposes; unassign, disable and assign-replace against an open rebalance; `rebalance` on the assignment item, the three columns unmapped (R10, R22–R25) + functional tests.
-9. The job proposes; the follow-up (R12) + functional tests.
-10. `Rebalance` no longer hand-reversible (R28) + Domain unit and functional tests.
-11. `rebalanceId` on the order item and the filter (R27) + functional tests.
-12. BFF prefix, Adviser Portal P14–P20 and D79 + frontend tests.
-13. Customer Portal C37 + frontend tests.
-14. Repo docs: mark this file landed; roadmap §13 step 12 and the §2 matrix.
-
-Do not put a consent record, a bulk confirm route, a scheduled rebalance or order aggregation in these commits.
-
-### Docs amended when this spec was accepted
+## 12. Docs changed when this spec was accepted
 
 [portfolios.md](portfolios.md) (the summary; R8, R9, R11–R13, R15, R18, R22–R25; §8 answers and the `lastRebalance…` fields; the failure codes of §11), [orders.md](orders.md) (R8, R15, R16, R18, R19 the sixth step, R49; §2 Out and §11 points 4 and 16 answered), [transaction-source.md](transaction-source.md) (R5, R9: no longer written; R12: `Rebalance` not hand-reversible), [custody-modes.md](custody-modes.md) (R15, R17 and the reverse row of the matrix), [trade-fees.md](trade-fees.md) (R24–R29: the planner's fees are estimates; a rebalance order is charged as any order), [trade-settlement.md](trade-settlement.md) (R5, R23 and "still open": rebalance orders settle like any order), [bank-reconciliation.md](bank-reconciliation.md) (R10: `Trades` keeps only rebalance trades from before this slice), [withdrawals.md](withdrawals.md) (R36: a rebalance lowers cash only through its orders), [account-closure.md](account-closure.md) (a note: R5 already refuses an assigned account), [corporate-actions.md](corporate-actions.md) (a note: a cancelled rebalance order ends its rebalance), [adjustments.md](adjustments.md) (R16: the next rebalance sees the adjusted holding, unchanged), [bff-adviser-portal.md](bff-adviser-portal.md) (prefix `/rebalances`), [api-design.md](../api-design.md) (§3.1 two permission rows, §4.2 five codes, §6 resource row, §7.6 and §7.12 notes, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [architecture.md](../architecture.md) (the sixth step of `broker-sync:{connection}`), [adviser-portal-portfolios.md](../adviser-portal/adviser-portal-portfolios.md) (P14–P20; P7, P8 and the confirmation copy), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D79; D27), [customer-portal.md](../customer-portal/customer-portal.md) (C37), [glossary.md](../glossary.md) (the review terms become accepted; Portfolio, AccountPortfolioAssignment, Order, Manual entry matrix, Transaction source and Hand-reversible source change), [function-plan.md](../function-plan.md) §5, [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §9, and the roadmap §8 O3, §11 S2, §12 D15, §13 and §14. The roadmap §2 matrix (the `Buy` / `Sell` and Reverse rows) changes when the slice lands.
 
 ---
 
-## Amendment 2026-11-24 (in-kind transfers) — accepted
+## 13. History
 
-Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rule R24 lives there; this section records what changes here.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/rebalances.md`).
 
-- On an assigned account only its rebalance changes holdings: an in-kind transfer is refused on it, and an account with an open transfer cannot be assigned. A rebalance therefore never meets a transfer out's reserved quantity.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-24 | [in-kind-transfers.md](in-kind-transfers.md) | R24: an in-kind transfer and an assignment never meet on one account |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
