@@ -102,7 +102,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 | H2 | **A day is a UTC date**, and the position of a day is the sum of the legs booked before 00:00 UTC of the next day. | The interest run already uses this rule for cash (interest-run R16). One rule for cash and quantity. |
 | H3 | **As booked.** A Reversal counts from its own `bookedAt`. A day between a Transaction and its Reversal shows the original. | The ledger is not rewritten; a valuation of a past day must not be either. |
 | H4 | **The price is the unadjusted close, and the quantity is the quantity held that day.** An adjusted close is never stored or used. | An adjusted series restates past prices for later splits. Multiplied by the quantity actually held, it gives a wrong value. |
-| H5 | **No invented number.** A holding with no price, or with a price that is too old, is unpriced, and the valuation says it is incomplete. It is not valued at 0. A missing rate fails. | Net worth may show 0 for a missing price (net-worth R7). A fee base or a tax figure may not. |
+| H5 | **No invented number.** A holding with no price, or with a price that is too old, is unpriced, and the valuation says it is incomplete. It is not valued at 0. A missing or old rate does the same: the line is not valued and the valuation is incomplete; it does not fail the read ([account-valuation](features/account-valuation.md) R14). | Net worth may show 0 for a missing price (net-worth R7). A fee base or a tax figure may not. |
 | H6 | **A stored valuation keeps what it used:** the price and its date, the rate and its date. It is never changed. | Fees and reports are computed from it. The platform already stores the rate used on every conversion. |
 | H7 | **Stored valuations only where the past cannot change.** Custodial accounts first. | An External `bookedAt` can be any past date, so a stored day could stop matching the ledger. |
 | H8 | **The run follows the interest run:** at most one result per account and day, a manual run for a date, and catch-up after a missed day (custodial-roadmap D18). | One pattern for every date-driven job. |
@@ -133,7 +133,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 - **Also decide:** the age limit (Q4); the rounding of a value; whether income that is earned but not posted counts (Q8); that reserved and unsettled amounts count in full, because the ledger books on the trade date; that cost and unrealised gain are not returned for a past day (§6).
 - **Risk to test:** on the ex-date of a split, the price and the quantity must be on the same side of the split. The price changes with the source's date; the quantity changes when the platform applies the corporate action.
 - **Worked example:** one account with cash and three instruments in two currencies over ten days, with a buy, a sell, a split, a reversal and a weekend.
-- **Spec:** [account-valuation.md](features/account-valuation.md) (in review, 2026-11-26). It proposes, as points to confirm: a missing or old rate marks the line and does not fail the read, which follows Q4 and not the last sentence of H5; an incomplete valuation still has a total, with its mark; rounding line by line to the currency's decimal places; the quantity restated on the ex-date of a hand-entered split, because the price job stores a US bar a day after its date and the entitlement is booked then; a price from before a corporate action is not used; any Account status and no earliest date; an External account valued from the ledger as it stands; `GET /accounts/{id}/valuation?date=` with `accounts.read`. No script.
+- **Spec:** [account-valuation.md](features/account-valuation.md) (accepted 2026-11-26; the eight points of its §11 confirmed as recommended). It locks: a missing or old rate marks the line and does not fail the read, which follows Q4 (H5 reworded); an incomplete valuation still has a total, with its mark; rounding line by line to the currency's decimal places; the quantity restated on the ex-date of a hand-entered split, because the price job stores a US bar a day after its date and the entitlement is booked then; a price from before a corporate action is not used; any Account status and no earliest date; an External account valued from the ledger as it stands; `GET /accounts/{id}/valuation?date=` with `accounts.read`. No script.
 
 ### V3. Daily valuation run and stored valuations
 
@@ -195,7 +195,7 @@ Each step depends only on earlier steps.
 | Step | Item | Closes | Spec | Status |
 | --- | --- | --- | --- | --- |
 | 1 | V1 price and rate history | "Historical back-fill" and the deferred read routes of instrument-prices and fx-rates | [market-data-history](features/market-data-history.md) | landed 2026-11-25 |
-| 2 | V2 valuation as of a date | — | [account-valuation](features/account-valuation.md) | review 2026-11-26 |
+| 2 | V2 valuation as of a date | — | [account-valuation](features/account-valuation.md) | accepted 2026-11-26 |
 | 3 | V3 daily valuation run and stored valuations | "Still open: daily snapshots" (function-plan §5.4) | — | not specified |
 | 4 | V4 net worth history and reports as of a date | "Daily snapshots, historical series" and "FX fold" (net-worth Out) | — | not specified; optional for the business roadmap |
 

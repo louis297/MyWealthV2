@@ -1,6 +1,6 @@
 ---
 title: Account valuation
-status: review
+status: accepted
 phase: 3
 language: en
 owner: ""
@@ -37,7 +37,7 @@ A **valuation** is a read that values one Account for one day: the cash and the 
 
 New: route `GET /accounts/{id}/valuation?date=`; Domain function `AccountValuation.Compute` with `LedgerDay`, `ValuationRules` and `ValuationLineStatus`; Application services `AccountPositions` and `ValueAccount` and the query `GetAccountValuation`. No script, table, permission, problem code, domain event, `TransactionType`, port, job or setting. No portal page and no simulator change.
 
-**Status is `review` (2026-11-26).** It is not a build contract. The eight points of §11 are recommendations that wait for an answer.
+**Status is `accepted` (2026-11-26).** The eight points of §11 were confirmed as recommended.
 
 ---
 
@@ -256,7 +256,7 @@ Invariants:
 
 Domain events: none. A valuation is not an entity and is not stored.
 
-Update [domain-model.md](../domain-model.md) when this spec is accepted (a new §8 entry, "Valuation of a day").
+[domain-model.md](../domain-model.md) §8.22, "Valuation of a day", lists these types.
 
 ---
 
@@ -434,9 +434,9 @@ No new ADR.
 
 ### Points to confirm
 
-Each point has a recommendation, which the rules above already follow, and the alternative. Say which ones to change.
+Each point was confirmed as recommended (2026-11-26) and is written into the rules above as stated here. The alternatives are kept for the record.
 
-1. **A missing or old rate marks the line; it does not fail the read** (R14). Recommended: roadmap Q4 says "older, or none: unpriced and incomplete" for a price or a rate, and one line without a rate should not hide the rest of the account. Roadmap H5 ends with "a missing rate fails"; this spec follows Q4, and H5 is reworded when the spec is accepted. Alternative: the read answers an error when any rate is missing, as a posting does.
+1. **A missing or old rate marks the line; it does not fail the read** (R14). Recommended: roadmap Q4 says "older, or none: unpriced and incomplete" for a price or a rate, and one line without a rate should not hide the rest of the account. Roadmap H5 ended with "a missing rate fails"; this spec follows Q4, and H5 was reworded. Alternative: the read answers an error when any rate is missing, as a posting does.
 2. **An incomplete valuation still has a total** (R16). Recommended: `total` is the cash plus the lines that could be valued, and `complete` and `unvaluedCount` say that it is partial. A reader sees most of the account, and V3 can store the row with its mark (roadmap V3, "stored with its mark"). The risk is a consumer that reads `total` and not `complete`. Alternative: `holdingsValue` and `total` are `null` when `complete` is `false`.
 3. **Rounding line by line, each figure from the figures shown** (R15). Recommended: the market value is rounded to the quote currency's decimal places, the value is the rounded market value times the rate, and the totals are sums of the rounded lines. A person can check every figure with the response alone, and the lines add up to the total exactly. Alternative: carry full precision to the end and round only the total; the lines then do not add up.
 4. **The ex-date of a split is valued by restating the quantity** (R18). Recommended. The price job stores a US bar the day after its date, so a hand-entered split is booked one UTC day after its ex-date. Without a rule, every holder's ex-date is valued with the new price and the old quantity: a quarter of the true value on the day of a 4 for 1 split, and that day would be a fee base in roadmap step 4. Alternative A: the line is not valued on such a day (`PriceBeforeCorporateAction` for both directions), which is simpler and leaves every split with an incomplete day. Alternative B: no rule, and the wrong day is a known issue.
@@ -478,6 +478,8 @@ The repository should build after each commit. Agents split each behaviour into 
 
 Do not put a table, a job, a series or a seeded history in these commits.
 
-### Docs to amend when this spec is accepted
+### Changes to other docs
+
+Made when this spec was accepted (2026-11-26):
 
 [interest-run.md](interest-run.md) (R16: the day balance is the cash of the position of a day, R2 and R3 here; no rule changes), [holdings.md](holdings.md) (§2 Out "snapshots" and a note under R14: the quantity of a past day is read from the security legs), [posting.md](posting.md) (a note that the cash of a past day is read by `bookedAt`), [corporate-actions.md](corporate-actions.md) (R23: the ex-date in a valuation, R18 here), [fx-rates.md](fx-rates.md) (R7: a valuation catches a missing pair and marks the line), [known-issues/eodhd-nz-jp-coverage.md](../known-issues/eodhd-nz-jp-coverage.md) (its effect on a valuation: `NoPrice`, incomplete), [api-design.md](../api-design.md) (the resource row and the change log), [domain-model.md](../domain-model.md) (the valuation of a day), [architecture.md](../architecture.md) (the two services), [glossary.md](../glossary.md) (the review terms become accepted; "Day balance" covers every Account), [features/README.md](README.md) row status, and [valuation-roadmap.md](../valuation-roadmap.md) (H5 reworded by point 1, §5 V2, §8).

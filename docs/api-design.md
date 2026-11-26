@@ -342,7 +342,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Withdrawals | `/withdrawals` | list / get / create (`Idempotency-Key`); approve / reject / cancel. See features/withdrawals.md | `withdrawals.read` / `.request` / `.approve` |
 | Bank reconciliations | `/bank-reconciliations` | overview / list / get / create (run now). No PUT or DELETE: a run never changes. See features/bank-reconciliation.md | `bank-reconciliations.manage` |
 | Instruments | `/instruments` | list / get / create / update / disable / enable; `GET …/prices` (features/market-data-history.md) | `instruments.read` / `instruments.create` / `instruments.manage` |
-| Accounts | `/accounts` | list / get / create / update / close / reopen; `GET …/cash-balance`; `GET …/deposit-instructions` (features/client-money-accounts.md); sub-resource `…/closures`: request (`Idempotency-Key`) / list / get (features/account-closure.md); `GET …/interest-accruals` (features/interest-run.md) | `accounts.read` / `accounts.create` / `accounts.manage`; closures `account-closures.read` / `.request` |
+| Accounts | `/accounts` | list / get / create / update / close / reopen; `GET …/cash-balance`; `GET …/deposit-instructions` (features/client-money-accounts.md); sub-resource `…/closures`: request (`Idempotency-Key`) / list / get (features/account-closure.md); `GET …/interest-accruals` (features/interest-run.md); `GET …/valuation?date=` (features/account-valuation.md) | `accounts.read` / `accounts.create` / `accounts.manage`; closures `account-closures.read` / `.request` |
 | Transactions | `/transactions` | list / get / create / reverse | `transactions.read` / `transactions.create` |
 | Net worth | `/net-worth`, `/users/customers/{id}/net-worth` | GET. See features/net-worth.md; `breakdowns.byCustodyMode` in features/custody-mode-grouping.md | `accounts.read` |
 | Portfolios | `/portfolios`, `/accounts/{id}/portfolio`, `/accounts/{id}/rebalance` | list / get / create / update / disable; assign / unassign / rebalance. See features/portfolios.md | `portfolios.read` / `portfolios.manage` + `transactions.create` |
@@ -506,6 +506,7 @@ Field rules: [features/accounts.md](features/accounts.md).
 | GET | `/accounts/{id}/cash-balance` | `accounts.read` | 200 `{ accountId, currency, cashBalance, reservedCash, availableCash, unsettledCash, withdrawableCash }` |
 | GET | `/accounts/{id}/deposit-instructions` | `accounts.read` | 200 `{ accountId, currency, reference, bankName, accountName, accountNumber }` |
 | GET | `/accounts/{accountId}/interest-accruals` | `accounts.read` | 200 envelope, newest first (filters `from`, `to`, `transactionId`, `posted`) |
+| GET | `/accounts/{id}/valuation?date=` | `accounts.read` | 200 item |
 | PUT | `/accounts/{accountId}/dividend-reinvestment` | `accounts.manage` | 204 |
 | POST | `/accounts/{accountId}/closures` | `account-closures.request` | 201 `{ id }` (`Idempotency-Key`) |
 | GET | `/accounts/{accountId}/closures`, `…/{id}` | `account-closures.read` | 200 |
@@ -538,6 +539,7 @@ Rules:
 - **Close.** On an External account close is rejected while cash `SUM ≠ 0` or a holding remains. `POST /accounts/{id}/close` on an Open Custodial account → 400 for every caller: it closes through `POST /accounts/{accountId}/closures`. The request posts the interest accrued through yesterday before the payout is worked out, and is refused while the account has a live order, a fill that is not settled or a pending dividend. While a closure is `InProgress` the Account is closing and every hand write on it → 400. No problem code.
 - **Deposit instructions.** 404 for an External or Closed account, or when the currency has no active client money account.
 - **Holdings.** The item of `GET /accounts/{id}/holdings` carries `reservedQuantity`, `availableQuantity`, `unsettledQuantity` and `transferableQuantity` ([features/orders.md](features/orders.md) R40, R41; [features/in-kind-transfers.md](features/in-kind-transfers.md) R43–R45).
+- **Valuation.** `GET /accounts/{id}/valuation?date=yyyy-MM-dd` values the Account for one UTC day: `{ accountId, date, currency, cash, holdings, holdingsValue, total, complete, unvaluedCount }`. `date` is required and not after today (else 400 `errors.Date`). A holding that cannot be valued has a status and no value, and the valuation is incomplete; it is never an error. A read only, no `Idempotency-Key`. Field rules: [features/account-valuation.md](features/account-valuation.md).
 - **Portfolio.** `POST /accounts/{id}/portfolio` and `POST /accounts/{id}/rebalance` require a Custodial account, else 400 `account_not_eligible`. Both answer 200 `{ status, rebalanceId }` with `status` `Proposed` or `NoChange`; a failed plan is 400 with its problem code. `GET /accounts/{id}/portfolio` carries `rebalance` (`{ id, status, failure, proposedAt, endedAt }`) ([features/rebalances.md](features/rebalances.md) R10, R25).
 
 ### 7.7 Transactions
@@ -852,3 +854,4 @@ One row per change. The text of each change is in git (`git log -p -- docs/api-d
 | 2026-11-24 | Migration batches (§7.13); in-kind transfers (§7.14); dividends (§7.11) |
 | 2026-11-25 | Adjustment requests (§7.15); `POST /transactions/adjustment` removed; price and FX rate history (§7.5, §7.16) |
 | 2026-11-26 | The amendments were folded into §7. §1, §3 and §5 now describe the portal clients as [ADR 0016](adr/0016-bff-for-first-party-portals.md) and the BFF specs define them. §7.17 gathers the statement line notes. No rule changed |
+| 2026-11-26 | Account valuation (§6, §7.6): `GET /accounts/{id}/valuation?date=` with `accounts.read`. No new permission or problem code |

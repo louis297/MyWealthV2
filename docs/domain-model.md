@@ -649,6 +649,20 @@ Invariants: a transfer is approved or rejected by a person other than its reques
 
 Invariants: a request has a cash part, a holding part or both; it is approved or rejected by a person other than its requester, and only from `Requested`; it is `Approved` if and only if it has a Transaction of type `Adjustment` with source `AdjustmentRequest`, written in the database transaction that approved it; an open request reserves nothing. Field rules: [features/adjustment-review.md](features/adjustment-review.md).
 
+### 8.22 Valuation of a day (accepted — account-valuation slice)
+
+A read model, not an entity: nothing is stored and no event is raised. Types in `src/Domain/Valuations`.
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `LedgerDay` | Static rule | `End(day)`: 00:00 UTC of the next day. `Of(instant)`: the UTC date. The one place that says which day a `bookedAt` belongs to |
+| `AccountPosition` | Value | A day, the cash, and one ledger quantity per Instrument with a quantity other than 0: the cash legs and the security legs booked before the day ended |
+| `ValuationRules` | Static | `MaxAgeDays = 4`; `IsFresh(asOfDate, day)` |
+| `ValuationLineStatus` | Enum | `Valued`, `NoPrice`, `StalePrice`, `NoRate`, `StaleRate`, `PriceBeforeCorporateAction`, `NegativeQuantity` |
+| `BasisChange` | Value | One entitlement posting of a `Manual` corporate action on the Account: Instrument, ex-date, `bookedAt`, kind and ratio |
+| `AccountValuation` | Value | Day, currency, cash, lines, `HoldingsValue`, `Total`, `Complete`, `UnvaluedCount`. `Compute(position, accountCurrency, decimalPlaces, prices, rates, basisChanges)` reads no clock and no store |
+
+Invariants: a line has a value if and only if it is `Valued`; the total is the cash plus the value of every `Valued` line; a price or rate more than 4 days older than the day never produces a value; the quantity differs from the ledger quantity only on a day a corporate action's price is on the new basis and its entitlement is not booked yet. Field rules: [features/account-valuation.md](features/account-valuation.md).
 
 ## 9. Value objects (Domain assembly; may exist in Phase 1)
 
@@ -689,6 +703,7 @@ One row per change. The text of each change is in git (`git log -p -- docs/domai
 | 2026-11-24 | Migration batches (§8.19, §8.6, §8.9, §8.12). In-kind transfers (§8.20, §8.6, §8.5, §8.16). Dividends (§8.15, §8.6, §8.5, §8.9, §8.12) |
 | 2026-11-25 | Adjustment review (§8.21, §8.6). Market data history: `MarketDataRow.IsFinal`, `MarketDataHistoryWindow` (§7) |
 | 2026-11-26 | The amendments were folded into §4–§8. No rule changed |
+| 2026-11-26 | Account valuation: `LedgerDay`, `AccountPosition`, `ValuationRules`, `ValuationLineStatus`, `BasisChange`, `AccountValuation` (§8.22). No entity or event. [features/account-valuation.md](features/account-valuation.md) |
 
 ---
 
