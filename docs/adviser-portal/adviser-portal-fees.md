@@ -4,7 +4,7 @@ status: accepted
 phase: 2
 language: en
 created: 2026-11-15
-updated: 2026-11-18
+updated: 2026-11-26
 related:
   - README.md
   - frontend-conventions.md
@@ -28,9 +28,9 @@ Backend prerequisites (accepted, must land first):
 - Policies `fees.read` (TenantAdmin, Adviser) and `fees.manage` (TenantAdmin) ([api-design.md](../api-design.md) §3.1).
 - Problem codes `fee_schedule_in_effect` and `stale_row_version` on `PUT` ([api-design.md](../api-design.md) §4.2).
 - Transaction item: every cash leg carries `role` and `fee` (trade-fees §8.1).
-- `POST /fees/trade-schedules/preview` (`fees.read`; trade-fees amendment 2026-11-15, R30–R33).
+- `POST /fees/trade-schedules/preview` (`fees.read`; trade-fees R30–R33).
 
-Session stays the BFF cookie. All calls go through `/api`. The BFF prefix allow-list adds `/fees`: [bff-adviser-portal.md](../features/bff-adviser-portal.md) amendment 2026-11-15.
+Session stays the BFF cookie. All calls go through `/api`. The BFF prefix allow-list adds `/fees`: [bff-adviser-portal.md](../features/bff-adviser-portal.md) §8.3.
 
 ---
 
@@ -166,9 +166,9 @@ Requests start 300 ms after the last change to the form or the amounts. A newer 
 
 ---
 
-## Amendment 2026-11-18 (External caller numbers) — accepted, landed
+### External caller numbers
 
-Status of this amendment: `accepted` (2026-11-18), together with [external-caller-numbers](../features/external-caller-numbers.md). Schedules then apply to trades on Custodial accounts only.
+Field rules: [external-caller-numbers](../features/external-caller-numbers.md). Schedules then apply to trades on Custodial accounts only.
 
 | ID | Behaviour |
 | --- | --- |
@@ -205,4 +205,15 @@ None.
 
 ## Locked decisions (2026-11-15)
 
-- **Fee preview** is computed by `webapi` (trade-fees amendment R30–R33), not in TypeScript: one calculation for previews and posted trades, and C# `decimal` instead of JS floating point. Policy `fees.read`, so an Adviser can preview on the read-only detail page.
+- **Fee preview** is computed by `webapi` (trade-fees R30–R33), not in TypeScript: one calculation for previews and posted trades, and C# `decimal` instead of JS floating point. Policy `fees.read`, so an Adviser can preview on the read-only detail page.
+
+---
+
+## History
+
+What changed in this file after it was accepted. Each row is a section above. The text of each change is in git (`git log -p -- docs/adviser-portal/adviser-portal-fees.md`).
+
+| Date | With | Section |
+| --- | --- | --- |
+| 2026-11-18 | [external-caller-numbers](../features/external-caller-numbers.md) | External caller numbers |
+| 2026-11-26 | — | The amendments became the sections above. No behaviour changed |
