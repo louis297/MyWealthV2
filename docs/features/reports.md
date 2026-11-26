@@ -385,6 +385,8 @@ Each item is:
 
 `parameters` is the stored snapshot. `asOf` is included only when the execution has one. The list carries no file bytes, storage key, or error text. TenantAdmin sees the tenant. An Adviser sees Customer-scoped executions for assigned customers, and Book-scoped executions whose snapshot `adviserId` is that Adviser. A Customer sees Customer-scoped executions whose snapshot `customerId` is that Customer. A snapshot that is not a JSON object is left off the list. Another tenant's rows are left off the list.
 
+`GET /reports/executions/{id}` returns one item of the same shape, with the same visibility. The portals poll it after a request. A caller whose role lacks the read policy of the execution's report scope gets 403. An unknown id, another tenant's execution, a snapshot that is not a JSON object, or an execution outside the caller's visibility gets 404.
+
 Adviser may omit `adviserId` (defaults to self). TenantAdmin and SystemAdmin must supply `adviserId` or the generator returns 400. `asOf` is never accepted from the client; the server writes it when the job is created. Unknown or missing required parameters → 400 from that report’s `ValidateAndBind`.
 
 ### 8.2 Errors
@@ -550,3 +552,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
 | 2026-11-26 | [valuation-history.md](valuation-history.md) | R14, §7.1, §9.2: the optional `date` of the Adviser Balances Report; Out: historical as-of snapshots point there |
 | 2026-11-27 | — | Intro, §1, §2: the `Tenant` scope, and the Customer Portal as the Customer's client. §6: the seed paragraph points at §6.1, which already names the three demo grants. §1, story 4, §12: the Customer's `reports.customer.create` (R5) and the Tenant policies (R6) stated where the old "read only" text remained; the open question on Customer create is closed. No rule changed |
+| 2026-11-27 | — | §8: the status codes and shape of `GET /reports/executions/{id}` written out next to the list. The route was in the §8 table but not built; it is now. No rule changed |
