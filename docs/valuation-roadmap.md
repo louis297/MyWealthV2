@@ -3,7 +3,7 @@ title: Historical valuation roadmap
 status: note
 language: en
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 related:
   - future-plans.md
   - function-plan.md
@@ -25,6 +25,7 @@ related:
   - adviser-portal/adviser-portal-dashboard.md
   - known-issues/eodhd-nz-jp-coverage.md
   - features/market-data-history.md
+  - features/account-valuation.md
 ---
 
 # Historical valuation roadmap
@@ -132,6 +133,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 - **Also decide:** the age limit (Q4); the rounding of a value; whether income that is earned but not posted counts (Q8); that reserved and unsettled amounts count in full, because the ledger books on the trade date; that cost and unrealised gain are not returned for a past day (§6).
 - **Risk to test:** on the ex-date of a split, the price and the quantity must be on the same side of the split. The price changes with the source's date; the quantity changes when the platform applies the corporate action.
 - **Worked example:** one account with cash and three instruments in two currencies over ten days, with a buy, a sell, a split, a reversal and a weekend.
+- **Spec:** [account-valuation.md](features/account-valuation.md) (in review, 2026-11-26). It proposes, as points to confirm: a missing or old rate marks the line and does not fail the read, which follows Q4 and not the last sentence of H5; an incomplete valuation still has a total, with its mark; rounding line by line to the currency's decimal places; the quantity restated on the ex-date of a hand-entered split, because the price job stores a US bar a day after its date and the entitlement is booked then; a price from before a corporate action is not used; any Account status and no earliest date; an External account valued from the ledger as it stands; `GET /accounts/{id}/valuation?date=` with `accounts.read`. No script.
 
 ### V3. Daily valuation run and stored valuations
 
@@ -193,7 +195,7 @@ Each step depends only on earlier steps.
 | Step | Item | Closes | Spec | Status |
 | --- | --- | --- | --- | --- |
 | 1 | V1 price and rate history | "Historical back-fill" and the deferred read routes of instrument-prices and fx-rates | [market-data-history](features/market-data-history.md) | landed 2026-11-25 |
-| 2 | V2 valuation as of a date | — | — | not specified |
+| 2 | V2 valuation as of a date | — | [account-valuation](features/account-valuation.md) | review 2026-11-26 |
 | 3 | V3 daily valuation run and stored valuations | "Still open: daily snapshots" (function-plan §5.4) | — | not specified |
 | 4 | V4 net worth history and reports as of a date | "Daily snapshots, historical series" and "FX fold" (net-worth Out) | — | not specified; optional for the business roadmap |
 
