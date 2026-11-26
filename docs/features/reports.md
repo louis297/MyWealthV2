@@ -25,7 +25,7 @@ related:
 
 # Reports
 
-Phase 3 domain. A catalog of reports plus execution infrastructure on `webapi` and the background `worker` (ADR 0017). Reports are not a single artefact. Each report declares its scope (`Customer` or `Book`), allowed triggers, and the parameters it requires. A shared pipeline handles grant checks, trigger checks, and enqueue; each report supplies its own parameter validation and scope rules.
+Phase 3 domain. A catalog of reports plus execution infrastructure on `webapi` and the background `worker` (ADR 0017). Reports are not a single artefact. Each report declares its scope (`Customer`, `Book` or `Tenant`), allowed triggers, and the parameters it requires. A shared pipeline handles grant checks, trigger checks, and enqueue; each report supplies its own parameter validation and scope rules.
 
 First phase ships two reports and both UI entry points:
 
@@ -40,7 +40,7 @@ Both support manual trigger and editable recurring schedules in the first phase.
 
 ## 1. Summary
 
-The platform owns a report catalog. Each report has an id, name, function description, scope (`Customer` or `Book`), and allowed trigger methods (manual / scheduled / event). Tenants are granted access via `TenantReports`. Schedules and executions must name a `ReportId`.
+The platform owns a report catalog. Each report has an id, name, function description, scope (`Customer`, `Book` or `Tenant`; `Tenant` from [bank-reconciliation.md](bank-reconciliation.md) R22), and allowed trigger methods (manual / scheduled / event). Tenants are granted access via `TenantReports`. Schedules and executions must name a `ReportId`.
 
 Policies are split by scope:
 
@@ -83,16 +83,16 @@ A shared request pipeline checks the coarse policy, the tenant grant, and allowe
 
 **Out**
 
-- Per-report policies finer than customer / book.
+- Per-report policies finer than the scope pairs (customer / book / tenant).
 - Historical as-of snapshots. The Adviser Balances Report for the end of a past day (`date`) is [valuation-history.md](valuation-history.md) R16–R20; a relative date in a schedule stays out.
 - FX fold.
 - Live vendor prices.
 - Email delivery of results.
-- Customer Portal (Customer uses Adviser Portal? No — Customer has no portal client yet; read policy is for a future client or for API completeness. First-phase UI is Adviser Portal only).
+- The Customer Portal pages. They are [customer-portal.md](../customer-portal/customer-portal.md); this spec owns only the routes and the Customer's policies (R5).
 - Concrete event bindings.
 - Fees, invitation, or other domains.
 
-Note: Customer has `reports.customer.read` but no first-phase UI. The policy exists so a later Customer Portal (or other client) can list and download without a policy change.
+Note: the Customer's client is the Customer Portal (client `customer-portal`). There a Customer lists and downloads the Customer-scoped executions that target them and requests one for themself (R5).
 
 ---
 
@@ -549,4 +549,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-24 | [dividends.md](dividends.md) | §9.1: a `Dividend` row |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
 | 2026-11-26 | [valuation-history.md](valuation-history.md) | R14, §7.1, §9.2: the optional `date` of the Adviser Balances Report; Out: historical as-of snapshots point there |
-| 2026-11-27 | — | §6: the seed paragraph points at §6.1, which already names the three demo grants. §1, story 4, §12: the Customer's `reports.customer.create` (R5) and the Tenant policies (R6) stated where the old "read only" text remained; the open question on Customer create is closed. No rule changed |
+| 2026-11-27 | — | Intro, §1, §2: the `Tenant` scope, and the Customer Portal as the Customer's client. §6: the seed paragraph points at §6.1, which already names the three demo grants. §1, story 4, §12: the Customer's `reports.customer.create` (R5) and the Tenant policies (R6) stated where the old "read only" text remained; the open question on Customer create is closed. No rule changed |
