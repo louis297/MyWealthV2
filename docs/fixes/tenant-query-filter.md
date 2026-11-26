@@ -3,7 +3,7 @@ title: Fix — Add EF global tenant query filter
 status: accepted
 language: en
 created: 2026-10-21
-updated: 2026-11-13
+updated: 2026-11-26
 related:
   - ../architecture.md
   - ../adr/0005-shared-database-tenantid-isolation.md
@@ -12,8 +12,6 @@ related:
 # Fix: Add EF global tenant query filter
 
 Status: accepted
-
-**Amendment 2026-11-13 (tenant composite keys, accepted, landed):** [tenant-composite-keys.md](tenant-composite-keys.md) adds `TenantId` to cash legs, security legs, `TransactionFxDetails` and `PortfolioLines`, so the filter covers them (`0027`). The sentence below about legs staying unfiltered is out of date.
 
 ## Problem
 
@@ -36,7 +34,7 @@ This pattern appears many times across Application handlers. A single omitted ch
 
 Add an EF Core global query filter on every tenant-scoped entity as a safety net. Keep the existing per-handler dual check.
 
-- Filter expression: `!engaged || TenantId == currentTenantId` on every mapped type that has `TenantId`, except `ApplicationUser` and OpenIddict. `UserToken` is included. Cash and security legs have no `TenantId` and stay unfiltered.
+- Filter expression: `!engaged || TenantId == currentTenantId` on every mapped type that has `TenantId`, except `ApplicationUser` and OpenIddict. `UserToken` is included. Cash legs, security legs, `TransactionFxDetails` and `PortfolioLines` carry `TenantId` since script `0027` ([tenant-composite-keys.md](tenant-composite-keys.md)), so the filter covers them too.
 - The filter is engaged only after a tenant id is known. A disengaged context matches every row, so schema tests, seeders, and SystemAdmin (null tenant) keep their current results. SystemAdmin handlers do not call `IgnoreQueryFilters()`; the filter is simply not engaged. `IgnoreQueryFilters()` remains the escape hatch for a query that must cross tenants while the filter is engaged.
 - The filter is configured once in `OnModelCreating`. Handlers continue to apply the explicit `Where` for non-SystemAdmin users. The filter is the backstop, not the only control.
 - Current tenant id is a scoped `ITenantIdAccessor` read by the `DbContext`. No ambient static state. A MediatR behaviour engages it from `ICurrentUser.TenantId` after authorization. Tenant-code login engages it after the tenant row is resolved. `ReportJob`, `RevokeTokensOnTenantDisabled` and `RebalanceJob` engage it from the row they loaded by public id (`RebalanceJob` since [tenant-composite-keys.md](tenant-composite-keys.md) B3).
