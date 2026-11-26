@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-19
-last_updated: 2026-11-25
+last_updated: 2026-11-26
 related:
   - ../custodial-roadmap.md
   - transaction-source.md
@@ -35,7 +35,9 @@ related:
 
 New ledger write on `webapi`. It is step 3 of [custodial-roadmap.md](../custodial-roadmap.md) §13 and covers roadmap item **F3** (controlled adjustment, first version, no review). It amends [posting.md](posting.md), [holdings.md](holdings.md), [custody-modes.md](custody-modes.md), [portfolios.md](portfolios.md), [reports.md](reports.md) and the two portal contracts.
 
-One new `TransactionType` (`Adjustment`), one new route (`POST /transactions/adjustment`), one new permission (`transactions.adjust`, TenantAdmin only), one new item field (`adjustment`). Script `0037_adjustments.sql` widens the type check and adds `TransactionAdjustmentDetails`. No new source kind and no problem code.
+This spec owns what an adjustment is: the `TransactionType` `Adjustment`, its shape, its reason, its checks, the permission `transactions.adjust` (TenantAdmin only) and the item field `adjustment`. How one is entered is [adjustment-review.md](adjustment-review.md): a TenantAdmin requests it and another TenantAdmin approves it, and the approval posts the Transaction. Script `0037_adjustments.sql` widens the type check and adds `TransactionAdjustmentDetails`. No problem code.
+
+This file states the rules as they are today. §13 lists what changed here, by date.
 
 **Status is `accepted` (2026-11-19), landed 2026-11-19.** The eight points of §11 were confirmed as recommended.
 
@@ -45,11 +47,11 @@ One change from §10 when it landed: there is no functional test of a security p
 
 ## 1. Summary
 
-An **adjustment** is a hand-entered correction on one Custodial account: a cash change, a holding change (quantity and cost of one instrument), or both, with a required **adjustment reason** and a required memo. Only a TenantAdmin may enter or reverse one.
+An **adjustment** is a hand-entered correction on one Custodial account: a cash change, a holding change (quantity and cost of one instrument), or both, with a required **adjustment reason** and a required memo. A TenantAdmin requests one, and a second TenantAdmin approves it. Nobody reverses one: a wrong adjustment is corrected by another.
 
 Why now: [transaction-source](transaction-source.md) took away the hand reverse of platform writes on a Custodial account (roadmap P6), and every later flow will write Transactions that a person cannot reverse. A break that is not a wrong hand entry, or a hand entry that can no longer be reversed (a `Buy` that is not the latest security activity on its holding), has no fix today. The adjustment is that fix.
 
-The rule that distinguishes this slice: an adjustment is a separate write with its own permission and a stated reason, not a hand type that anyone with `transactions.create` can enter. Reviewing it by a second person (roadmap X1) is later; in this version it is posted at once, like every other Transaction.
+The rule that distinguishes this slice: an adjustment is a separate write with its own permission and a stated reason, not a hand type that anyone with `transactions.create` can enter. A second person reviews it before it is posted ([adjustment-review.md](adjustment-review.md)); a Transaction still has no status.
 
 ---
 
@@ -101,42 +103,54 @@ The rule that distinguishes this slice: an adjustment is a separate write with i
 | ID | Rule |
 | --- | --- |
 | R1 | **Unchanged access rules.** posting R1–R4, leg-accounts R6–R8. 401 / 403 / 404, PublicId only. The Account must be in the caller's tenant; another tenant's Account or a missing one → 404. A disabled current tenant → 403. |
-| R2 | **Permission.** `POST /transactions/adjustment` requires the new permission `transactions.adjust`. Only TenantAdmin holds it. Adviser, Customer and SystemAdmin → 403. The permission is checked before the body is read, so a 403 never reveals whether the Account exists. |
+| R2 | **Permission.** An adjustment is requested with `POST /adjustment-requests`, which requires the permission `transactions.adjust`. Only TenantAdmin holds it. Adviser, Customer and SystemAdmin → 403. A TenantAdmin other than the requester approves the request, and the approval posts the `Adjustment` (adjustment-review R1–R9). No route posts an adjustment at once. |
 | R3 | **No `tenantId`.** The body must omit `tenantId` (400 if present), as for every TenantAdmin write (posting R4). No caller of this route names a tenant. |
 
 ### 4.2 The adjustment
 
 | ID | Rule |
 | --- | --- |
-| R4 | **Type and source.** An adjustment is a Transaction with `Type = Adjustment` (17) and source `Manual` with no id (transaction-source R4). The person is in `CreatedBy`. |
+| R4 | **Type and source.** An adjustment is a Transaction with `Type = Adjustment` (17). Posted from a request it has source `AdjustmentRequest` (11) with the request's PublicId, and `CreatedBy` is the approver (adjustment-review R13). An adjustment posted before 2026-11-25 has source `Manual` and keeps it. |
 | R5 | **Custodial only.** The Account must be Custodial. An External account → 400 with `errors.AccountId` and the message `An adjustment can be entered only on a Custodial account.` Nothing is written. The manual entry matrix (custody-modes R5) gains the row `Adjustment`: External **refused**, Custodial **allowed on its own route, with `transactions.adjust`**. |
 | R6 | **One Account, at most one cash leg and one security leg.** An adjustment books into the one `accountId` of the body. It has a cash part (`amount`), a holding part (`security`), or both. Neither → 400 with `errors` on the body (`At least one of amount and security is required.`). |
-| R7 | **Reason.** `reason` is required and is one of the `AdjustmentReason` names, matched exactly: `EntryError` (a hand entry was wrong and cannot be reversed), `CorporateAction` (a real corporate action the platform cannot record yet), `ReconciliationBreak` (the books disagree with an outside statement), `Other`. Missing or unknown → 400 `errors.Reason`. The list changes only in a spec. |
+| R7 | **Reason.** `reason` is required and is one of the `AdjustmentReason` names, matched exactly: `EntryError` (a hand entry was wrong and cannot be reversed), `CorporateAction` (a real corporate action the platform cannot record yet), `ReconciliationBreak` (the books disagree with an outside statement), `Other`. Missing or unknown → 400 `errors.Reason`. The list changes only in a spec. `CorporateAction` corrects one account after a corporate action was applied (for example a trade booked at the new price before the posting), not the whole event; a wrong ratio is corrected for every account by the inverse corporate action (corporate-actions R32). |
 | R8 | **Memo.** `memo` is required: trimmed, 1–200 characters. Missing or blank → 400 `errors.Memo`. The memo is shown to the Customer (§9). `reference` stays optional (posting R23). |
-| R9 | **Cash part.** `amount` is a signed book amount in the Account currency (posting R8): non-zero, with no more decimal places than the currency's `DecimalPlaces`. The body must not send a currency. After the adjustment the cash `SUM` of the Account must be `≥ 0` (posting R9), else 400. The cash leg has role `Principal` and no fee detail. |
+| R9 | **Cash part.** `amount` is a signed book amount in the Account currency (posting R8): non-zero, with no more decimal places than the currency's `DecimalPlaces`. The body must not send a currency. After the adjustment the cash `SUM` of the Account must be `≥ 0` (posting R9), else 400. The cash leg has role `Principal` and no fee detail. With a negative `amount`, the Account's **available cash** (cash `SUM` minus reserved cash, which counts open withdrawals and live buy orders) must also be `≥ 0`, checked under the Account lock: when the `SUM` stays `≥ 0` but falls below reserved cash → 400 with `Available cash cannot become negative: 300.00 USD is reserved for withdrawals.` (withdrawals R36, R37; orders R39). |
 | R10 | **Holding part.** `security` names one `instrumentId` (Instrument PublicId in the tenant, else 404), a signed `quantityChange` and a signed `costChange`. Either may be `0`, not both (400 `errors.Security`). `quantityChange` has at most 8 decimal places, `costChange` at most 4. Cost is in the instrument's quote currency (holdings R10); the body must not send a currency. |
-| R11 | **Holding after the adjustment.** Let quantity and cost be the holding's projection before the adjustment (0 and 0 when there is none). After it: quantity `≥ 0` and cost `≥ 0`; when quantity is `0`, cost must be `0`, because the projection row is deleted at zero (holdings R14). Any other result → 400 `errors.Security` with the message `The holding cannot have a negative quantity or cost, or a cost without a quantity.` A cost-only change (`quantityChange: 0`) needs an existing holding. |
+| R11 | **Holding after the adjustment.** Let quantity and cost be the holding's projection before the adjustment (0 and 0 when there is none). After it: quantity `≥ 0` and cost `≥ 0`; when quantity is `0`, cost must be `0`, because the projection row is deleted at zero (holdings R14). Any other result → 400 `errors.Security` with the message `The holding cannot have a negative quantity or cost, or a cost without a quantity.` A cost-only change (`quantityChange: 0`) needs an existing holding. An adjustment that lowers a holding's quantity must also leave its **available quantity** `≥ 0` (quantity minus the quantity reserved for live sell orders and open in-kind transfers `Out`); otherwise 400 `errors.Security` with the message `40 ACME.SIM is reserved for sell orders and transfers out.` (orders R40, in-kind-transfers R43). |
 | R12 | **Instrument state.** A disabled instrument is allowed only when the Account already holds it (a correction of an existing position). A disabled instrument with no holding → 400, as holdings R7. |
 | R13 | **Cost is the caller's number.** The server does not read a price, a rate or a fee schedule for an adjustment. The new security leg stores `quantityChange` and `costChange` as they are. It does not call the average-cost release (buy-sell): a negative `costChange` is the cost the TenantAdmin removes. |
-| R14 | **Booking time.** The server sets `bookedAt` (custody-modes R10, R12). A body that sends `bookedAt` → 400 `errors.BookedAt` with the custody-modes R10 message. |
-| R15 | **Account and Customer state.** Closed Account → 400 (posting R6). Disabled Customer → 400 `disabled` / `target=user` (posting R7). Checked after the Account is found and locked, before R5. |
+| R14 | **Booking time.** The server sets `bookedAt`: the time of the approval (custody-modes R10, R12; adjustment-review R9). A request body that sends `bookedAt` → 400 `errors.BookedAt` with the custody-modes R10 message. |
+| R15 | **Account and Customer state.** Closed Account → 400 (posting R6). Disabled Customer → 400 `disabled` / `target=user` (posting R7). Checked after the Account is found and locked, before R5. An adjustment on a closing account (an account closure `InProgress`) → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key, directly after the Closed-account check (account-closure R12). |
 | R16 | **Not a trade.** The portfolio trade lock (portfolios R18) does not apply to an adjustment or its reverse. An Active assignment stays as it is, and no rebalance is enqueued. The next rebalance sees the adjusted holding. |
 
 Order in the handler: request shape (R3, R6–R8, R10 decimal places, R14) → Account found and locked (R1) → R15 → R5 → idempotency → instrument (R10, R12) → R9 cash and R11 holding checks → insert. A refusal after the idempotency check writes no idempotency record, as on the other create routes.
+
+R3 and R5–R16 are checked twice: when the adjustment is requested and again, under the Account lock, when it is approved (adjustment-review R4, R9).
+
+What an adjustment corrects, since no platform write on a Custodial account is reversed by hand:
+
+- A fill booked wrongly. With reason `ReconciliationBreak` it also removes the cause of a fill that waits for cash or shares, which the next run then posts (orders R36, R37).
+- A rebalance trade posted before rebalances went through orders (rebalances R28).
+- A wrong entry of a posted migration batch, with reason `EntryError` (migration-batches R25).
+- A custody movement in suspense, a transfer set aside, or a wrong cost or quantity on a completed in-kind transfer (in-kind-transfers R18, R39, R41).
+- A dividend paid to one account in error, with reason `CorporateAction`. No flow reverses a paid dividend (dividends R42).
+
+The remainder write-off of an account closure is not an adjustment: it is a `CloseOut` with source `AccountClosure`, and R7 has no `Rounding` reason ([account-closure.md](account-closure.md) §11 point 6).
 
 ### 4.3 Reverse
 
 | ID | Rule |
 | --- | --- |
-| R17 | **Only with `transactions.adjust`.** `POST /transactions/{id}/reverse` of an `Adjustment` by a caller without `transactions.adjust` → 403. The check runs after the Transaction is found and visible (a Transaction the caller cannot see is still 404) and before every other reverse rule. An Adviser keeps `transactions.create` and reverses every other type as today. |
-| R18 | **Otherwise an ordinary reverse.** An adjustment has a hand-reversible source (`Manual`), so transaction-source R13 allows it. The Reversal has the opposite cash leg and the opposite security leg (posting R11, holdings R15), source `Manual`, and a copy of the adjustment detail. The latest security activity rule applies: an adjustment with a security leg can be reversed only while it is the latest security activity on that holding, and an adjustment is itself security activity that blocks the reverse of earlier trades. A Reversal of an adjustment is not itself an `Adjustment`; R17 does not apply to it, and it cannot be reversed (posting R11). |
+| R17 | **No reverse.** An `Adjustment` is never reversed by hand, by any caller, whatever its source: `POST /transactions/{id}/reverse` → 400 with `An adjustment cannot be reversed. Request a new adjustment that corrects it.` (adjustment-review R15). The check runs after the Transaction is found and visible (a Transaction the caller cannot see is still 404). |
+| R18 | Removed 2026-11-25 (adjustment-review R15): the ordinary reverse of an adjustment. No new Reversal carries an adjustment detail; a Reversal posted before keeps its copy. An adjustment with a security leg is still security activity that blocks the reverse of earlier trades on its holding. |
 
 ### 4.4 Other routes and reads
 
 | ID | Rule |
 | --- | --- |
 | R19 | **One create route.** `POST /transactions` with `type: "Adjustment"` → 400 `errors.Type`, the same refusal as `InternalTransfer` and `FxConversion` (api-design §7.7, type-specific create routes). |
-| R20 | **Idempotency.** `Idempotency-Key` is required (ADR 0015). Missing → 400. Same tenant, key and request hash → original `201 { id }`. Same key, different hash → 409. The request path is part of the hash. |
+| R20 | **Idempotency.** `POST /adjustment-requests` requires `Idempotency-Key` (ADR 0015; adjustment-review R3). |
 | R21 | **Item.** The transaction item gains `adjustment`: `{ "reason": "<AdjustmentReason name>" }` on an `Adjustment` and on its Reversal, `null` on every other Transaction. Every caller who can read the Transaction sees it, the Customer included. `GET /transactions?type=Adjustment` lists adjustments (internal-transfers, `type` filter). |
 | R22 | **Balances and reads.** Cash balance, holdings, net worth and the Adviser Balances Report add the adjustment's legs like any other legs. They do not distinguish adjustments. |
 | R23 | **Customer Transactions Report.** An adjustment row shows the type cell `Adjustment (<reason label>)` with the labels of §9, and its memo as on every row. Its Reversal shows `Reversal` as today. Parameters and the rest of the report do not change. |
@@ -224,8 +238,8 @@ Update [database-design.md](../database-design.md) §9 and §11.4 when this spec
 
 | Method | Route | Policy | Success | Failure |
 | --- | --- | --- | --- | --- |
-| POST | `/transactions/adjustment` | `transactions.adjust` | 201 `{ "id" }`, `Location: /transactions/{id}` | 400 / 401 / 403 / 404 / 409 |
-| POST | `/transactions/{id}/reverse` | `transactions.create` (unchanged) | 201 `{ "id" }` | adds 403 for an `Adjustment` without `transactions.adjust` (R17) |
+| POST | `/adjustment-requests` | `transactions.adjust` | 201 `{ "id" }` of the request ([adjustment-review.md](adjustment-review.md) §8). `POST /transactions/adjustment` was removed on 2026-11-25 | 400 / 401 / 403 / 404 / 409 |
+| POST | `/transactions/{id}/reverse` | `transactions.create` (unchanged) | — | 400 for an `Adjustment` (R17) |
 | POST | `/transactions` | `transactions.create` (unchanged) | — | 400 for `type: "Adjustment"` (R19) |
 | GET | `/transactions`, `/transactions/{id}` | `transactions.read` (unchanged) | item has `adjustment` | — |
 
@@ -315,9 +329,9 @@ Reason labels, used by both portals and the report:
 | ID | Behaviour |
 | --- | --- |
 | D28 | `/accounts/:id` shows an "Adjust" action only to a TenantAdmin, only on an Open Custodial account. It opens `/accounts/:id/adjust`. An Adviser never sees it. |
-| D29 | `/accounts/:id/adjust`: Reason (select, required), Memo (required, with the hint "The customer sees this memo"), an optional cash change (signed, in the Account currency), and an optional holding change (instrument picker from the Account's holdings plus `GET /instruments?enabledOnly=true`, signed quantity change, signed cost change in the quote currency). No booked-at input. Review lists the changes as entered ("Cash −0.60 USD; AAPL quantity 0, cost +0.60 USD"); the form does no balance arithmetic. Confirm posts `POST /transactions/adjustment` with one `Idempotency-Key` per form open. A 400 is shown at its field, or as the sentence when it has none. |
+| D29 | `/accounts/:id/adjust`: Reason (select, required), Memo (required, with the hint "The customer sees this memo"), an optional cash change (signed, in the Account currency), and an optional holding change (instrument picker from the Account's holdings plus `GET /instruments?enabledOnly=true`, signed quantity change, signed cost change in the quote currency). No booked-at input. Review lists the changes as entered ("Cash −0.60 USD; AAPL quantity 0, cost +0.60 USD"); the form does no balance arithmetic. Confirm posts `POST /transactions/adjustment` with one `Idempotency-Key` per form open. A 400 is shown at its field, or as the sentence when it has none. The form posts an adjustment request (adjustment-review D102–D106). |
 | D30 | `/transactions/:id` of an `Adjustment` or its Reversal shows a "Reason" line with the label, under the Source line (D26). `/transactions` shows the type as "Adjustment" like any other type name. |
-| D31 | Reverse on an `Adjustment` (D27 conditions plus this one) is offered only to a TenantAdmin. A 403 from reverse shows "Only a firm administrator can reverse an adjustment." |
+| D31 | Removed 2026-11-25: an adjustment is not reversed (adjustment-review D102–D106). |
 
 **Customer Portal**
 
@@ -335,15 +349,13 @@ None.
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `PostAdjustment`: cash only, security only, both; neither → throws; blank memo → throws; `amount: 0` → throws; both changes `0` → throws; cash `SUM` below zero → throws; quantity or cost below zero → throws; quantity `0` with cost left → throws; quantity to `0` with cost to `0` → allowed; Bank or Cash account with a security part → throws; the detail holds the reason; source is the one passed. `Reverse` of an adjustment: opposite legs and a copy of the detail. `CustodyRules.RefusalMessage` for `Adjustment` on both modes |
-| Application.FunctionalTests — create | No Bearer → 401 not 302; Adviser, Customer, SystemAdmin → 403 (and 403, not 404, for an unknown `accountId`); TenantAdmin happy paths: cash in, cash out, a new holding (quantity and cost from zero), a split by hand (`quantityChange` only), a cost-only change, cash and holding together; cash balance and holding projection after each; item `type` `Adjustment`, `source` `{ Manual, null }`, `adjustment.reason`, `bookedAt` set by the server. Each 400 of §8.2 with its field. External account → 400 `errors.AccountId`, nothing written. Disabled instrument with and without an existing holding. Account with an Active portfolio assignment → 201, assignment unchanged, no rebalance enqueued. Closed Account → 400; Disabled Customer → 400 `disabled` / `target=user`. `POST /transactions` with `Adjustment` → 400. Idempotency: missing key 400, replay same id, different hash 409. Cross-tenant: tenant B's Account or Instrument → 404 |
-| Application.FunctionalTests — reverse and reads | TenantAdmin reverses an adjustment → 201, legs opposite, Reversal `adjustment.reason` equal, balances back. Adviser reverses an adjustment on an assigned Customer's account → 403, nothing written; Adviser reverses another type on the same account → 201. An adjustment with a security leg blocks the reverse of an earlier `Buy` on that holding (latest security activity), and is itself reversible only while latest. `GET /transactions?type=Adjustment` lists it; every other item has `adjustment: null`; the Customer reads it on their own account. Tenant B's adjustment → 404 on get and reverse |
-| Application.FunctionalTests — report | Customer Transactions Report with an adjustment and its Reversal: the type cells `Adjustment (Entry error)` and `Reversal` (assert on the generator's row model, as the existing report tests do) |
-| Infrastructure.IntegrationTests | Script `0037` on a scratch database: `Type = 17` inserts; `Type = 18` violates the check; a detail with `Reason = 4` violates its check; a detail whose `TenantId` differs from its Transaction's violates the composite FK; existing rows unchanged |
-| Adviser Portal | Adjust action and route for a TenantAdmin on an Open Custodial account only; form posts the body of §8.1 with no `bookedAt`; field 400s shown at their inputs; Reason line on the detail page; Reverse on an adjustment shown to a TenantAdmin, hidden from an Adviser |
-| Customer Portal | An adjustment row labelled "Adjustment" with its memo |
+| Domain.UnitTests | `Entities/AdjustmentTests.cs`; folder `AdjustmentRequests/` |
+| Application.FunctionalTests | `Transactions/Adjustment*Tests.cs` (fixture `AdjustmentWorld`); folder `AdjustmentRequests/` |
+| Infrastructure.IntegrationTests | `AppliedSchema/AdjustmentsSchemaTests.cs`, `AppliedSchema/AdjustmentRequestsSchemaTests.cs` |
 
 ---
 
@@ -353,21 +365,21 @@ No new ADR. Roadmap F3, principle P6 and decision D5 gave the direction.
 
 | Item | Lock |
 | --- | --- |
-| Type | `Adjustment = 17`, its own route `POST /transactions/adjustment` |
-| Permission | `transactions.adjust`, TenantAdmin only; also required to reverse an adjustment |
+| Type | `Adjustment = 17`, posted only by the approval of an adjustment request |
+| Permission | `transactions.adjust`, TenantAdmin only |
 | Custody mode | Custodial only |
 | Shape | One Account; optional signed cash `amount`; optional one-instrument holding change (`quantityChange`, `costChange`); at least one |
 | Reason | Required `AdjustmentReason`: `EntryError`, `CorporateAction`, `ReconciliationBreak`, `Other`; memo required |
-| Source | `Manual`; no new source kind |
-| Storage | `TransactionAdjustmentDetails`, one per adjustment and per its Reversal |
+| Source | `AdjustmentRequest` with the request's PublicId; `Manual` on adjustments posted before 2026-11-25 |
+| Storage | `TransactionAdjustmentDetails`, one per adjustment |
 | Trade lock | Does not apply |
 | Item | `adjustment: { reason }` or `null` |
 | Script | `0037_adjustments.sql`, forward only |
-| Review | None in this version; no Transaction status |
+| Review | On the adjustment request, before anything is posted ([adjustment-review.md](adjustment-review.md)); no Transaction status |
 
 ### Confirmed when this spec was accepted (2026-11-19)
 
-Each point was confirmed as recommended and is written into the rules above as stated here. The alternatives are kept for the record.
+Each point was confirmed as recommended. The alternatives are kept for the record. Points 3 and 4 were later replaced by [adjustment-review.md](adjustment-review.md): an adjustment is never reversed, and one posted from a request has source `AdjustmentRequest`.
 
 1. **Custodial only** (R5). Decided: refuse on External accounts. They keep every hand type (`Interest`, `StockIn`, `StockOut`, `Split`, …), so they have a correction already, and roadmap target 5 keeps them as they are. Alternative: allow on both modes, so an External account also gets a reason-coded correction.
 2. **TenantAdmin only, SystemAdmin not granted** (R2). Decided: as roadmap F3 says, and like the four report policies that SystemAdmin does not hold. Alternative: grant SystemAdmin too, with `tenantId` on the body as on `POST /transactions`, for support through Scalar.
@@ -380,109 +392,26 @@ Each point was confirmed as recommended and is written into the rules above as s
 
 Still open, not this slice:
 
-- Review by a second person and a status on the Transaction (roadmap X1)
 - An operations role when one TenantAdmin doing everything breaks the four-eyes rule (roadmap D5)
 - Linking an adjustment to a reconciliation break (roadmap B7, T3)
-- Whether a later flow (account closure, roadmap B8) writes `Adjustment` with its own source
 
 ---
 
-## 12. Suggested commits
-
-The repository should build after each commit. Agents split each behaviour into red then green.
-
-1. Store an adjustment (R4, R6–R11, R13): `TransactionType.Adjustment`, `AdjustmentReason`, `TransactionAdjustmentDetail`, `PostAdjustment`, `Reverse` copies the detail, EF mapping, script `0037`. Domain unit tests and the script integration test. The script and the mapping land together.
-2. The permission and the route (R1–R3, R5, R12, R14–R16, R19, R20): `transactions.adjust` in `Policies` and `RolePermissions`, `CustodyRules` row, `CreateAdjustment`, `POST /transactions/adjustment`, `POST /transactions` refuses the type + functional tests.
-3. `adjustment` on the transaction item (R21, R22) + functional tests.
-4. Reverse needs `transactions.adjust` (R17, R18) + functional tests.
-5. Customer Transactions Report reason (R23) + tests.
-6. Adviser Portal: Adjust action and form, Reason line, Reverse for TenantAdmin only (D28–D31) + frontend tests. Customer Portal label + test.
-7. Repo docs: mark this file landed; update roadmap §13 step 3; remove the row "No correction other than reverse" from [known-issues/custodial-account-gaps.md](../known-issues/custodial-account-gaps.md).
-
-Do not put a review status, an operations role, a reconciliation or a new source kind in these commits.
-
-### Docs amended when this spec was accepted
+## 12. Docs changed when this spec was accepted
 
 [posting.md](posting.md) (amendment note; R16 type set), [holdings.md](holdings.md) (amendment note: a holding change outside the trade types), [custody-modes.md](custody-modes.md) (matrix row `Adjustment`), [portfolios.md](portfolios.md) (R18 does not apply), [reports.md](reports.md) (§9.1 type cell), [api-design.md](../api-design.md) (§3.1 permission row, §7.7 route and item note, change log), [domain-model.md](../domain-model.md) §8.6, [database-design.md](../database-design.md) §9 and §11.4, [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D28–D31), [customer-portal.md](../customer-portal/customer-portal.md) (label), [function-plan.md](../function-plan.md) §9 item, [features/README.md](README.md) row status, the roadmap §13 status.
 
 ---
 
-## Amendment 2026-11-20 (available cash) — accepted
+## 13. History
 
-Status of this amendment: `accepted` (2026-11-20), together with [withdrawals.md](withdrawals.md).
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/adjustments.md`).
 
-- R9: after an adjustment with a negative `amount`, the Account's **available cash** (cash `SUM` minus the reserved cash of open withdrawals) must be `≥ 0`, checked under the Account lock. When the `SUM` stays `≥ 0` but falls below reserved cash → 400 with `Available cash cannot become negative: 300.00 USD is reserved for withdrawals.` (withdrawals R37). The reverse of an adjustment that lowers cash follows the same rule.
-
----
-
-## Amendment 2026-11-22 (account closure) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [account-closure.md](account-closure.md).
-
-- R15: an adjustment on a closing account (an account closure `InProgress`), and the reverse of one, → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key, directly after the Closed-account check (account-closure R12).
-- §2 Out, the B8 write-off: decided in [account-closure.md](account-closure.md) §11 point 6. The remainder write-off is a `CloseOut` with source `AccountClosure`, not an `Adjustment`; R7 gains no `Rounding` reason and R9 is unchanged.
-
----
-
-## Amendment 2026-11-22 (corporate actions) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md).
-
-- R7: the reason `CorporateAction` stays. It now corrects one account after a corporate action was applied (for example a trade booked at the new price before the posting), not the whole event; a wrong ratio is corrected for every account by the inverse corporate action (corporate-actions R32).
-
----
-
-## Amendment 2026-11-23 (orders and settlement) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R36, R37 and R40 live there; this section records what changes here.
-
-- R11: on a Custodial account an adjustment that lowers a holding's quantity must also leave the holding's available quantity `≥ 0` (quantity minus the quantity reserved for live sell orders); otherwise 400 `errors.Security` with the message `40 ACME.SIM is reserved for sell orders.` (orders R40).
-- R9: reserved cash now also counts live buy orders (orders R39); the rule and its message follow withdrawals R36 and R37 as amended.
-- Use: a fill is not hand-reversible, so a fill booked wrongly is corrected with an adjustment; and an adjustment with reason `ReconciliationBreak` removes the cause of a fill that waits (not enough cash or shares), which the next run then posts (orders R36, R37).
-
----
-
-## Amendment 2026-11-23 (rebalance through orders) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rule R24 lives there; this section records what changes here.
-
-- R16: unchanged. An adjustment stays outside the trade lock, and the next rebalance plans from the adjusted holding. An adjustment is how a rebalance trade posted before this slice is corrected on a Custodial account, now that it is not hand-reversible (rebalances R28).
-
----
-
-## Amendment 2026-11-24 (migration batches) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rule R25 lives there; this section records what changes here.
-
-- Use: a posted migration batch is not reversed. A wrong entry is corrected with an adjustment (reason `EntryError`) on the account.
-
----
-
-## Amendment 2026-11-24 (in-kind transfers) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R18, R39, R41 and R43 live there; this section records what changes here.
-
-- The reserved quantity of a holding now counts open in-kind transfers `Out`; the refusal of an adjustment that lowers a holding below it reads `40 ACME.SIM is reserved for sell orders and transfers out.`
-- An adjustment is the correction after a custody movement in suspense, a transfer set aside, or a wrong cost or quantity on a completed transfer (reasons `ReconciliationBreak`, `EntryError`, `CorporateAction`).
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R42 lives there; this section records what changes here.
-
-- A note: a dividend paid to one account in error is corrected with an adjustment with reason `CorporateAction`. No flow reverses a paid dividend.
-
----
-
-## Amendment 2026-11-25 (adjustment review) — accepted
-
-Status of this amendment: `accepted` (2026-11-25), together with [adjustment-review.md](adjustment-review.md). Rules R1–R21 live there; this section records what changes here.
-
-- §1, R2, R20 and §8: a TenantAdmin no longer posts an adjustment. `POST /transactions/adjustment` and `CreateAdjustment` are removed. An adjustment is requested with `POST /adjustment-requests` (the same body, `transactions.adjust`, `Idempotency-Key`), and a TenantAdmin other than the requester approves it. The approval posts the `Adjustment`.
-- R3 and R5–R16 are unchanged and are checked twice: when the adjustment is requested and again, under the Account lock, when it is approved. `bookedAt` is the time of the approval.
-- R4: an `Adjustment` posted from a request has source `AdjustmentRequest` (11) with the request's PublicId. `CreatedBy` is the approver. Adjustments posted before keep `Manual`. This takes back §11 point 4 for new adjustments.
-- R17, R18: replaced. An `Adjustment` is never reversed by hand, by any caller, whatever its source: 400 with `An adjustment cannot be reversed. Request a new adjustment that corrects it.` The 403 of R17 is gone. No new Reversal carries an adjustment detail; existing ones keep theirs.
-- R21–R24 are unchanged.
-- §9: D29 posts the request and D31 is removed (adjustment-review D102–D106).
-- §11 "Review: none in this version" and the first "Still open" item are answered by [adjustment-review.md](adjustment-review.md): the review is on the request, and a Transaction gets no status.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-20 | [withdrawals.md](withdrawals.md) | R9: available cash |
+| 2026-11-22 | [account-closure.md](account-closure.md), [corporate-actions.md](corporate-actions.md) | R15: a closing account. R7: what `CorporateAction` corrects |
+| 2026-11-23 | [orders.md](orders.md), [rebalances.md](rebalances.md) | R9, R11: reserved cash and available quantity. §4.2: what an adjustment corrects |
+| 2026-11-24 | [migration-batches.md](migration-batches.md), [in-kind-transfers.md](in-kind-transfers.md), [dividends.md](dividends.md) | R11: transfers out reserve quantity. §4.2: what an adjustment corrects |
+| 2026-11-25 | [adjustment-review.md](adjustment-review.md) | §1, R2, R4, R14, R17, R18, R20, §8, §11: an adjustment is requested and approved, and never reversed |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
