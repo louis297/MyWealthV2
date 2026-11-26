@@ -21,6 +21,40 @@ public static class FxFold
         string reportingCurrency,
         int decimalPlaces,
         IReadOnlyDictionary<string, StoredRate> rates,
-        DateOnly day) =>
-        new(reportingCurrency, [], 0m, false);
+        DateOnly day)
+    {
+        var lines = totals
+            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+            .Select(entry => Line(entry.Key, entry.Value, reportingCurrency, decimalPlaces, rates, day))
+            .ToList();
+        var total = lines.Where(line => line.Status == FoldLineStatus.Folded).Sum(line => line.Value!.Value);
+        return new FoldedTotal(reportingCurrency, lines, total, lines.All(line => line.Status == FoldLineStatus.Folded));
+    }
+
+    private static FoldLine Line(
+        string currency,
+        decimal total,
+        string reportingCurrency,
+        int decimalPlaces,
+        IReadOnlyDictionary<string, StoredRate> rates,
+        DateOnly day)
+    {
+        if (currency == reportingCurrency)
+        {
+            return new FoldLine(currency, total, FoldLineStatus.Folded, null, total);
+        }
+
+        if (!rates.TryGetValue(currency, out var rate))
+        {
+            return new FoldLine(currency, total, FoldLineStatus.NoRate, null, null);
+        }
+
+        if (!ValuationRules.IsFresh(rate.AsOfDate, day))
+        {
+            return new FoldLine(currency, total, FoldLineStatus.StaleRate, rate, null);
+        }
+
+        var value = decimal.Round(total * rate.Rate, decimalPlaces, MidpointRounding.AwayFromZero);
+        return new FoldLine(currency, total, FoldLineStatus.Folded, rate, value);
+    }
 }
