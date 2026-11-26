@@ -32,4 +32,17 @@ public class ValuationRun : BaseAuditableEntity
     public int DaysValued { get; private set; }
 
     public int DaysIncomplete { get; private set; }
+
+    public static ValuationRun Start(
+        int tenantId,
+        DateOnly throughDate,
+        ValuationRunTrigger trigger,
+        int? ranByUserId,
+        DateTimeOffset startedAt,
+        Guid? publicId = null) =>
+        throw new NotImplementedException();
+
+    /// <summary>R13: the run ended with these counts; once.</summary>
+    public void Complete(int accountsProcessed, int accountsFailed, int daysValued, int daysIncomplete, DateTimeOffset completedAt) =>
+        throw new NotImplementedException();
 }

@@ -113,6 +113,10 @@ public class Account : BaseAuditableEntity
         InterestAccruedThrough = through;
     }
 
+    /// <summary>Valuation-run R5: a stored valuation of <paramref name="day"/> was written. Only on a Custodial account,
+    /// and only to the day after <see cref="ValuedThrough"/>; the first day is checked by the caller, which knows it.</summary>
+    public void MarkValued(DateOnly day) => throw new NotImplementedException();
+
     /// <summary>Dividends R17: the standing reinvestment election, set by <paramref name="byUserId"/>.</summary>
     public void SetDividendReinvestment(bool reinvest, int byUserId, DateTimeOffset at)
     {

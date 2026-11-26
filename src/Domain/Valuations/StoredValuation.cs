@@ -38,6 +38,11 @@ public class StoredValuation
     public DateTimeOffset ValuedAt { get; private set; }
 
     public IReadOnlyList<StoredValuationLine> Lines => _lines;
+
+    /// <summary>R8: copies <paramref name="valuation"/> of the Account <paramref name="accountId"/>, stored by the run
+    /// <paramref name="runId"/> at <paramref name="at"/>. The only way to build one.</summary>
+    public static StoredValuation From(int tenantId, int accountId, AccountValuation valuation, int runId, DateTimeOffset at) =>
+        throw new NotImplementedException();
 }
 
 /// <summary>One line of a stored valuation: a <see cref="ValuationLine"/> with the price row and the rate row it
