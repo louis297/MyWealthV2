@@ -70,9 +70,10 @@ public class FxRateReadTests
             await TestSeed.SeedAsync(db, CancellationToken.None);
             await TestSeed.SeedAsync(db, CancellationToken.None);
 
-            var rows = await db.FxRates.AsNoTracking().ToListAsync();
+            // Valuation run §9.1: one row of each pair for every day from 2026-01-02 to 2026-03-31 too.
+            (await db.FxRates.AsNoTracking().CountAsync()).ShouldBe(10 * 90);
+            var rows = await db.FxRates.AsNoTracking().Where(row => row.AsOfDate == new DateOnly(2026, 1, 1)).ToListAsync();
             rows.Count.ShouldBe(10);
-            rows.ShouldAllBe(row => row.AsOfDate == new DateOnly(2026, 1, 1));
             rows.ShouldAllBe(row => row.Source == "Frankfurter");
             Pair(rows, "USD", "NZD").ShouldBe(1.50000000m);
             Pair(rows, "USD", "AUD").ShouldBe(1.40000000m);

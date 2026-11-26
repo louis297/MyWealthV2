@@ -103,7 +103,8 @@ public class DevelopmentSeedSecondFirmTests : TestBase
             var currencies = json.RootElement.GetProperty("currencies").EnumerateArray().ToList();
             currencies.Select(row => row.GetProperty("currency").GetString()).ShouldBe(["NZD", "USD"]);
             AssertCurrency(currencies[0], "NZD", cash: 100m, holdings: 0m);
-            AssertCurrency(currencies[1], "USD", cash: 6900m, holdings: 21600m);
+            // Valuation run §9.1: the Custodial account sold 10 VTI at 252.50 and received 5,000.00.
+            AssertCurrency(currencies[1], "USD", cash: 14425m, holdings: 19100m);
             json.RootElement.GetProperty("breakdowns").GetProperty("byCustomer").EnumerateArray()
                 .Select(row => row.GetProperty("name").GetString())
                 .ShouldBe([TestSeed.SecondCustomerName]);
