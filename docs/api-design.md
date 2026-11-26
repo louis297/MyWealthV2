@@ -3,7 +3,7 @@ title: API design
 status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-25
+updated: 2026-11-26
 related:
   - README.md
   - glossary.md
@@ -41,11 +41,11 @@ Browser
 | `src/IdentityHost` | `identity` | Authorization server: OpenIddict default paths + hosted login |
 | `src/Web` | `webapi` | Resource API: Minimal API → MediatR; Scalar; Bearer validation only |
 
-The portal (`adviser-portal`) does not issue tokens. It redirects to `identity`, stores access / refresh after the callback, and calls `webapi` with Bearer.
+A first-party portal does not issue tokens, and its browser does not hold them. The portal's BFF is the OIDC client: it runs the authorization code flow against `identity`, keeps the access and refresh tokens server-side and calls `webapi` with Bearer ([ADR 0016](adr/0016-bff-for-first-party-portals.md), [features/bff-adviser-portal.md](features/bff-adviser-portal.md), [features/bff-customer-portal.md](features/bff-customer-portal.md)).
 
 A third process, the simulator (`simulator`, [features/simulator.md](features/simulator.md) §8, landed 2026-11-19), has its own HTTP surfaces: a control surface for a person behind sign-in on client `simulator`, and a party surface for the platform behind an API key on an internal port. Neither is a `webapi` resource, and the conventions in this document do not apply to them.
 
-Phase 1 registers one public OIDC client: `adviser-portal`. IdentityHost allows TenantAdmin and Adviser on that client (SystemAdmin removed by identity-auth amendment 2026-11-11; SystemAdmin signs in through `back-office`). A Customer with a correct password does not receive an authorization code for it. Customer Portal is a later second client; it is not registered in Phase 1. Adviser-management resource routes stay 403 for Customer.
+OIDC clients and the roles each allows: `adviser-portal` (TenantAdmin, Adviser), `customer-portal` (Customer), `back-office` (SystemAdmin) and `simulator` (SimulatorOperator). The two portal clients are confidential and held by their BFF (ADR 0016). The client × role allow-list is identity-auth's: a Customer with a correct password does not receive an authorization code for `adviser-portal`. Adviser-management resource routes stay 403 for Customer.
 
 ---
 
@@ -100,7 +100,7 @@ Protocol scopes (not permissions): `openid`, `profile`, `offline_access`, `api`.
 | SystemAdmin | Hosted login on `back-office`, no tenantCode. `adviser-portal` issues no code (identity-auth amendment 2026-11-11) | `/tenants` manage + `GET /tenants/by-code/{code}`, `/users/tenant-admins`, `/users/me`, `/currencies` |
 | TenantAdmin | Hosted login on `adviser-portal` + tenantCode | `/users/advisers`, tenant `/users/customers`, `GET /tenants/by-code/{own}`, `/users/me`, `/currencies` |
 | Adviser | Hosted login on `adviser-portal` + tenantCode | Assigned `/users/customers`, `GET /tenants/by-code/{own}`, `/users/me`, `/currencies` |
-| Customer | Login principal; `adviser-portal` issues no code. Tokens wait for `customer-portal` | `/users/me` and `/currencies` only, on a client that allows Customer. `/users/advisers`, `/users/customers`, `/users/tenant-admins`, `/tenants` including by-code → 403 |
+| Customer | Hosted login on `customer-portal` + tenantCode. `adviser-portal` issues no code | The routes §3.1 grants a Customer, for the caller's own data only. `/users/advisers`, `/users/customers`, `/users/tenant-admins`, `/tenants` including by-code → 403 |
 
 Disable / enable for people: `POST /{id}/disable`, `POST /{id}/enable` (`Disabled` ↔ `Active`). Not a physical delete. Disabling an Adviser requires assigned non-disabled Customers to be handled first. Disabling the last TenantAdmin is allowed in Phase 1 (known gap).
 
@@ -287,21 +287,21 @@ Protocol paths use **OpenIddict defaults. Do not remap.** Portals and `webapi` f
 | Userinfo | `GET /connect/userinfo` | Library default; Phase 1 portal mainly uses access-token claims |
 | Hosted login | Password page on `identity` | email + password + tenantCode (SystemAdmin omits tenantCode). **Not** a `/connect` protocol endpoint. Razor Pages at `/login` |
 
-**Phase 1 client**
+**Portal client**
 
 | Item | Value |
 | --- | --- |
-| ClientId | `adviser-portal` |
-| Type | Public client + PKCE |
+| ClientId | `adviser-portal`. `customer-portal` has the same shape ([features/bff-customer-portal.md](features/bff-customer-portal.md) R10, R11) |
+| Type | Confidential client + PKCE, held by the portal's BFF; the secret is in host configuration (ADR 0016) |
 | Grant | Authorization code + refresh. Password grant off |
-| Redirect | `{portalOrigin}/callback` |
-| Post-logout | `{portalOrigin}/` |
+| Redirect | `{bffOrigin}/signin-oidc` ([features/bff-adviser-portal.md](features/bff-adviser-portal.md) R11) |
+| Post-logout | `{bffOrigin}/` |
 
 **Out (authorization server)**
 
 - Custom `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout` as a token issuer
 - Resource Owner Password Credentials
-- The later `customer-portal` client
+- A public client that keeps tokens in the browser (ADR 0016)
 - A separate identity SQL database
 - Invitation, forgot-password, MFA, external IdP
 
@@ -414,16 +414,23 @@ Lookup: `GET /tenants/by-code/{code}` uses `tenants.read` (SystemAdmin, TenantAd
 | POST | `/tenants/{id}/disable` | `tenants.manage` | 204 |
 | POST | `/tenants/{id}/enable` | `tenants.manage` | 204 |
 
-- POST body: `name`, `code`, `reportingCurrency`
-- PUT body: `name`, `reportingCurrency`, `rowVersion`
-- `code` is immutable after create (login key). Reporting currency may change in this phase (no ledger balances keyed on it yet).
+- POST body: `name`, `code`, `reportingCurrency`, required `allowedCustodyModes` (array of `External` / `Custodial`, non-empty, no repeats; bad shape → 400 `errors.AllowedCustodyModes`), optional `brokerConnection` (a name from configuration, else 400 `errors.BrokerConnection`)
+- PUT body: `name`, `reportingCurrency`, `rowVersion`; optional `allowedCustodyModes` and `brokerConnection` (omitted, or `null` for the connection, = unchanged)
+- The item on list, get and by-code carries `allowedCustodyModes`, `clientMoneyCurrencies` and `brokerConnection` (`null` when none).
+- `code` is immutable after create (login key). Reporting currency may change (no ledger balance is keyed on it).
 - After disable, that Code must not complete login; existing refresh fails once the outbox delivers `TenantDisabled`. Its people get 403 from `webapi` at once. Person `Status` is not bulk-updated.
-- Field rules: [features/tenants.md](features/tenants.md).
-- Amendment 2026-11-18 (tenant custody modes, accepted, landed; field rules in [features/tenant-custody-modes.md](features/tenant-custody-modes.md)): POST body adds required `allowedCustodyModes` (array of `External` / `Custodial`, non-empty, no repeats); PUT body may carry it (omitted = unchanged); the item on list, get and by-code carries it. Bad shape → 400 `errors.AllowedCustodyModes`. `POST /accounts` with a custody mode the Tenant does not allow → 400 `errors.CustodyMode`. No new route, policy or problem code.
-- Amendment 2026-11-20 (client money accounts, accepted; field rules in [features/client-money-accounts.md](features/client-money-accounts.md)): sub-resource `/tenants/{tenantId}/client-money-accounts` with list, get, create (201 `{ id }`), `POST …/{id}/disable` and `POST …/{id}/enable` (`rowVersion`), all `tenants.manage`. No PUT. One active row per currency and an account number active on one row only, else 400 `errors.Currency` / `errors.AccountNumber`. The tenant item on list, get and by-code carries `clientMoneyCurrencies`. No new policy or problem code.
-- Amendment 2026-11-20 (bank feed and deposit matching, accepted; field rules in [features/deposit-matching.md](features/deposit-matching.md)): creating a client money account requires `bankConnection`, a name from configuration (else 400 `errors.BankConnection`); the item carries `bankConnection` and `bankFeed` (`{ lastSucceededAt, lastFailedAt, lastFailure }` or `null`). `GET /bank-connections` (`tenants.manage`) lists the configured connections without secrets.
-- Amendment 2026-11-23 (orders and settlement, accepted; field rules in [features/orders.md](features/orders.md) R3, R4): POST and PUT bodies take an optional `brokerConnection`, a name from configuration (else 400 `errors.BrokerConnection`); omitted or `null` on PUT leaves it unchanged. The item carries `brokerConnection` (`null` when none). `GET /broker-connections` (`tenants.manage`) lists the configured names with the state of each execution report feed, and `GET /execution-reports` (`tenants.manage`) lists the stored reports.
-- Amendment 2026-11-24 (in-kind transfers, accepted; field rules in [features/in-kind-transfers.md](features/in-kind-transfers.md) R2–R7): sub-resource `/tenants/{tenantId}/safekeeping-accounts` with list, get, create, disable and enable (no PUT), one active per currency; `GET /custodian-connections` lists the configured custodian connections. Both `tenants.manage`.
+- Field rules: [features/tenants.md](features/tenants.md), [features/tenant-custody-modes.md](features/tenant-custody-modes.md), [features/orders.md](features/orders.md) R3, R4.
+
+Sub-resources and configuration lists of a Tenant, all `tenants.manage`, with no problem code of their own:
+
+| Route | Verbs | Notes |
+| --- | --- | --- |
+| `/tenants/{tenantId}/client-money-accounts` | list, get, create (201 `{ id }`), `POST …/{id}/disable`, `POST …/{id}/enable` (`rowVersion`). No PUT | One active row per currency and an account number active on one row only, else 400 `errors.Currency` / `errors.AccountNumber`. Create requires `bankConnection`, a name from configuration (else 400 `errors.BankConnection`). The item carries `bankConnection` and `bankFeed` (`{ lastSucceededAt, lastFailedAt, lastFailure }` or `null`). [features/client-money-accounts.md](features/client-money-accounts.md), [features/deposit-matching.md](features/deposit-matching.md) |
+| `/tenants/{tenantId}/safekeeping-accounts` | list, get, create, disable, enable. No PUT | One active per currency. [features/in-kind-transfers.md](features/in-kind-transfers.md) R2–R7 |
+| `GET /bank-connections` | list | The configured bank connections, without secrets |
+| `GET /broker-connections` | list | The configured names with the state of each execution report feed and `settlementCurrencies` |
+| `GET /execution-reports` | list | The stored reports (filters `connection`, `status`) |
+| `GET /custodian-connections` | list | The configured custodian connections |
 
 ### 7.4 People (TenantAdmin / Adviser / Customer)
 
@@ -461,8 +468,7 @@ Rule summary:
 
 People lists reuse the tenants envelope `{ items, page, pageSize, totalCount }` (page default 1, size default 20, max 100). Currencies, people collections, and instruments use `enabledOnly` (omit / `false` = all, `true` = enabled / Active only). Each person item includes `status`. Create on a disabled tenant uses §4.1.
 
-- Amendment 2026-11-22 (interest run, accepted; field rules in [features/interest-run.md](features/interest-run.md) R1–R8): sub-resource `GET` / `PUT /users/customers/{customerId}/tax-profile` (`customers.manage` or `customers.manage-own`, scope as every `/users/customers` route; a Customer → 403) and `GET /users/me/tax-profile` (`users.me`; a caller who is not a Customer → 404). The item is `{ taxResidency, irdNumberHeld, rwtRatePercent, withholding: { kind, ratePercent, basis }, updatedBy, updatedAt, rowVersion }`; `PUT` takes the three attributes and `rowVersion` (`null` for the first write) and answers 204; stale → 409 `stale_row_version`. The IRD number itself is never stored.
-- Amendment 2026-11-22 (corporate actions, accepted; field rules in [features/corporate-actions.md](features/corporate-actions.md) R26, R27, R32, R33, R37): source kind `CorporateAction` marks an entitlement posting (`Split` or `Bonus` written by the platform, one security leg of the quantity difference with cost 0); it is not hand-reversible. The item gains `corporateAction` `{ id, kind, ratioNew, ratioHeld, exDate, recordDate, paymentDate, quantityBefore, quantityAfter }` on an entitlement posting and its Reversal, `null` otherwise. A hand `Split`, `Bonus` or `Scrip` on a Custodial account stays refused (400 `errors.Type`).
+Tax profile ([features/interest-run.md](features/interest-run.md) R1–R8): sub-resource `GET` / `PUT /users/customers/{customerId}/tax-profile` (`customers.manage` or `customers.manage-own`, scope as every `/users/customers` route; a Customer → 403) and `GET /users/me/tax-profile` (`users.me`; a caller who is not a Customer → 404). The item is `{ taxResidency, irdNumberHeld, rwtRatePercent, withholding: { kind, ratePercent, basis }, updatedBy, updatedAt, rowVersion }`; `PUT` takes the three attributes and `rowVersion` (`null` for the first write) and answers 204; stale → 409 `stale_row_version`. The IRD number itself is never stored.
 
 ### 7.5 Instruments
 
@@ -472,6 +478,7 @@ Field rules: [features/instruments.md](features/instruments.md).
 | --- | --- | --- | --- |
 | GET | `/instruments` | `instruments.read` | 200 envelope |
 | GET | `/instruments/{id}` | `instruments.read` | 200 item |
+| GET | `/instruments/{id}/prices` | `instruments.read` | 200 envelope of `{ date, price, currency, source, fetchedAt }`, newest first |
 | POST | `/instruments` | `instruments.create` | 201 `{ id }` |
 | PUT | `/instruments/{id}` | `instruments.manage` | 204 |
 | POST | `/instruments/{id}/disable` | `instruments.manage` | 204 |
@@ -480,10 +487,9 @@ Field rules: [features/instruments.md](features/instruments.md).
 - TenantAdmin / Adviser: current tenant. Body / list query must omit `tenantId`.
 - SystemAdmin: list and create require tenant PublicId. Get / PUT / disable / enable may cross tenants.
 - Customer → 403.
-- Item includes `id`, `tenantId`, `symbol`, `name`, `quoteCurrency`, `isActive`, `rowVersion`. No price.
-- Amendment 2026-11-22 (simulated instruments, accepted; field rules in [features/simulated-instruments.md](features/simulated-instruments.md) R6): the item gains `marketDataConnection`, the name of the market data connection whose symbol suffix the symbol ends with, or `null`. Worked out from the symbol and the configuration; no filter on it. Still no price.
+- Item includes `id`, `tenantId`, `symbol`, `name`, `quoteCurrency`, `isActive`, `marketDataConnection`, `rowVersion`. No price. `marketDataConnection` is the name of the market data connection whose symbol suffix the symbol ends with, or `null`; it is worked out from the symbol and the configuration, and there is no filter on it ([features/simulated-instruments.md](features/simulated-instruments.md) R6).
 - Create on a disabled tenant → §4.1 `target=tenant`.
-- Amendment 2026-11-25 (market data history, accepted; field rules in [features/market-data-history.md](features/market-data-history.md) R19, R21–R23): `GET /instruments/{id}/prices` (`instruments.read`) → 200 envelope of `{ date, price, currency, source, fetchedAt }`, newest first. Optional `from` and `to` (`yyyy-MM-dd`, inclusive) and paging. The instrument is found as `GET /instruments/{id}` finds it (other Tenant or missing → 404; SystemAdmin any Tenant). An inactive instrument is readable. `?to={date}&pageSize=1` answers the row a price read as of that date chooses. The instrument item still carries no price.
+- Prices ([features/market-data-history.md](features/market-data-history.md) R19, R21–R23): optional `from` and `to` (`yyyy-MM-dd`, inclusive) and paging. The instrument is found as `GET /instruments/{id}` finds it (other Tenant or missing → 404; SystemAdmin any Tenant). An inactive instrument is readable. `?to={date}&pageSize=1` answers the row a price read as of that date chooses.
 
 ### 7.6 Accounts
 
@@ -497,28 +503,46 @@ Field rules: [features/accounts.md](features/accounts.md).
 | PUT | `/accounts/{id}` | `accounts.manage` | 204 |
 | POST | `/accounts/{id}/close` | `accounts.manage` | 204 |
 | POST | `/accounts/{id}/reopen` | `accounts.manage` | 204 |
+| GET | `/accounts/{id}/cash-balance` | `accounts.read` | 200 `{ accountId, currency, cashBalance, reservedCash, availableCash, unsettledCash, withdrawableCash }` |
+| GET | `/accounts/{id}/deposit-instructions` | `accounts.read` | 200 `{ accountId, currency, reference, bankName, accountName, accountNumber }` |
+| GET | `/accounts/{accountId}/interest-accruals` | `accounts.read` | 200 envelope, newest first (filters `from`, `to`, `transactionId`, `posted`) |
+| PUT | `/accounts/{accountId}/dividend-reinvestment` | `accounts.manage` | 204 |
+| POST | `/accounts/{accountId}/closures` | `account-closures.request` | 201 `{ id }` (`Idempotency-Key`) |
+| GET | `/accounts/{accountId}/closures`, `…/{id}` | `account-closures.read` | 200 |
+
+Who:
 
 - TenantAdmin / Adviser: current tenant. Body / list query must omit `tenantId`. Adviser: assigned Customers only.
-- SystemAdmin: list and create require tenant PublicId. Get / PUT / close / reopen may cross tenants.
-- Customer → 403.
-- Item includes `id`, `tenantId`, `customerId`, `name`, `type`, `currency`, `status`, `isActive`, `cashBalance`, `rowVersion`. `cashBalance` is computed; added by [features/posting.md](features/posting.md).
-- Close rejected while cash `SUM ≠ 0` (posting amendment).
-- `GET /accounts/{id}/cash-balance` → `{ accountId, currency, cashBalance }` (`accounts.read`).
-- Create on a disabled tenant → §4.1 `target=tenant`. Create or reopen on a Disabled Customer → §4.1 `target=user`.
-- Amendment 2026-11-17 (account custody mode, accepted; field rules in [features/account-custody-mode.md](features/account-custody-mode.md)): the item also includes `custodyMode` (`External` / `Custodial`). `POST /accounts` requires `custodyMode`; only `External` can be selected, and a missing, reserved or unknown value is a field 400 with no problem code. A PUT body that includes `custodyMode` → 400. `GET /accounts` takes an optional `custodyMode` filter.
-- Amendment 2026-11-17 (custody modes, accepted, landed; field rules in [features/custody-modes.md](features/custody-modes.md)): `POST /accounts` accepts `custodyMode: "Custodial"`, with `type` `Brokerage` only; another type → 400 `errors.Type`. `POST /accounts/{id}/portfolio` and `POST /accounts/{id}/rebalance` require a Custodial account, else 400 `account_not_eligible`.
-- Amendment 2026-11-20 (client money accounts and deposit references, accepted; field rules in [features/client-money-accounts.md](features/client-money-accounts.md)): `POST /accounts` with `Custodial` in a currency where the Tenant has no active client money account → 400 `errors.Currency`. The item includes `depositReference` (server-generated on a Custodial account, `null` on an External one); a POST or PUT body that carries it → 400. `GET /accounts/{id}/deposit-instructions` (`accounts.read`) → `{ accountId, currency, reference, bankName, accountName, accountNumber }`, or 404 for an External or Closed account or when the currency has no active client money account.
-- Amendment 2026-11-20 (deposit matching, accepted; field rules in [features/deposit-matching.md](features/deposit-matching.md)): `GET /accounts` takes an optional `depositReference` (exact after trim and upper-casing; an invalid value returns an empty list).
-- Amendment 2026-11-20 (withdrawals, accepted; field rules in [features/withdrawals.md](features/withdrawals.md)): the item and `GET /accounts/{id}/cash-balance` include `reservedCash` (the sum of open withdrawals; 0 on an External account) and `availableCash` (cash balance minus reserved cash).
-- Amendment 2026-11-21 (receipt returns, recalls and other debit lines, accepted; field rules in [features/bank-returns.md](features/bank-returns.md)): no new route or permission. `POST /statement-lines/{id}/request-return` also creates the return payment the bank sends; `reopen` of a `ReturnRequested` line is refused (400 `errors.Status`) once the bank was asked. `ignore` (from `Unmatched`) and `reopen` (from `Ignored`) apply to debit lines too. The statement line item gains statuses `ReturnSent` and `Returned`, reasons `UnknownPayment`, `UnknownReturn`, `RecallNotCovered`, `ReturnRejected`, method `Recall`, and `returnPayment: { status, attempts, lastFailure }` (`null` without a return payment); `match.accountId`, `match.customerId` and `match.transactionId` are `null` on a match with no Transaction. A recalled deposit is reversed by the flow (source `BankFeed`).
-- Amendment 2026-11-22 (account closure, accepted; field rules in [features/account-closure.md](features/account-closure.md)): sub-resource `/accounts/{accountId}/closures` — `POST` (`account-closures.request`, `Idempotency-Key`, 201 `{ id }`), `GET` and `GET …/{id}` (`account-closures.read`); SystemAdmin has neither. The item gains `closure` (the latest closure, or `null`). `POST /accounts/{id}/close` on an Open Custodial account → 400 for every caller; External accounts unchanged. While a closure is `InProgress` the Account is closing and every hand write on it → 400. No problem code.
-- Amendment 2026-11-22 (interest run, accepted; field rules in [features/interest-run.md](features/interest-run.md) R33, R35, R36): the item gains `accruedInterest` (unposted daily accruals, 8 decimals; `0` on an External account) and `interestAccruedThrough` (a date or `null`). `GET /accounts/{accountId}/interest-accruals` (`accounts.read`, the Account's scope) → list envelope of the daily accrual rows, newest first; filters `from`, `to`, `transactionId`, `posted`. `POST /accounts/{accountId}/closures` posts the interest accrued through yesterday before the payout is worked out.
-- Amendment 2026-11-23 (orders and settlement, accepted; field rules in [features/orders.md](features/orders.md) R39–R41, R44, R47): `reservedCash` also counts the account's live buy orders. The item and `GET /accounts/{id}/cash-balance` gain `unsettledCash` (the net cash of posted sell fills that are not settled) and `withdrawableCash` (available cash minus unsettled cash, never below 0); on an External account `0` and the cash balance. The holding item of `GET /accounts/{id}/holdings` gains `reservedQuantity` and `availableQuantity`. An account closure is refused while the account has a live order or a fill that is not settled.
-- Amendment 2026-11-23 (rebalance through orders, accepted; field rules in [features/rebalances.md](features/rebalances.md) R10, R25): `POST /accounts/{id}/rebalance` and `POST /accounts/{id}/portfolio` answer 200 `{ status, rebalanceId }` with `status` `Proposed` or `NoChange`; a failed plan is 400 with its problem code. `GET /accounts/{id}/portfolio` loses `lastRebalanceAt`, `lastRebalanceStatus` and `lastRebalanceMessage` and gains `rebalance` (`{ id, status, failure, proposedAt, endedAt }`).
+- SystemAdmin: list and create require tenant PublicId. Get / PUT / close / reopen may cross tenants. SystemAdmin has neither closure permission.
+- A Customer reads their own accounts (`accounts.read`, §3.1) and writes nothing.
+
+Item: `id`, `tenantId`, `customerId`, `name`, `type`, `custodyMode` (`External` / `Custodial`), `currency`, `status`, `isActive`, `rowVersion`, and the computed fields below. A POST or PUT body that carries `depositReference` → 400.
+
+| Field | Is | External account | Field rules |
+| --- | --- | --- | --- |
+| `cashBalance` | The cash `SUM` | — | [features/posting.md](features/posting.md) |
+| `depositReference` | Server-generated on open | `null` | [features/client-money-accounts.md](features/client-money-accounts.md) |
+| `reservedCash` | Open withdrawals plus live buy orders | `0` | [features/withdrawals.md](features/withdrawals.md), [features/orders.md](features/orders.md) R39 |
+| `availableCash` | Cash balance minus reserved cash | The cash balance | [features/withdrawals.md](features/withdrawals.md) |
+| `unsettledCash` | The net cash of posted sell fills that are not settled | `0` | [features/orders.md](features/orders.md) R44 |
+| `withdrawableCash` | Available cash minus unsettled cash, never below 0 | The cash balance | [features/orders.md](features/orders.md) R44 |
+| `closure` | The latest account closure, or `null` | `null` | [features/account-closure.md](features/account-closure.md) |
+| `accruedInterest`, `interestAccruedThrough` | Unposted daily accruals (8 decimals); a date or `null` | `0`, `null` | [features/interest-run.md](features/interest-run.md) R33, R35, R36 |
+| `reinvestDividends`, `pendingDividends` | The account's election; dividends not paid yet | — | [features/dividends.md](features/dividends.md) §8 |
+
+Rules:
+
+- **Create.** `custodyMode` is required; a missing or unknown value is a field 400 with no problem code. `Custodial` needs `type` `Brokerage` (else 400 `errors.Type`), a Tenant that allows the mode (else 400 `errors.CustodyMode`) and an active client money account of the Tenant in the currency (else 400 `errors.Currency`). Create on a disabled tenant → §4.1 `target=tenant`. Create or reopen on a Disabled Customer → §4.1 `target=user`. Field rules: [features/account-custody-mode.md](features/account-custody-mode.md), [features/custody-modes.md](features/custody-modes.md), [features/tenant-custody-modes.md](features/tenant-custody-modes.md).
+- **Update.** A PUT body that includes `custodyMode` → 400.
+- **List.** Optional filters `custodyMode` and `depositReference` (exact after trim and upper-casing; an invalid value returns an empty list).
+- **Close.** On an External account close is rejected while cash `SUM ≠ 0` or a holding remains. `POST /accounts/{id}/close` on an Open Custodial account → 400 for every caller: it closes through `POST /accounts/{accountId}/closures`. The request posts the interest accrued through yesterday before the payout is worked out, and is refused while the account has a live order, a fill that is not settled or a pending dividend. While a closure is `InProgress` the Account is closing and every hand write on it → 400. No problem code.
+- **Deposit instructions.** 404 for an External or Closed account, or when the currency has no active client money account.
+- **Holdings.** The item of `GET /accounts/{id}/holdings` carries `reservedQuantity`, `availableQuantity`, `unsettledQuantity` and `transferableQuantity` ([features/orders.md](features/orders.md) R40, R41; [features/in-kind-transfers.md](features/in-kind-transfers.md) R43–R45).
+- **Portfolio.** `POST /accounts/{id}/portfolio` and `POST /accounts/{id}/rebalance` require a Custodial account, else 400 `account_not_eligible`. Both answer 200 `{ status, rebalanceId }` with `status` `Proposed` or `NoChange`; a failed plan is 400 with its problem code. `GET /accounts/{id}/portfolio` carries `rebalance` (`{ id, status, failure, proposedAt, endedAt }`) ([features/rebalances.md](features/rebalances.md) R10, R25).
 
 ### 7.7 Transactions
 
-Field rules: [features/posting.md](features/posting.md) for cash types, [features/holdings.md](features/holdings.md) for `OpeningHoldings`, [features/buy-sell.md](features/buy-sell.md) for `Buy` / `Sell` / `StockIn` / `StockOut`, and [features/split.md](features/split.md) for `Split` / `Bonus` / `Scrip`. The transaction item has `cash` and `security` arrays; every leg carries its own `accountId` and `customerId`, and only legs on accounts the caller can see are returned ([features/leg-accounts.md](features/leg-accounts.md) §8.1). There is no top-level `accountId` / `customerId` and no flat `amount` on the item. Create body for a cash type still sends `amount`. `Split` / `Bonus` / `Scrip` send the new total quantity and omit cash.
+Field rules: [features/posting.md](features/posting.md) for the aggregate, the cash types and the item; the spec of each other type is named in posting §5. The transaction item has `cash` and `security` arrays; every leg carries its own `accountId` and `customerId`, and only legs on accounts the caller can see are returned ([features/leg-accounts.md](features/leg-accounts.md) §8.1). There is no top-level `accountId` / `customerId` and no flat `amount` on the item. Create body for a cash type sends `amount`. `Split` / `Bonus` / `Scrip` send the new total quantity and omit cash.
 
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |
@@ -528,30 +552,50 @@ Field rules: [features/posting.md](features/posting.md) for cash types, [feature
 | POST | `/transactions/transfer` | `transactions.create` | 201 `{ id }` |
 | POST | `/transactions/fx` | `transactions.create` | 201 `{ id }` |
 | POST | `/transactions/fx/quote` | `transactions.create` | 200 quote |
-| POST | `/transactions/adjustment` | — | removed 2026-11-25; see §7.15 |
 | POST | `/transactions/{id}/reverse` | `transactions.create` | 201 `{ id }` |
+
+`POST /transactions/adjustment` was removed on 2026-11-25: an `Adjustment` is posted only by the approval of an adjustment request (§7.15).
 
 - Create and reverse require `Idempotency-Key` ([ADR 0015](adr/0015-idempotency-keys.md)).
 - TenantAdmin / Adviser omit `tenantId`. SystemAdmin list/create require tenant PublicId.
-- Customer → 403.
+- A Customer reads the transactions of their own accounts (`transactions.read`, §3.1) and writes nothing.
 - Optional list filters: `accountId`, `customerId`, `type`.
-- The item has an `fx` object `{ baseCurrency, quoteCurrency, rate, rateAsOfDate }` when the Transaction has an FX detail (an `FxConversion` and its Reversal); otherwise `fx` is `null` ([features/fx-conversions.md](features/fx-conversions.md) R22).
-- Amendment 2026-11-17 (custody modes, accepted, landed; field rules in [features/custody-modes.md](features/custody-modes.md)): the Account's custody mode decides what a create body may carry. On a Custodial account `POST /transactions` refuses `Interest`, `Opening`, `OpeningHoldings`, `StockIn`, `StockOut`, `Split`, `Bonus` and `Scrip` (400 `errors.Type`), and the server sets `bookedAt`: a body that sends it to `POST /transactions`, `/transactions/transfer`, `/transactions/fx` or `/transactions/fx/quote` → 400 `errors.BookedAt`. On an External account `bookedAt` stays required. A transfer, conversion or quote between a Custodial and an External account → 400 `errors.ToAccountId`. All are field 400s with no problem code.
-- Amendment 2026-11-18 (External caller numbers, accepted, landed; field rules in [features/external-caller-numbers.md](features/external-caller-numbers.md)): on an External account `POST /transactions` `Buy` / `Sell` require `security[0].price` (executed price), accept an optional `fee`, and require the new `fxRate` when the instrument's quote currency differs from the Account currency; no price, rate or schedule is read. On a Custodial account all three → 400. `POST /transactions/fx` between External Accounts requires both `sellAmount` and `buyAmount` and refuses `expectedRate`; the rate is derived. `POST /transactions/fx/quote` between External Accounts → 400 `errors.FromAccountId`. The item shape does not change: `fee.scheduleId` is `null` for an entered fee, and `fx` is filled for an External `Buy` / `Sell` with a rate. No new route, policy or problem code.
-- Amendment 2026-11-19 (transaction source, accepted; field rules in [features/transaction-source.md](features/transaction-source.md)): the item gains `source: { kind, id }` (`Manual`, `Seed` or `Rebalance`; `id` is the rebalance handle on a rebalance trade, else `null`). No body or query field. Rebalance trades have `reference: null`. On a Custodial account `POST /transactions/{id}/reverse` of a Transaction whose source is not `Manual` or `Rebalance` → 400.
-- Amendment 2026-11-19 (adjustments, accepted; field rules in [features/adjustments.md](features/adjustments.md)): `POST /transactions/adjustment` (`transactions.adjust`, TenantAdmin only) posts an `Adjustment` on one Custodial account: optional signed `amount`, optional `security` `{ instrumentId, quantityChange, costChange }`, required `reason` and `memo`; no `bookedAt`, `tenantId` or currency. External account → 400 `errors.AccountId`. `POST /transactions` refuses `Adjustment`. Reverse of an `Adjustment` without `transactions.adjust` → 403. The item gains `adjustment: { reason }` (`null` on other types). No problem code.
-- Amendment 2026-11-20 (bank feed and deposit matching, accepted; field rules in [features/deposit-matching.md](features/deposit-matching.md)): on a Custodial account `POST /transactions` refuses `TransferIn` (400 `errors.Type`): deposits come from the bank statement. A deposit is a `TransferIn` with `source: { kind: "BankFeed", id: <statement line id> }` and the new item field `bankReceipt: { valueDate, reference, payerName, payerAccount }` (`null` on other Transactions); a hand reverse of it → 400. New resource `/statement-lines` (`statement-lines.manage`, TenantAdmin only): list (filters `status`, `currency`, `clientMoneyAccountId`), get, and `POST …/{id}/match` `{ accountId, rowVersion, note? }`, `…/ignore`, `…/request-return`, `…/unmatch` `{ note, rowVersion }`, `…/reopen` `{ rowVersion }`, each 204; stale `rowVersion` → 409 `stale_row_version`. No `Idempotency-Key` on these actions. No problem code added.
-- Amendment 2026-11-20 (withdrawals, accepted; field rules in [features/withdrawals.md](features/withdrawals.md)): on a Custodial account `POST /transactions` refuses `TransferOut` (400 `errors.Type`, every caller) and a `CloseOut` of more than a remainder below the currency's minor unit (400 `errors.Type`); `POST /transactions/transfer` between Custodial accounts of two Customers → 400 `errors.ToAccountId`. Every Custodial write that lowers cash (create, transfer, fx, adjustment, reverse, rebalance, unmatch) is refused when it would leave available cash below 0. A payout is a `TransferOut` with `source: { kind: "Payment", id: <withdrawal id> }` and the new item field `payment: { valueDate, reference, payeeName, payeeAccount }` (`null` on other Transactions); a hand reverse of it → 400. New resources `/nominated-bank-accounts` and `/withdrawals` (§6). `GET /statement-lines` takes an optional `direction` (`Credit`, `Debit`; else 400 `errors.Direction`); the line item gains `relatedLineId`, `withdrawalId` and `returnReason`. No problem code added.
-- Amendment 2026-11-22 (account closure, accepted; field rules in [features/account-closure.md](features/account-closure.md)): on a Custodial account `POST /transactions` refuses `CloseOut` for every amount (400 `errors.Type`, every caller). Source kind `AccountClosure` marks the remainder write-off; it is not hand-reversible. Every create, quote and reverse with a leg on a closing account → 400 under the empty `errors` key.
-- Amendment 2026-11-22 (interest run, accepted; field rules in [features/interest-run.md](features/interest-run.md) R23–R27, R34, R39): source kind `InterestRun` marks an interest posting; it is not hand-reversible. A cash leg's `role` may be `Tax`; every cash leg gains `tax` (`{ kind, ratePercent, basisAmount, amount, currency }` on a `Tax` leg, `null` otherwise) and the item gains `interest` (`{ periodFrom, periodTo, days, accruedAmount, grossAmount }` on an interest posting and its Reversal, `null` otherwise). A hand `Interest` on a Custodial account stays refused. The statement line item gains `kind` (`Transfer`, `Interest`), and `GET /statement-lines` an optional `kind` filter (else 400 `errors.Kind`).
-- Amendment 2026-11-23 (orders and settlement, accepted; field rules in [features/orders.md](features/orders.md) R32, R35, R37, R38, R45, R48): on a Custodial account `POST /transactions` refuses `Buy` and `Sell` (400 `errors.Type`, `Trades on a Custodial account go through the broker. Place an order.`); the caller places an order (§7.12). Source kind `OrderFill` marks the `Buy` or `Sell` the platform posts for a fill, with the order's PublicId as source id; it is not hand-reversible. The item gains `execution` `{ orderId, fillId, price, tradeDate, settlementDate, brokerReference, settledAt }` on a fill and its Reversal, `null` otherwise. `POST /transactions/transfer`, `POST /transactions/fx` and the FX quote from a Custodial account refuse an amount that would take out cash from sales that have not settled (400).
-- Amendment 2026-11-24 (migration batches, accepted; field rules in [features/migration-batches.md](features/migration-batches.md) R25–R27, R31): source kind `Migration` marks an `Opening` or `OpeningHoldings` written by a migration batch, with the batch's PublicId as source id; it is not hand-reversible. The item gains `migration` (`{ asOfDate, previousProvider }` on such a Transaction, `null` otherwise). On a Custodial account a hand `Opening` or `OpeningHoldings` stays refused (400 `errors.Type`) with the message `Opening balances on a Custodial account come from a migration batch.`
-- Amendment 2026-11-24 (in-kind transfers, accepted; field rules in [features/in-kind-transfers.md](features/in-kind-transfers.md) R37–R42, R48): source kind `InKindTransfer` marks a `StockIn` or `StockOut` written by an in-kind transfer, with the transfer's PublicId as source id; it is not hand-reversible. The item gains `inKindTransfer` (`{ transferId, direction, counterpartyName, counterpartyAccount, changesBeneficialOwner, acquiredOn, settlementDate, custodianReference }`, `null` on every other Transaction). The hand `StockIn` / `StockOut` on a Custodial account is refused with the message of R48. The holdings item gains `unsettledQuantity` and `transferableQuantity`; `reservedQuantity` counts open transfers out.
-- Amendment 2026-11-25 (adjustment review, accepted; field rules in [features/adjustment-review.md](features/adjustment-review.md) R13–R15, R21): `POST /transactions/adjustment` is removed; an `Adjustment` is posted only by the approval of an adjustment request (§7.15). Source kind `AdjustmentRequest` marks it, with the request's PublicId as its id; it is not hand-reversible. Reverse of any `Adjustment` → 400, for every caller, in place of the 403 without `transactions.adjust`.
 
-**Type-specific create routes.** When a type's create body differs from the common shape (one top-level `accountId`), that type gets its own `POST /transactions/{action}`. Each type has exactly one create route: a type with its own route is rejected by `POST /transactions` (400). Read (`GET /transactions`, `GET /transactions/{id}`) and reverse (`POST /transactions/{id}/reverse`) stay shared by every type. Every new type gets its own `POST /transactions/{action}` route, whatever its body shape (decided 2026-11-10). Existing types keep `POST /transactions` until each is moved in its own spec amendment ([future-plans.md](future-plans.md) §4).
+**By custody mode.** The custody mode of the Account decides what a person may enter and what a body may carry. All refusals here are field 400s with no problem code.
 
-Type-specific routes: `POST /transactions/transfer` for `InternalTransfer` ([features/internal-transfers.md](features/internal-transfers.md)); `POST /transactions/fx` for `FxConversion` and the read-only `POST /transactions/fx/quote` ([features/fx-conversions.md](features/fx-conversions.md)); `Adjustment` has no create route under `/transactions` since 2026-11-25: it is requested and approved under `/adjustment-requests` ([features/adjustment-review.md](features/adjustment-review.md)). The quote is a `POST` because it takes the create body and the same validation; it writes nothing, takes no `Idempotency-Key` and holds no rate. Create confirms the quoted rate with `expectedRate`; a different stored rate → 409 with `expectedRate` in `errors`.
+| | External account | Custodial account |
+| --- | --- | --- |
+| `POST /transactions` | Every type the route accepts | Every type is refused (400 `errors.Type`): the platform writes them from its flows. The matrix and the messages are [features/custody-modes.md](features/custody-modes.md) §4.2 |
+| `bookedAt` | Required | Set by the server; a body that sends it to `POST /transactions`, `/transactions/transfer`, `/transactions/fx` or `/transactions/fx/quote` → 400 `errors.BookedAt` |
+| Transfer, conversion, quote | Only with another External account, else 400 `errors.ToAccountId` | Only with another Custodial account; a transfer only between accounts of one Customer (400 `errors.ToAccountId`) |
+| `Buy` / `Sell` numbers | Require `security[0].price` (the executed price), accept an optional `fee`, and require `fxRate` when the instrument's quote currency differs from the Account currency; no price, rate or schedule is read ([features/external-caller-numbers.md](features/external-caller-numbers.md)) | Not entered by hand: the caller places an order (§7.12) |
+| `POST /transactions/fx` | Requires both `sellAmount` and `buyAmount` and refuses `expectedRate`; the rate is derived. The quote → 400 `errors.FromAccountId` | One amount, the reference rate and `expectedRate`; the quote applies |
+| Cash that may leave | Cash `SUM ≥ 0` | Every write that lowers cash is refused when it would leave available cash below 0; a transfer, a conversion and the quote also refuse cash from sales that have not settled ([features/withdrawals.md](features/withdrawals.md), [features/orders.md](features/orders.md) R45) |
+| `POST /transactions/{id}/reverse` | Every source | Only source `Manual`; another source → 400 ([features/transaction-source.md](features/transaction-source.md)) |
+
+On both custody modes: reverse of an `Adjustment` → 400 for every caller ([features/adjustment-review.md](features/adjustment-review.md) R15), and every create, quote and reverse with a leg on a closing account → 400 under the empty `errors` key ([features/account-closure.md](features/account-closure.md)).
+
+**Item fields by source.** The item carries `source: { kind, id }`; no body or query field sets it. Every cash leg carries `role` (`Principal`, `Fee`, `Tax`, `Reinvestment`), `fee` (the fee detail on a `Fee` leg, `null` otherwise; `fee.scheduleId` is `null` for an entered fee) and `tax` (`{ kind, ratePercent, basisAmount, amount, currency }` on a `Tax` leg, `null` otherwise). `fx` is `{ baseCurrency, quoteCurrency, rate, rateAsOfDate }` when the Transaction has an FX detail, else `null` ([features/fx-conversions.md](features/fx-conversions.md) R22). Each field below is `null` on every other Transaction, and is copied to a Reversal:
+
+| Source kind | Marks | `source.id` | Item field |
+| --- | --- | --- | --- |
+| `Manual` | What a person entered | `null` | — |
+| `Seed` | Seed data | `null` | — |
+| `Rebalance` | A rebalance trade posted before rebalances went through orders; `reference` is `null` | The rebalance handle | — |
+| `BankFeed` | A deposit (`TransferIn`) | The statement line | `bankReceipt: { valueDate, reference, payerName, payerAccount }` |
+| `Payment` | A payout (`TransferOut`) | The withdrawal | `payment: { valueDate, reference, payeeName, payeeAccount }` |
+| `AccountClosure` | The remainder write-off (`CloseOut`) | The account closure | — |
+| `InterestRun` | An interest posting | The interest run | `interest: { periodFrom, periodTo, days, accruedAmount, grossAmount }` |
+| `CorporateAction` | An entitlement posting (`Split` or `Bonus`: one security leg of the quantity difference with cost 0) | The corporate action | `corporateAction: { id, kind, ratioNew, ratioHeld, exDate, recordDate, paymentDate, quantityBefore, quantityAfter }` |
+| `CorporateAction` | A `Dividend` | The corporate action | `dividend` ([features/dividends.md](features/dividends.md) §8) |
+| `OrderFill` | The `Buy` or `Sell` of a fill | The order | `execution: { orderId, fillId, price, tradeDate, settlementDate, brokerReference, settledAt, brokenAt }` |
+| `Migration` | An `Opening` or `OpeningHoldings` of a migration batch | The migration batch | `migration: { asOfDate, previousProvider }` |
+| `InKindTransfer` | The `StockIn` or `StockOut` of an in-kind transfer | The in-kind transfer | `inKindTransfer: { transferId, direction, counterpartyName, counterpartyAccount, changesBeneficialOwner, acquiredOn, settlementDate, custodianReference }` |
+| `AdjustmentRequest` | An `Adjustment` | The adjustment request | `adjustment: { reason }` |
+
+**Type-specific create routes.** When a type's create body differs from the common shape (one top-level `accountId`), that type gets its own `POST /transactions/{action}`. Each type has exactly one create route: a type with its own route is rejected by `POST /transactions` (400). Read (`GET /transactions`, `GET /transactions/{id}`) and reverse (`POST /transactions/{id}/reverse`) stay shared by every type. Every new type gets its own `POST /transactions/{action}` route, whatever its body shape (decided 2026-11-10). Existing types keep `POST /transactions` until each is moved in its own spec change ([future-plans.md](future-plans.md) §4).
+
+Type-specific routes: `POST /transactions/transfer` for `InternalTransfer` ([features/internal-transfers.md](features/internal-transfers.md)); `POST /transactions/fx` for `FxConversion` and the read-only `POST /transactions/fx/quote` ([features/fx-conversions.md](features/fx-conversions.md)). `Adjustment` has no create route under `/transactions`: it is requested and approved under `/adjustment-requests` ([features/adjustment-review.md](features/adjustment-review.md)). The quote is a `POST` because it takes the create body and the same validation; it writes nothing, takes no `Idempotency-Key` and holds no rate. Create confirms the quoted rate with `expectedRate`; a different stored rate → 409 with `expectedRate` in `errors`.
 
 ---
 
@@ -605,7 +649,7 @@ Back Office tenant configuration lists the active catalog and calls the existing
 | DELETE | `/fees/trade-schedules/{id}` | `fees.manage` | 204 |
 | POST | `/fees/trade-schedules/preview` | `fees.read` | 200 fee preview ([features/trade-fees.md](features/trade-fees.md) R30–R33; no write) |
 
-Field rules: [features/trade-fees.md](features/trade-fees.md). Update or delete of a schedule row in effect → 409 `fee_schedule_in_effect`. Every cash leg in the transaction item carries `role` (`Principal` or `Fee`) and `fee` (the fee detail on a `Fee` leg, null otherwise).
+Field rules: [features/trade-fees.md](features/trade-fees.md). Update or delete of a schedule row in effect → 409 `fee_schedule_in_effect`. The `role` and `fee` of a cash leg are in §7.7.
 
 ### 7.10 Interest
 
@@ -642,7 +686,7 @@ A corporate action is an event of one Instrument of the caller's Tenant. Its ent
 
 Field rules: [features/corporate-actions.md](features/corporate-actions.md). No `Idempotency-Key`: the status and `rowVersion` make a repeat a 400 or a 409 `stale_row_version`. A served instrument takes no hand entry (400 `errors.InstrumentId`); a `Feed` action cannot be changed by hand (400 `errors.Origin`). No new problem code.
 
-Amendment 2026-11-24 (dividends, accepted; field rules in [features/dividends.md](features/dividends.md) §8): kind `Dividend` with its terms in place of a ratio on create and update; `reinvestmentPrice` only from the feed. The item gains `dividend`, `payment` and `election`; the entitlement item the dividend fields. `POST /corporate-actions/{id}/pay-in-cash` releases an accepted election whose shares did not arrive. A dividend's entitlements are posted as `Dividend` Transactions (§7.7) once its receipt is matched: `POST /statement-lines/{id}/match` takes `corporateActionId` (also needs `corporate-actions.manage`), and a receipt matched to a dividend cannot be unmatched. `PUT /accounts/{accountId}/dividend-reinvestment` (`accounts.manage`) sets the account's election; the account item gains `reinvestDividends` and `pendingDividends`. Closure of an account with a pending dividend → 400 `errors.AccountId`.
+Dividends ([features/dividends.md](features/dividends.md) §8): kind `Dividend` with its terms in place of a ratio on create and update; `reinvestmentPrice` only from the feed. The item carries `dividend`, `payment` and `election`; the entitlement item the dividend fields. `POST /corporate-actions/{id}/pay-in-cash` releases an accepted election whose shares did not arrive. A dividend's entitlements are posted as `Dividend` Transactions (§7.7) once its receipt is matched (§7.17).
 
 ### 7.12 Orders
 
@@ -660,7 +704,7 @@ An order is an instruction to buy or sell a quantity of one Instrument for one C
 
 Field rules: [features/orders.md](features/orders.md). `POST /orders` requires `Idempotency-Key` ([ADR 0015](adr/0015-idempotency-keys.md)); cancel takes `rowVersion` and no key, and a stale one is 409 `stale_row_version`. The body carries no price: the platform sets a price limit from the latest stored price, reserves the cash of a buy or the quantity of a sell, and the `worker` sends the order. Nothing is sent to the broker in the request. A Customer reads own orders and writes nothing. No new problem code.
 
-Amendment 2026-11-23 (trade settlement and broken trades, accepted; field rules in [features/trade-settlement.md](features/trade-settlement.md)):
+Trade settlements and broken trades ([features/trade-settlement.md](features/trade-settlement.md)):
 
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |
@@ -670,9 +714,9 @@ Amendment 2026-11-23 (trade settlement and broken trades, accepted; field rules 
 | POST | `/trade-settlements/{id}/set-aside` | `trade-settlements.manage` | 204 |
 | POST | `/orders/{id}/fills/{fillId}/resolve-break` | `transactions.adjust` | 204 |
 
-A fill item gains `brokerSettlementId`, `tradeSettlementId` and `break`, and its `status` may be `Broken`; `execution` on the transaction item gains `brokenAt`. The statement line item gains `tradeSettlementId`, match method `Settlement` and unmatched reason `SettlementMismatch`. The bank reconciliation item gains four kinds, and the run gains `openSettlements`. `GET /broker-connections` gains `settlementCurrencies`; `GET /execution-reports` gains the two kinds, three skip reasons and five fields. Writes take `rowVersion` (409 `stale_row_version`) and no `Idempotency-Key`. No new problem code.
+A fill item carries `brokerSettlementId`, `tradeSettlementId` and `break`, and its `status` may be `Broken`. The bank reconciliation run carries `openSettlements`. Writes take `rowVersion` (409 `stale_row_version`) and no `Idempotency-Key`. No new problem code.
 
-Amendment 2026-11-23 (rebalance through orders, accepted; field rules in [features/rebalances.md](features/rebalances.md)):
+Rebalances ([features/rebalances.md](features/rebalances.md)):
 
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |
@@ -681,11 +725,11 @@ Amendment 2026-11-23 (rebalance through orders, accepted; field rules in [featur
 | POST | `/rebalances/{id}/confirm` | `rebalances.confirm` | 204 |
 | POST | `/rebalances/{id}/cancel` | `rebalances.confirm` | 204 |
 
-The order item gains `rebalanceId`, and `GET /orders` the filter `rebalanceId`. `POST /orders/{id}/cancel` of a rebalance order → 400 `errors.Status`. Confirm and cancel take `rowVersion` (409 `stale_row_version`) and no `Idempotency-Key`. Nothing is sent to the broker in the request: the advance step of `broker-sync:{connection}` places the later waves. On a Custodial account a Transaction with source `Rebalance` is no longer hand-reversible. Five new problem codes (§4.2).
+The order item carries `rebalanceId`, and `GET /orders` has the filter `rebalanceId`. `POST /orders/{id}/cancel` of a rebalance order → 400 `errors.Status`. Confirm and cancel take `rowVersion` (409 `stale_row_version`) and no `Idempotency-Key`. Nothing is sent to the broker in the request: the advance step of `broker-sync:{connection}` places the later waves. Five problem codes (§4.2).
 
 ### 7.13 Migration batches
 
-Amendment 2026-11-24 (migration batches, accepted; field rules in [features/migration-batches.md](features/migration-batches.md)):
+Field rules: [features/migration-batches.md](features/migration-batches.md).
 
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |
@@ -698,11 +742,11 @@ Amendment 2026-11-24 (migration batches, accepted; field rules in [features/migr
 | POST | `/migration-batches/{id}/cancel` | `migration-batches.manage` | 204 |
 | POST | `/migration-batches/{id}/post` | `migration-batches.manage` | 204 |
 
-An id in the body that is not in the Tenant → 400 at its place in the body. Submit and post of a batch with an issue → 400 `migration_batch_not_valid`. Post by the person who submitted → 400 `errors.Status`. Writes take `rowVersion` (409 `stale_row_version`) and no `Idempotency-Key`. `POST /statement-lines/{id}/match` takes `migrationBatchId` in place of `accountId`; the statement line item gains `migrationBatchId` and method `Migration`; the bank reconciliation item gains the kind `MigrationNotPosted`.
+An id in the body that is not in the Tenant → 400 at its place in the body. Submit and post of a batch with an issue → 400 `migration_batch_not_valid`. Post by the person who submitted → 400 `errors.Status`. Writes take `rowVersion` (409 `stale_row_version`) and no `Idempotency-Key`. A batch is funded by matching statement lines to it (§7.17).
 
 ### 7.14 In-kind transfers, custody movements and custodian reconciliations
 
-Amendment 2026-11-24 (in-kind transfers, accepted; field rules in [features/in-kind-transfers.md](features/in-kind-transfers.md)):
+Field rules: [features/in-kind-transfers.md](features/in-kind-transfers.md).
 
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |
@@ -723,7 +767,7 @@ Approve or reject by the requester → 400 `errors.Status`. Actions take `rowVer
 
 ### 7.15 Adjustment requests
 
-Amendment 2026-11-25 (adjustment review, accepted; field rules in [features/adjustment-review.md](features/adjustment-review.md)):
+Field rules: [features/adjustment-review.md](features/adjustment-review.md).
 
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |
@@ -732,17 +776,34 @@ Amendment 2026-11-25 (adjustment review, accepted; field rules in [features/adju
 | POST | `/adjustment-requests` | `transactions.adjust` | 201 `{ id }` (requires `Idempotency-Key`) |
 | POST | `/adjustment-requests/{id}/approve`, `…/reject`, `…/cancel` | `transactions.adjust` | 204 |
 
-The request body is the body `POST /transactions/adjustment` took. Approve posts the `Adjustment` in the same database transaction and may answer any 400 of the adjustment itself; the request then stays `Requested`. Approve or reject by the requester → 400 `errors.Status`. Actions take `rowVersion` (409 `stale_row_version`) and no `Idempotency-Key`. No new problem code. Cross-tenant or wrong-collection id → 404.
+The request body is: optional signed `amount`, optional `security` `{ instrumentId, quantityChange, costChange }`, required `reason` and `memo`; no `bookedAt`, `tenantId` or currency ([features/adjustments.md](features/adjustments.md)). An External account → 400 `errors.AccountId`. Approve posts the `Adjustment` in the same database transaction and may answer any 400 of the adjustment itself; the request then stays `Requested`. Approve or reject by the requester → 400 `errors.Status`. Actions take `rowVersion` (409 `stale_row_version`) and no `Idempotency-Key`. No new problem code. Cross-tenant or wrong-collection id → 404.
 
 ### 7.16 FX rates
 
-Amendment 2026-11-25 (market data history, accepted; field rules in [features/market-data-history.md](features/market-data-history.md) R20–R22):
+Field rules: [features/market-data-history.md](features/market-data-history.md) R20–R22.
 
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |
 | GET | `/fx-rates?base={code}&quote={code}` | Authenticated | 200 envelope of `{ date, base, quote, rate, source, fetchedAt }`, newest first |
 
 Rates are platform reference data with no Tenant, read by any authenticated caller as `GET /currencies`. `base` and `quote` are required catalog codes (active or not), compared without regard to case; otherwise 400 `errors.Base` / `errors.Quote`; the same code twice → 400 `errors.Quote`. The directed pair only: the inverse pair is not used. Optional `from` and `to` (`yyyy-MM-dd`, inclusive; not a date or `from` after `to` → 400 `errors.From` / `errors.To`) and paging. No rows is an empty page. No write route.
+
+### 7.17 Statement lines
+
+Resource `/statement-lines` (`statement-lines.manage`, TenantAdmin only). Field rules: [features/deposit-matching.md](features/deposit-matching.md), and for each kind of match the spec in the table.
+
+| Method | Route | Body | Success |
+| --- | --- | --- | --- |
+| GET | `/statement-lines` | Filters `status`, `currency`, `clientMoneyAccountId`, `direction` (`Credit`, `Debit`; else 400 `errors.Direction`), `kind` (`Transfer`, `Interest`; else 400 `errors.Kind`) | 200 envelope |
+| GET | `/statement-lines/{id}` | — | 200 item |
+| POST | `/statement-lines/{id}/match` | `{ accountId, rowVersion, note? }`; or `migrationBatchId` or `corporateActionId` in place of `accountId` | 204 |
+| POST | `/statement-lines/{id}/ignore`, `…/request-return`, `…/unmatch` | `{ note, rowVersion }` | 204 |
+| POST | `/statement-lines/{id}/reopen` | `{ rowVersion }` | 204 |
+
+- A stale `rowVersion` → 409 `stale_row_version`. No `Idempotency-Key` on these actions. No problem code of its own.
+- A match to a migration batch funds it ([features/migration-batches.md](features/migration-batches.md)). A match to a dividend is its receipt, also needs `corporate-actions.manage`, and cannot be unmatched ([features/dividends.md](features/dividends.md) §8).
+- `request-return` also creates the return payment the bank sends; `reopen` of a `ReturnRequested` line is refused (400 `errors.Status`) once the bank was asked. `ignore` (from `Unmatched`) and `reopen` (from `Ignored`) apply to debit lines too. A recalled deposit is reversed by the flow, with source `BankFeed` ([features/bank-returns.md](features/bank-returns.md)).
+- The item carries `kind`, `relatedLineId`, `withdrawalId`, `returnReason`, `tradeSettlementId`, `migrationBatchId` and `returnPayment: { status, attempts, lastFailure }` (`null` without a return payment). `match.accountId`, `match.customerId` and `match.transactionId` are `null` on a match with no Transaction. The statuses, unmatched reasons and match methods are listed in [domain-model.md](domain-model.md) §8.9.
 
 ---
 
@@ -774,64 +835,20 @@ Locked in identity-auth: `AspNetUsers.UserName` = Domain `Users.PublicId`; unifo
 
 ## 10. Change log
 
+One row per change. The text of each change is in git (`git log -p -- docs/api-design.md`); the last commit of the amendment form is the tag `docs-pre-consolidation`.
+
 | Date | Change |
 | --- | --- |
-| 2026-09-11 | First English draft. Two HTTP surfaces; OpenIddict default protocol paths; no resource-API token issuer; `/users` namespace for people collections; `/users/me` on `webapi`; Customer may complete the authorization server; no ledger routes in Phase 1. |
-| 2026-09-12 | identity-auth locks: Razor `/login`; JWT claim names; 15 min access / 14 day absolute refresh; UserName = PublicId. |
-| 2026-09-13 | Currencies: `enabledOnly` (omit/`false` = all, `true` = enabled only); item includes `isEnabled`. |
-| 2026-09-13 | §4.1 shared disabled error (`code=disabled` + `target`). People lists reuse tenants envelope; `enabledOnly` aligned with currencies. TenantAdmin field rules in [features/tenant-admins.md](features/tenant-admins.md). |
-| 2026-09-14 | Adviser field rules in [features/advisers.md](features/advisers.md). Disable-adviser assigned-customer 400 is ordinary validation, not §4.1. |
-| 2026-09-14 | Customer field rules in [features/customers.md](features/customers.md). Client allow-list: `adviser-portal` issues no Customer code. `GET /tenants/by-code/{code}` + `tenants.read`. |
-| 2026-09-20 | `/instruments` catalog + §7.5. SystemAdmin list/create take tenant PublicId. Field rules in [features/instruments.md](features/instruments.md). Landed `9ea2f2a`. |
-| 2026-09-21 | Catalog JSON `isEnabled` → `isActive`. Column rename script `0011`. People list/get JSON adds `isActive`. |
-| 2026-09-25 | `/transactions` + account `cashBalance` / `/cash-balance`. Close-zero guard. Field rules in [features/posting.md](features/posting.md). |
-| 2026-10-11 | Buy / Sell / StockIn / StockOut and transaction item shape (`cash` + `security`). Field rules in [features/buy-sell.md](features/buy-sell.md). |
-| 2026-10-12 | Split / Bonus / Scrip accepted. New total quantity, no cash, total cost unchanged. Field rules in [features/split.md](features/split.md). |
-| 2026-10-12 | Net-worth read model accepted and landed (`af422c2`). `GET /net-worth` and `GET /users/customers/{id}/net-worth`. Current point-in-time, per-currency arrays, breakdowns. Field rules in [features/net-worth.md](features/net-worth.md). BFF allow-list adds `/net-worth`. |
-| 2026-11-02 | Portfolios draft. `/portfolios` and assignment/rebalance routes sketched in [features/portfolios.md](features/portfolios.md). Async 202 returns jobId + per-account handles. |
-| 2026-11-02 | Portfolios accepted. Assign and `POST /accounts/{id}/rebalance` return 200 `{ status }`. Weight change and `POST /portfolios/{id}/rebalance` return 202. `POST /portfolios/{id}/disable` unassigns. |
-| 2026-10-26 | Reports: `PUT /reports/{id}` for catalog IsActive. False cascades revoke of all TenantReports for that report. |
-| 2026-10-26 | Reports: `GET /reports/catalog` lists every catalog row for SystemAdmin. Tenant grant list omits inactive rows. Granting an inactive catalog report is 404. |
-| 2026-11-10 | Transactions: type-specific create routes convention (§7.7). Internal transfers draft: `POST /transactions/transfer`, `type` list filter ([features/internal-transfers.md](features/internal-transfers.md)). |
-| 2026-11-11 | FX conversions accepted and landed. `POST /transactions/fx` returns 201 `{ id }` with `Location`, requires `Idempotency-Key` and `expectedRate` (mismatch → 409, `errors.expectedRate`). `POST /transactions/fx/quote` returns 200 with rate, as-of date and both amounts; no write. `POST /transactions` rejects `FxConversion`. The transaction item gains `fx` (null for other types). |
-| 2026-11-10 | Internal transfers accepted. `POST /transactions/transfer` returns 201 `{ id }` with `Location: /transactions/{id}` and requires `Idempotency-Key`. `POST /transactions` rejects `InternalTransfer`. `GET /transactions` takes an optional `type` (exact `TransactionType` name; anything else → 400). |
-| 2026-11-13 | `webapi` re-checks person `Status` and the tenant flag on every request. A disabled person, or any person of a disabled tenant, gets 403 with a still-valid token. §4.1 `target=tenant` on create is reached only by SystemAdmin ([features/identity-auth.md](features/identity-auth.md) amendment 2026-11-13). |
-| 2026-11-14 | §2 Instants and §4 rows: a request instant needs `Z` or an offset and is converted to UTC; responses use `Z`; an unreadable body gets a `ProblemDetails` in every environment ([fixes/utc-instants.md](fixes/utc-instants.md)). |
-| 2026-11-13 | §4.2 problem codes (accepted): every 409 and every named business 400 carries a stable `code`; one registry; clients branch on `code`. Build contract: [features/portfolios.md](features/portfolios.md) amendment 2026-11-13 part 1. |
-| 2026-11-15 | Trade fees accepted: `/fees` namespace and `/fees/trade-schedules` (`fees.read` / `fees.manage`, §7.9); problem code `fee_schedule_in_effect`; cash legs in the transaction item gain `role` and `fee` ([features/trade-fees.md](features/trade-fees.md)). |
-| 2026-11-15 | §3.1 role permission table: the one table of grants, matching `RolePermissions`. Moved from ADR 0013 and the instruments, accounts, posting and identity-auth specs; adds the portfolios, reports and fees rows and the Customer Portal grants that were missing there. |
-| 2026-11-16 | §4 rows: a `bookedAt` in the future and a cash `amount` with too many decimal places are field 400s. A reverse of a security transaction that is not the latest security activity on its holding is an ordinary 400. No new problem code ([fixes/ledger-write-guards.md](fixes/ledger-write-guards.md)). |
-| 2026-11-17 | §7.6: account custody mode in `review`. `custodyMode` on the account item, required on `POST /accounts`, refused on PUT, optional list filter. No new route, policy or problem code ([features/account-custody-mode.md](features/account-custody-mode.md)). |
-| 2026-11-17 | §7.6: account custody mode accepted. |
-| 2026-11-17 | §7.6: account custody mode landed. |
-| 2026-11-17 | §7.6, §7.7: custody modes in `review`. A Custodial account can be opened (`Brokerage` only); manual entry matrix, same custody mode on both Accounts of a transfer or conversion, and server-set `bookedAt` on Custodial accounts; portfolio assignment and rebalance on Custodial accounts only. No new route, policy or problem code ([features/custody-modes.md](features/custody-modes.md)). |
-| 2026-11-17 | §7.6, §7.7: custody modes accepted. |
-| 2026-11-17 | §7.6, §7.7: custody modes landed. |
-| 2026-11-18 | §7.3: tenant custody modes in `review`. `allowedCustodyModes` on the tenant bodies and item; `POST /accounts` checks it. No new route, policy or problem code ([features/tenant-custody-modes.md](features/tenant-custody-modes.md)). |
-| 2026-11-18 | §7.3: tenant custody modes accepted. |
-| 2026-11-18 | §7.3: tenant custody modes landed. |
-| 2026-11-18 | §7.7: External caller numbers in `review`. Caller `price`, `fee` and `fxRate` on External `Buy` / `Sell`; both amounts and no `expectedRate` or quote on External conversions. No new route, policy or problem code ([features/external-caller-numbers.md](features/external-caller-numbers.md)). |
-| 2026-11-18 | §7.7: External caller numbers accepted. |
-| 2026-11-18 | §7.7: External caller numbers landed. |
-| 2026-11-18 | §7 catalog, §7.8: grouping by custody mode in `review`. `breakdowns.byCustodyMode` on both net-worth reads; a Custody column and subtotals per custody mode in the Adviser Balances PDF; a Custody column and a note in the Customer Transactions PDF. No new route, policy, parameter or problem code ([features/custody-mode-grouping.md](features/custody-mode-grouping.md)). |
-| 2026-11-18 | §7 catalog, §7.8: grouping by custody mode accepted. |
-| 2026-11-19 | §7 catalog, §7.8: grouping by custody mode landed. |
-| 2026-11-19 | §1, §3.1: simulator accepted. A third process with its own control and party surfaces; role `SimulatorOperator` has no permission and gets 401 on `webapi`. No `webapi` route or policy added ([features/simulator.md](features/simulator.md)). |
-| 2026-11-19 | §3.1, §7.7: adjustments accepted. New permission `transactions.adjust` (TenantAdmin only), route `POST /transactions/adjustment`, item field `adjustment`, 403 on reverse of an `Adjustment` without the permission. No problem code. |
-| 2026-11-20 | §6, §7.3, §7.6: client money accounts and deposit references accepted. Sub-resource `/tenants/{tenantId}/client-money-accounts` (`tenants.manage`); tenant item `clientMoneyCurrencies`; account item `depositReference`; `GET /accounts/{id}/deposit-instructions`; Custodial open needs an active client money account in its currency. No new policy or problem code ([features/client-money-accounts.md](features/client-money-accounts.md)). |
-| 2026-11-20 | §3.1, §6, §7.3, §7.6, §7.7: bank feed and deposit matching accepted. Permission `statement-lines.manage` (TenantAdmin only); resources `/statement-lines` and `/bank-connections`; client money account `bankConnection` and `bankFeed`; `GET /accounts?depositReference=`; transaction item `bankReceipt` and source kind `BankFeed`; hand `TransferIn` refused on a Custodial account. No problem code ([features/deposit-matching.md](features/deposit-matching.md)). |
-| 2026-11-20 | §3.1, §6, §7.6, §7.7: nominated bank accounts and withdrawals accepted. Six permissions (`nominated-bank-accounts.read` / `.manage` / `.verify`, `withdrawals.read` / `.request` / `.approve`); resources `/nominated-bank-accounts` and `/withdrawals`; account item `reservedCash` and `availableCash`; transaction item `payment` and source kind `Payment`; hand `TransferOut` refused and `CloseOut` limited on a Custodial account; Custodial transfers between Customers refused; statement line `direction` filter and payout fields. No problem code ([features/withdrawals.md](features/withdrawals.md)). |
-| 2026-11-21 | §6, §7.7: receipt returns, recalls and other debit lines accepted. No route, permission or problem code; statement line statuses `ReturnSent`, `Returned`, four unmatched reasons, method `Recall`, item `returnPayment`, nullable match ids; ignore and reopen on debit lines; request return sends the payment ([features/bank-returns.md](features/bank-returns.md)). |
-| 2026-11-21 | §3.1, §6, §7.8: bank reconciliation accepted. Permissions `bank-reconciliations.manage`, `reports.tenant.read` and `reports.tenant.create` (TenantAdmin only); resource `/bank-reconciliations` (overview, list, get, run now); report scope `Tenant` and report `bank-reconciliation`. No problem code ([features/bank-reconciliation.md](features/bank-reconciliation.md)). |
-| 2026-11-22 | §3.1, §6, §7.6, §7.7: account closure accepted. Permissions `account-closures.read` and `account-closures.request`; sub-resource `/accounts/{accountId}/closures` (request, list, get); account item `closure`, withdrawal item `accountClosureId`; source kind `AccountClosure`; hand `CloseOut` and `POST /accounts/{id}/close` refused on a Custodial account; a closing account refuses every hand write. No problem code ([features/account-closure.md](features/account-closure.md)). |
-| 2026-11-22 | §2, §3.1, §4.2, §6, §7.4, §7.6, §7.7, §7.10: interest run accepted. Namespace `/interest` with `/interest/rate-schedules` and `/interest/runs`; permissions `interest-rates.read`, `interest-rates.manage`, `interest-runs.read`, `interest-runs.start`; problem code `interest_schedule_in_effect`; sub-resources `/users/customers/{customerId}/tax-profile`, `/users/me/tax-profile` and `/accounts/{accountId}/interest-accruals`; account item `accruedInterest`, `interestAccruedThrough`; transaction item `interest`, leg role `Tax` and leg `tax`; source kind `InterestRun`; statement line `kind` and its filter ([features/interest-run.md](features/interest-run.md)). |
-| 2026-11-22 | §6, §7.5: simulated instruments accepted. Resource `/market-data-connections` (`tenants.manage`, list from configuration with the price feed state); instrument item `marketDataConnection`. No new permission or problem code. |
-| 2026-11-22 | §3.1, §6, §7.7, §7.11: corporate actions accepted. Permissions `corporate-actions.read` and `corporate-actions.manage`; resource `/corporate-actions` (list, get, create, update, cancel, apply, entitlements) and `/corporate-action-announcements` (`tenants.manage`); source kind `CorporateAction`; transaction item `corporateAction`; connection item `corporateActions`. No new problem code. |
-| 2026-11-23 | §3.1, §6, §7.3, §7.6, §7.7, §7.12: orders and settlement accepted. Permissions `orders.read` and `orders.place`; resource `/orders` (list, get, create, preview, cancel), `/broker-connections` and `/execution-reports` (`tenants.manage`); `brokerConnection` on the tenant; source kind `OrderFill`; transaction item `execution`; account item `unsettledCash` and `withdrawableCash`; holding item `reservedQuantity` and `availableQuantity`; hand `Buy` / `Sell` refused on a Custodial account. No new problem code. |
-| 2026-11-23 | §3.1, §6, §7.12: trade settlement and broken trades accepted. Permission `trade-settlements.manage`; resource `/trade-settlements` (list, get, pay, set aside); `POST /orders/{id}/fills/{fillId}/resolve-break` (`transactions.adjust`); fill `break`, transaction `execution.brokenAt`, statement line `tradeSettlementId`, reconciliation `openSettlements` and four item kinds, connection `settlementCurrencies`. No new problem code. |
-| 2026-11-23 | §3.1, §4.2, §6, §7.6, §7.12: rebalance through orders accepted. Permissions `rebalances.read` and `rebalances.confirm`; resource `/rebalances` (list, get, confirm, cancel); problem codes `stale_price`, `instrument_inactive`, `currency_mismatch`, `no_broker_connection`, `rebalance_in_progress`; propose and assign answer `{ status, rebalanceId }`; assignment item `rebalance` replaces the three `lastRebalance…` fields; order item `rebalanceId` and filter; `Rebalance` no longer hand-reversible on a Custodial account. |
-| 2026-11-24 | §3.1, §4.2, §6, §7.7, §7.13: migration batches accepted. Permission `migration-batches.manage`; resource `/migration-batches` (list, get, create, replace, submit, return, cancel, post); problem code `migration_batch_not_valid`; source kind `Migration`; transaction item `migration`; statement line `migrationBatchId` and match method `Migration`; reconciliation item kind `MigrationNotPosted`. |
-| 2026-11-24 | §3.1, §6, §7.3, §7.7, §7.14: in-kind transfers accepted. Permissions `in-kind-transfers.read`, `.request`, `.approve`, `custody-movements.manage`, `custodian-reconciliations.manage`; resources `/in-kind-transfers`, `/custody-movements`, `/custodian-reconciliations`, `/tenants/{tenantId}/safekeeping-accounts`, `GET /custodian-connections`; source kind `InKindTransfer`; transaction item `inKindTransfer`; holding item `unsettledQuantity`, `transferableQuantity`. |
-| 2026-11-24 | §6, §7.6, §7.7, §7.11: dividends accepted. Kind `Dividend` on `/corporate-actions` with `dividend`, `payment`, `election` on the item and the `kind` filter; `POST /corporate-actions/{id}/pay-in-cash`; `corporateActionId` on `POST /statement-lines/{id}/match` and the statement line item; `PUT /accounts/{accountId}/dividend-reinvestment`, `reinvestDividends` and `pendingDividends` on the account item; transaction item `dividend`, cash leg role `Reinvestment`, tax kind `ForeignWithholding`; reconciliation item kinds `DividendsNotPosted`, `DividendDifference`. No new permission or problem code |
-| 2026-11-25 | §3.1, §6, §7.7, §7.15: adjustment review accepted. Resource `/adjustment-requests` (list, get, request, approve, reject, cancel) with `transactions.adjust`; `POST /transactions/adjustment` removed; source kind `AdjustmentRequest`; reverse of an `Adjustment` → 400 for every caller. No new permission or problem code. |
-| 2026-11-25 | §6, §7.5, §7.16: market data history accepted. `GET /instruments/{id}/prices` (`instruments.read`) and `GET /fx-rates` (authenticated): stored rows newest first, with `from`, `to` and paging. No new permission or problem code. |
+| 2026-09-11 – 09-14 | First draft: two HTTP surfaces, OpenIddict default paths, the `/users` namespace; identity-auth locks; currencies; §4.1 shared disabled error; people field rules; `GET /tenants/by-code/{code}` |
+| 2026-09-20 – 09-25 | `/instruments` (§7.5); `isEnabled` → `isActive`; `/accounts` (§7.6); `/transactions` and `cashBalance` (§7.7) |
+| 2026-10-11 – 10-26 | Security types and the item shape with `cash` + `security`; net worth; reports (§7.8) |
+| 2026-11-02 | Portfolios |
+| 2026-11-10 – 11-11 | Type-specific create routes (§7.7); internal transfers; FX conversions |
+| 2026-11-13 – 11-16 | Per-request status check; §4.2 problem codes; UTC instants (§2); trade fees (§7.9); §3.1 role permission table; ledger write guards (§4) |
+| 2026-11-17 – 11-19 | Account custody mode and custody modes (§7.6, §7.7); tenant custody modes (§7.3); External caller numbers (§7.7); grouping by custody mode (§7.8); simulator (§1, §3.1); transaction source and adjustments (§7.7) |
+| 2026-11-20 – 11-21 | Client money accounts (§7.3, §7.6); statement lines and deposit matching (§7.17); nominated bank accounts and withdrawals (§6); bank returns; bank reconciliation (§7.8) |
+| 2026-11-22 | Account closure (§7.6); interest (§7.10, §7.4); simulated instruments (§7.5); corporate actions (§7.11) |
+| 2026-11-23 | Orders, trade settlements and rebalances (§7.12) |
+| 2026-11-24 | Migration batches (§7.13); in-kind transfers (§7.14); dividends (§7.11) |
+| 2026-11-25 | Adjustment requests (§7.15); `POST /transactions/adjustment` removed; price and FX rate history (§7.5, §7.16) |
+| 2026-11-26 | The amendments were folded into §7. §1, §3 and §5 now describe the portal clients as [ADR 0016](adr/0016-bff-for-first-party-portals.md) and the BFF specs define them. §7.17 gathers the statement line notes. No rule changed |
