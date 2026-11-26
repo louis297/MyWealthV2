@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-18
-last_updated: 2026-11-15
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -70,7 +70,7 @@ The catalog is firm-wide, not per-Adviser. Customer receives 403. TenantAdmin / 
 - Adviser Portal Instruments page. Catalog management is Scalar or the Back Office ([../backoffice/back-office-instruments.md](../backoffice/back-office-instruments.md)).
 - SystemAdmin ledger screens on `adviser-portal`
 - Empty Account / Holding / Journal tables “for later”
-- Seeding instruments from `0010_instruments.sql` or in Production
+- Seeding instruments from `0010_instruments.sql`. In Production only the demo catalog of `webapi --seed-demo` is written (§9.1)
 
 ---
 
@@ -105,7 +105,7 @@ The catalog is firm-wide, not per-Adviser. Customer receives 403. TenantAdmin / 
 | R11 | Status is `IsActive` (bit), not a `UserStatus` machine. Disable / enable are `POST …/disable` and `POST …/enable`. Not a field on PUT. Never an `IsEnabled` column. |
 | R12 | HTTP idempotent: already disabled + disable, or already enabled + enable → 204, no second event. |
 | R13 | PUT / disable / enable require `rowVersion`. Conflict 409. Missing 400. Same encoding as people. |
-| R14 | PUT updates `name` and/or `symbol` only. Other fields in the body → 400. |
+| R14 | PUT updates `name` and/or `symbol` only. Other fields in the body → 400. Renaming the symbol can change `marketDataConnection` (R23), and with it where the instrument's price comes from, from the next price run. |
 | R15 | No physical delete. Disable is the only way to take a row out of pickers. |
 | R16 | This slice does **not** block disable because holdings exist (no holdings table). The holdings slice adds: new holding of a disabled instrument → 400; existing holdings unchanged. |
 | R17 | List is one tenant. TenantAdmin / Adviser: current tenant. SystemAdmin: `tenantId` query. Every item includes `isActive` and `tenantId`. `enabledOnly` omitted/`false` = all; `true` = `IsActive` only; any other value 400. `page` default 1, `pageSize` default 20 max 100. Optional `search`: Symbol / Name contains (CI) or PublicId exact. Sort symbol then name. |
@@ -116,6 +116,14 @@ The catalog is firm-wide, not per-Adviser. Customer receives 403. TenantAdmin / 
 Policies (register now; map in `RolePermissions`):
 
 `instruments.read`, `instruments.create`, `instruments.manage`. Grants per role are in the role permission table, [api-design.md](../api-design.md) §3.1 (moved there 2026-11-15).
+
+Added by later specs:
+
+| ID | Rule |
+| --- | --- |
+| R23 | **`marketDataConnection`.** The instrument item of `GET /instruments` and `GET /instruments/{id}` carries `marketDataConnection`: the name of the configured market data connection whose symbol suffix the symbol ends with (compared without regard to case), or `null`. Every caller who can read the instrument sees it. No filter on it, and no column: it is worked out from the symbol and the configuration on each read. A symbol like `ACME.SIM` is an ordinary catalog symbol under R6 (simulated-instruments R4, R6). |
+| R24 | **Corporate actions.** A disabled Instrument may still get a corporate action, by hand or from the feed, because it may still be held. An Instrument served by a market data connection takes no hand-entered corporate action; its corporate actions come from the connection's feed (corporate-actions R12, R15, R16). |
+| R25 | **Prices.** `GET /instruments/{id}/prices` lists the stored prices ([instrument-prices.md](instrument-prices.md) R12). The item itself carries no price. |
 
 ---
 
@@ -320,7 +328,9 @@ Development seed prices are not a UI.
 
 ### 9.1 Test seed
 
-Contribute to host `TestSeed` (Development and TestAppHost only). Not `0010_instruments.sql`. Not Production. Idempotent on `(TenantId, Symbol)`.
+Contribute to host `TestSeed` (Development and TestAppHost only). Not `0010_instruments.sql`. Idempotent on `(TenantId, Symbol)`.
+
+The 18-row demo catalog ([demo-tenant-seed.md](demo-tenant-seed.md) §5.1) may be written for tenant `demo` in any environment by `webapi --seed-demo`, without prices. `TestSeed` takes the same catalog and keeps its Development-only extras: the disabled `NZD-CASH` row, the fake table prices, and `ACME.SIM` (USD) and `KIWI.SIM` (NZD) on each firm it seeds ([simulated-instruments.md](simulated-instruments.md)).
 
 Target: the existing Development demo tenant (Phase 1 people seed). CreatedBy = system name.
 
@@ -338,13 +348,13 @@ Functional tests do **not** rely on these rows for isolation; they create their 
 
 ## 10. Tests
 
-| Project | Assert |
-| --- | --- |
-| Domain.UnitTests | Create normalises symbol; `QuoteCurrency` cannot change; disable / enable idempotent; events only on actual change |
-| Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; Adviser POST 201 and GET 200; Adviser PUT / disable → 403; TenantAdmin PUT / disable 204; SystemAdmin list/create without `tenantId` → 400; SystemAdmin with tenant PublicId POST 201 and PUT 204 on another tenant’s id; TenantAdmin other-tenant id → 404; duplicate symbol 400; disabled quote currency 400; `enabledOnly=true` omits disabled; list envelope paging; `rowVersion` 409 |
-| Infrastructure.IntegrationTests | Two-tenant fixture: TenantAdmin other tenant’s PublicId → 404. Unique `(TenantId, Symbol)` allows the same symbol in tenant B. TestSeed idempotent on second run. `IFxRate` same-currency = 1; missing cross pair does not return 1. `IMarketData` missing price is empty |
+The tests are the executable form of §4. Where they live:
 
-No holdings fixture in this slice.
+| Project | Where |
+| --- | --- |
+| Domain.UnitTests | `Entities/InstrumentTests.cs` |
+| Application.FunctionalTests | Folder `Instruments/` |
+| Infrastructure.IntegrationTests | `AppliedSchema/InstrumentsSchemaTests.cs`, `AppliedSchema/TestSeedInstrumentsTests.cs` |
 
 ---
 
@@ -380,45 +390,13 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
+## 12. History
 
-The repository should build after each commit. Agents split each line into red then green.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/instruments.md`).
 
-1. `0010_instruments.sql` + EF mapping + integration test “table exists”
-2. `Instrument` aggregate + Domain.UnitTests
-3. Policies registered in `RolePermissions`
-4. Create / get / list handlers + functional tests (401 / 403 / isolation / unique symbol)
-5. Update / disable / enable + `rowVersion` 409
-6. `IMarketData` / `IFxRate` ports + unit tests for the 1-vs-not-1 FX rule (implementations read local tables; see instrument-prices.md and fx-rates.md)
-7. `TestSeed` instruments + table prices + idempotent integration test
-
-Do not put holdings or portal pages in these commits.
-
----
-
-## Amendment 2026-11-14 (demo catalog in production)
-
-Accepted with [demo-tenant-seed.md](demo-tenant-seed.md). Narrows §2 Out "Seeding instruments … in Production" and §9.1 "Not Production".
-
-- The 18-row demo catalog (demo-tenant-seed §5.1) may be written for tenant `demo` in any environment by `webapi --seed-demo`, without prices.
-- `TestSeed` takes the same catalog and keeps its Development-only extras: the disabled `NZD-CASH` row and the fake table prices.
-- Seeding from `0010_instruments.sql` stays out.
-
----
-
-## Amendment 2026-11-22 (market data connection on the item) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [simulated-instruments.md](simulated-instruments.md). Rules R4 and R6 live there; this section records what changes here.
-
-- The instrument item of `GET /instruments` and `GET /instruments/{id}` gains `marketDataConnection`: the name of the configured market data connection whose symbol suffix the symbol ends with (compared without regard to case), or `null`. Every caller who can read the instrument sees it. No filter on it, and no column: it is worked out from the symbol and the configuration on each read.
-- R14 (rename): renaming the symbol can change `marketDataConnection`, and with it where the instrument's price comes from, from the next price run. A symbol like `ACME.SIM` is an ordinary catalog symbol under R6; no create rule changes.
-- `TestSeed` (§9.1) adds `ACME.SIM` (USD) and `KIWI.SIM` (NZD) to each firm it seeds. The demo catalog of `webapi --seed-demo` does not change.
-
----
-
-## Amendment 2026-11-22 (corporate actions) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md). Rules R15 and R16 live there; this section records what changes here.
-
-- A disabled Instrument may still get a corporate action, by hand or from the feed, because it may still be held (corporate-actions R12, R15).
-- An Instrument served by a market data connection takes no hand-entered corporate action; its corporate actions come from the connection's feed (corporate-actions R16).
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-14 | [demo-tenant-seed.md](demo-tenant-seed.md) | §2, §9.1: the demo catalog may be written in any environment |
+| 2026-11-22 | [simulated-instruments.md](simulated-instruments.md), [corporate-actions.md](corporate-actions.md) | R23, R24, R14: `marketDataConnection`; corporate actions on an Instrument |
+| 2026-11-25 | [market-data-history.md](market-data-history.md) | R25: the price read route |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
