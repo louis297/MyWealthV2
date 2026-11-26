@@ -232,7 +232,7 @@ List filters are separate: currencies and people collections use `enabledOnly` (
 
 ### 4.2 Problem codes (accepted, 2026-11-13)
 
-Status of this section: `accepted` (2026-11-13). The build contract for it is [features/portfolios.md](features/portfolios.md), amendment 2026-11-13, part 1. Landed 2026-11-13: every code in the registry below is a `ProblemException` subclass.
+Status of this section: `accepted` (2026-11-13). It was built with the portfolios change of 2026-11-13 ([features/portfolios.md](features/portfolios.md) §12). Landed 2026-11-13: every code in the registry below is a `ProblemException` subclass.
 
 **Why.** One HTTP status already carries several meanings. `webapi` returns 409 for a stale `rowVersion`, a reused `Idempotency-Key`, a changed FX rate, a report that is not ready, and a portfolio already assigned to the account. `POST /transactions/fx` alone can return two different 409s today, and only the first has a field to tell them apart (`errors.expectedRate`). The portfolios amendment 2026-11-13 adds a sixth. A client that branches on the status alone shows the wrong message as soon as one route can return two of them. A **problem code** names the meaning. The status stays the category.
 
@@ -257,7 +257,7 @@ Status of this section: `accepted` (2026-11-13). The build contract for it is [f
 | `rate_changed` | 409 | The stored FX rate is not the request's `expectedRate`. | `errors.expectedRate` | [features/fx-conversions.md](features/fx-conversions.md) R12 |
 | `report_not_ready` | 409 | The report execution has no result to download yet. | — | [features/reports.md](features/reports.md) |
 | `portfolio_already_assigned` | 409 | The account's Active assignment is already this portfolio. | — | [features/portfolios.md](features/portfolios.md) §7 `AssignPortfolio` |
-| `portfolio_shared` | 409 | The caller is an Adviser and the portfolio is a Shared portfolio. | — | [features/portfolios.md](features/portfolios.md) amendment 2026-11-13 |
+| `portfolio_shared` | 409 | The caller is an Adviser and the portfolio is a Shared portfolio. | — | [features/portfolios.md](features/portfolios.md) §4.1 |
 | `fee_schedule_in_effect` | 409 | The trade fee schedule row may already apply to a posted trade, so it cannot be updated or deleted. Add a new row instead. | — | [features/trade-fees.md](features/trade-fees.md) R11 |
 | `interest_schedule_in_effect` | 409 | The interest rate schedule row may already apply to an accrued day, so it cannot be updated or deleted. Add a new row instead. | — | [features/interest-run.md](features/interest-run.md) R13 |
 | `disabled` | 400 | §4.1 | `target`, `targetId` | §4.1 |
