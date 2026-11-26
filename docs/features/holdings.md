@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-28
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -30,20 +30,11 @@ related:
 
 Security legs, holdings projection, and Opening of holdings on `webapi`. Public write stays `POST /transactions`. Adds script `0014_holdings.sql`. Amends [posting.md](posting.md) with type `OpeningHoldings` and amends [accounts.md](accounts.md) R16 so close also requires a flat holdings book.
 
-Buy / Sell / StockIn / StockOut are accepted in [buy-sell.md](buy-sell.md). Split / Bonus / Scrip are accepted in [split.md](split.md). Dividend is an ordinary cash type and is not this file. No portal page.
+Buy / Sell / StockIn / StockOut are accepted in [buy-sell.md](buy-sell.md). Split / Bonus / Scrip are accepted in [split.md](split.md). §5 lists everything that changes a holding today and the spec that owns it. No portal page.
+
+This file states the rules as they are today. §12 lists what changed here, by date.
 
 **Status is `accepted` and landed** on repo master `676e77a` (PR #1, 2026-10-11). Scripts `0014_holdings.sql` and `0015_transaction_type_opening_holdings.sql` (`CK_Transactions_Type` widened to 0–9; `0016` widens it to 0–11; `0017` widens it to 0–14). `GET /accounts/{id}/holdings` returns `{ "items": [...] }`, not a paged list. TestSeed has one `OpeningHoldings` on the demo brokerage, plus a funding transfer, a Buy, a StockIn, and a Split.
-
-
-**Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md). Each security leg carries its own `AccountId`; the header has none (script `0024`). Security legs are unique per `(TransactionId, AccountId, InstrumentId)`. The projection key is the leg's `(AccountId, InstrumentId)` (R14). "Same Account-locked command" means every leg account locked in ascending `Accounts.Id` order. Bank / Cash refusal is checked per security leg's Account. Item JSON: leg-accounts §8.1.
-
-**Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md) R16. A `Buy` adds `gross + fee` to the holding cost. Release on `Sell` / `StockOut` is unchanged. No other type that changes a holding has a fee.
-
-**Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R15: a Transaction with a security leg can be reversed only while it is the latest security activity on each of its holdings. R18 follows posting R24, which now refuses a `bookedAt` in the future.
-
-**Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). R8: `OpeningHoldings` is refused on a Custodial account (400 with `errors.Type`). A Custodial account starts empty and gets its positions from `Buy`. R6 is unchanged; a Custodial account is always `Brokerage`. R18 follows posting R24 as amended there. The projection, the cost rule and the holdings read are the same for both custody modes.
-
-**Amendment 2026-11-19 (adjustments, accepted):** [adjustments.md](adjustments.md) R10–R13. On a Custodial account a TenantAdmin may change one holding with an `Adjustment`: a security leg that stores the signed `quantityChange` and `costChange` as entered (no price, no average-cost release). After it, quantity `≥ 0` and cost `≥ 0`, and a zero quantity has zero cost, so the projection row can be deleted at zero (R14). A disabled instrument is allowed only when the Account already holds it (R7 otherwise). An adjustment counts as security activity for R15.
 
 ---
 
@@ -84,7 +75,6 @@ Cash position stays the `SUM` of cash legs. An `OpeningHoldings` header has no c
 - Short positions
 - Customer ledger-write
 
-**Amendment for Customer Portal (accepted 2026-11-02).** Holdings read reuses `accounts.read`. With Customer `accounts.read` and self-scope, `GET /accounts/{id}/holdings` succeeds for the caller’s own accounts and returns 404 for another customer’s account. No write.
 - A second POST collection
 - `UPDATE` / `DELETE` of a posted transaction
 - Hand-edited holding quantity or cost
@@ -102,7 +92,7 @@ Cash position stays the `SUM` of cash legs. An `OpeningHoldings` header has no c
 5. As an Adviser I list holdings and see quantity and cost, not market value.
 6. As an Adviser I reverse `OpeningHoldings`. The original row stays.
 7. As an Adviser I cannot close while cash `SUM ≠ 0` or any quantity remains. Close does not liquidate.
-8. As a Customer I receive 403.
+8. As a Customer I read the holdings of my own accounts. I receive 403 on every write.
 
 ---
 
@@ -115,20 +105,20 @@ Cash position stays the `SUM` of cash legs. An `OpeningHoldings` header has no c
 | R3 | Writes stay `POST /transactions` and `POST /transactions/{id}/reverse`. Holdings read is `GET /accounts/{id}/holdings`. Not under `/users`. |
 | R4 | TenantAdmin / Adviser omit `tenantId` (400 if present). SystemAdmin create requires `tenantId`, same as posting. Holdings read uses the account PublicId only. |
 | R5 | Account must be Open, same tenant, and visible to the caller. Closed → 400. Disabled Customer on create / reverse → 400 `disabled` / `target=user`. |
-| R6 | Account type must be Brokerage or Other. Bank or Cash → 400. Property and Credit are not selectable. |
+| R6 | The Account of each security leg must be Brokerage or Other (leg-accounts R16). Bank or Cash → 400. Property and Credit are not selectable. A Custodial account is always `Brokerage`. |
 | R7 | Each security leg stores `InstrumentId` only. Instrument must exist in the same tenant. Disabled instrument on a new leg → 400. Reverse of an existing leg is allowed. Disable instrument is still allowed while holdings exist. |
-| R8 | Type on create in this increment: `OpeningHoldings` only. Buy / Sell / StockIn / StockOut are accepted in [buy-sell.md](buy-sell.md). Split / Bonus / Scrip are accepted in [split.md](split.md). Dividend / unknown → 400 here. Cash `Opening` rules in posting R19 are unchanged. |
+| R8 | `OpeningHoldings` is the type of this spec. The other types that change a holding are in §5. On a Custodial account a hand `OpeningHoldings` is refused (400 `errors.Type`, custody-modes R5): there it is written only by a migration batch, on an empty account, with the cost the batch carries in the instrument's quote currency (migration-batches R10, R22). Cash `Opening` rules are posting R19. |
 | R9 | `security` is an array of 1..n legs. Each leg: `instrumentId`, `quantity` `> 0`, `cost` `≥ 0`. Duplicate instrument in the array → 400. No `amount` and no `cash` on this type → 400 if present. |
 | R10 | Cost currency is the instrument quote currency. Body must not send a currency. A later-disabled catalog currency does not rewrite stored cost currency. |
 | R11 | At most one `OpeningHoldings` per `(Account, Instrument)`, including a reversed one until the product says otherwise: a second header that names an instrument already opened → 400. `OpeningHoldings` must be the first security activity for that instrument. |
 | R12 | No auto zero row. Create Account does not insert a holding. |
-| R13 | After insert, quantity `SUM` per `(Account, Instrument)` `≥ 0`. Stored quantity is `decimal(18,8)`. Cost amount is `decimal(18,4)`. |
-| R14 | Projection upsert in the same Account-locked command. Callers never PUT a holding. Quantity 0 deletes the projection row. Tests assert projection quantity = `SUM` of security-leg quantities. |
-| R15 | Posted rows are not updated or deleted. Reverse copies the opposite security quantity and cost. One reversal per original. No client `rowVersion`. Account Open. Result must stay `≥ 0`. Only the latest security activity on a holding can be reversed: a live later security leg on the same `(Account, Instrument)` → 400 ([ledger-write-guards](../fixes/ledger-write-guards.md)). |
+| R13 | After insert, quantity `SUM` per `(Account, Instrument)` `≥ 0`. Stored quantity is `decimal(18,8)`. Cost amount is `decimal(18,4)`. On a Custodial account a sell order and an `Adjustment` that lowers a holding must also leave **available quantity** `≥ 0` (orders R13, R40); a fill, a rebalance and an entitlement posting are not refused by this rule. |
+| R14 | Projection upsert in the same command, with every leg account locked in ascending `Accounts.Id` order (leg-accounts R11). The projection key is the security leg's `(AccountId, InstrumentId)` (leg-accounts R15). Callers never PUT a holding. Quantity 0 deletes the projection row. Tests assert projection quantity = `SUM` of security-leg quantities. A platform-side flow that writes a security leg updates the projection in the same Account-locked database transaction. |
+| R15 | Posted rows are not updated or deleted. Reverse copies the opposite security quantity and cost. One reversal per original. No client `rowVersion`. Account Open. Result must stay `≥ 0`. Only the latest security activity on a holding can be reversed: a live later security leg on the same `(Account, Instrument)` → 400 ([ledger-write-guards](../fixes/ledger-write-guards.md)). An adjustment, an order fill, an entitlement posting, an in-kind transfer and a reinvested dividend all count as security activity. By hand, on a Custodial account only a Transaction with source `Manual` is reversed (transaction-source R13). |
 | R16 | `CloseAccount` rejects unless cash `SUM = 0` and no `Holdings` row remains for that account. Amends accounts R16. `Account.Close()` writes neither cash nor holdings. |
 | R17 | `Idempotency-Key` required on create and reverse, same as posting. |
 | R18 | `bookedAt` required instant, as [posting](posting.md) R24. Memo optional 1–200. Reference optional, stored, no uniqueness. |
-| R19 | Customer has no ledger-write policy → 403. Holdings read is `accounts.read`, so a caller who can see the account can see its positions. No `holdings.create`. |
+| R19 | Customer has no ledger-write policy → 403. Holdings read is `accounts.read`, so a caller who can see the account can see its positions: a Customer reads the holdings of their own accounts and gets 404 for another Customer's account. No `holdings.create`. |
 | R20 | Account list and item do not embed holdings. |
 
 Policies: no new names. `transactions.create` for Opening and reverse. `accounts.read` for the holdings read.
@@ -148,6 +138,20 @@ Policies: no new names. `transactions.create` for Opening and reverse. `accounts
 
 Average cost is the rule the projection uses. This increment only adds cost (Opening). Sell release is specified so the next feature does not add a second cost column: cost out = average × quantity, server-computed.
 
+What changes a holding. The first column is the type of the Transaction; a person enters it where the manual entry matrix allows (custody-modes §4.2), and the platform writes it on a Custodial account:
+
+| Type | On a Custodial account written by | Effect on the holding | Rules |
+| --- | --- | --- | --- |
+| `OpeningHoldings` | A migration batch | Adds quantity and the cost given | R8–R11; [migration-batches.md](migration-batches.md) |
+| `Buy` | An order fill | Adds quantity; adds `gross + fee` to the cost | [buy-sell.md](buy-sell.md), [trade-fees.md](trade-fees.md) R16, [orders.md](orders.md) |
+| `Sell`, `StockOut` | An order fill; an in-kind transfer out | Lowers quantity; releases average cost. A fee does not change the release | [buy-sell.md](buy-sell.md), [in-kind-transfers.md](in-kind-transfers.md) |
+| `StockIn` | An in-kind transfer in | Adds quantity and the cost given | [buy-sell.md](buy-sell.md), [in-kind-transfers.md](in-kind-transfers.md) |
+| `Split`, `Bonus`, `Scrip` | An entitlement posting (`Split` and `Bonus` only): `quantityAfter = RoundDown(quantityBefore × factor, 8)` | Changes quantity; total cost unchanged | [split.md](split.md), [corporate-actions.md](corporate-actions.md) R25–R29 |
+| `Adjustment` | The approval of an adjustment request. Custodial accounts only | The signed `quantityChange` and `costChange` as entered (no price, no average-cost release). After it quantity `≥ 0`, cost `≥ 0`, and a zero quantity has zero cost. A disabled instrument is allowed only when the Account already holds it | [adjustments.md](adjustments.md) R10–R13 |
+| `Dividend` with a reinvestment | Corporate actions | Adds the reinvested quantity, and the reinvested amount as cost, like a `Buy` with no fee. A holding sold since the ex-date is created again | [dividends.md](dividends.md) R40 |
+
+A `Dividend` with no reinvestment, and every cash type, does not touch a holding.
+
 Buy / Sell, when that feature opens, must not trust client price, cost, or cash amount. Server calls `IMarketData.TryGetPrice(instrumentId, bookedAt)`. Missing price → 400. Cross currency uses `IFxRate`; missing pair → 400, never 1. Price is not stored on the leg. That HTTP is not this increment.
 
 ---
@@ -158,7 +162,7 @@ Script: `database/schema/0014_holdings.sql`. Do not back-fill. Do not add EF mig
 
 | Table | Change | Index / FK |
 | --- | --- | --- |
-| `TransactionSecurityLegs` | add | PK `Id`. FK `TransactionId` → `Transactions` RESTRICT. Unique `(TransactionId, InstrumentId)`. FK instrument and tenant consistent with the header. Quantity `decimal(18,8)`. Cost `decimal(18,4)` + `char(3)` quote currency. Audit + `RowVersion`. |
+| `TransactionSecurityLegs` | add | PK `Id`. FK `TransactionId` → `Transactions` RESTRICT. `AccountId` (script `0024`) and `TenantId` (script `0027`) on every leg. Unique `(TransactionId, AccountId, InstrumentId)`. FK instrument and tenant consistent with the header. Quantity `decimal(18,8)`. Cost `decimal(18,4)` + `char(3)` quote currency. Audit + `RowVersion`. |
 | `Holdings` | add | PK `Id`. Unique `PublicId`. Unique `(AccountId, InstrumentId)`. Quantity `decimal(18,8)`. Cost + cost currency. Audit + `RowVersion`. |
 
 No quantity or cost column on `Accounts`. No free-text symbol. No price column. Leg `Id` and leg `RowVersion` are not client tokens. HTTP addresses Transaction `PublicId` and Holding `PublicId`.
@@ -224,6 +228,17 @@ Holdings item:
 
 Transaction item shape is owned by [leg-accounts.md](leg-accounts.md) §8.1: `cash` and `security` arrays, each leg with its own `accountId` / `customerId`. `OpeningHoldings` returns `cash: []`.
 
+The holdings item also carries four computed quantities, none stored on `Holdings`:
+
+| Field | Is | On an External account |
+| --- | --- | --- |
+| `reservedQuantity` | The open quantity of the Account's live sell orders in the Instrument plus their fills not posted yet, plus the quantity of its open in-kind transfers `Out` | `0` |
+| `availableQuantity` | Quantity minus reserved quantity | The quantity |
+| `unsettledQuantity` | The quantity of the Account's `Posted` buy fills in the Instrument that are not settled and not broken | `0` |
+| `transferableQuantity` | Available quantity minus unsettled quantity, never below 0 | The quantity |
+
+Field rules: orders R40, R41; in-kind-transfers R43, R44.
+
 ### 8.2 Errors
 
 Ordinary validation stays in `errors`: Bank/Cash, disabled instrument, second Opening for the same instrument, cash field present, quantity not `> 0`, cost `< 0`, close while holdings remain. Disabled Customer uses `code=disabled` / `target=user`. Cross-tenant or wrong-collection id → 404.
@@ -238,11 +253,13 @@ None. Pages live in [docs/adviser-portal/](../adviser-portal/). Scalar is enough
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | Quantity sign; Bank/Cash refuse security; cost `≥ 0`; cannot mutate posted header |
-| Application.FunctionalTests | 401; Customer 403; OpeningHoldings happy path; second instrument allowed; same instrument 400; disabled instrument 400; Bank 400; cash field 400; reverse; close rejected while quantity remains; holdings read includes `id` |
-| Infrastructure.IntegrationTests | Other tenant 404; Adviser unassigned 404; no quantity column on `Accounts`; no free-text symbol; `PublicId` on `Holdings` |
+| Domain.UnitTests | `Entities/OpeningHoldingsTests.cs` |
+| Application.FunctionalTests | `Transactions/OpeningHoldingsTests.cs`, `Transactions/OpeningHoldingsProjectionTests.cs` |
+| Infrastructure.IntegrationTests | `AppliedSchema/HoldingsSchemaTests.cs` |
 
 TestSeed (Development / TestAppHost only): one `OpeningHoldings` on Demo brokerage for an existing TestSeed instrument. Not a Buy. Functional tests create their own rows.
 
@@ -269,63 +286,20 @@ Still out of this increment: portal pages, net worth, live FX, lots.
 
 ---
 
-## 12. Suggested commits
+## 12. History
 
-Only after this file is `accepted`. Tree must build after each commit.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/holdings.md`).
 
-1. `0014_holdings.sql` + EF mapping + integration test that security legs and `Holdings` exist and `Accounts` has no quantity column.
-2. Domain security leg + `OpeningHoldings` guards + unit tests.
-3. `CreateTransaction` for `OpeningHoldings` + policies reused + functional tests.
-4. Reverse of `OpeningHoldings` + projection upsert / delete-at-zero.
-5. Close-flat guard + `GET /accounts/{id}/holdings` + TestSeed.
-
-## Amendment 2026-11-14 (UTC instants)
-
-Accepted with [utc-instants](../fixes/utc-instants.md). R18 follows posting R24.
-
----
-
-## Amendment 2026-11-22 (corporate actions) — accepted
-
-Status of this amendment: `accepted` (2026-11-22), together with [corporate-actions.md](corporate-actions.md). Rules R25–R29 live there; this section records what changes here.
-
-- The type table: an **entitlement posting** (`Split` or `Bonus` with source `CorporateAction`) is a security-only change on a Custodial holding, written by the platform. Quantity becomes `quantityAfter = RoundDown(quantityBefore × factor, 8)`; total cost is unchanged. The projection is updated in the same Account-locked transaction (R14).
-- An entitlement posting counts as security activity for R15 (corporate-actions R31).
-
----
-
-## Amendment 2026-11-23 (orders and settlement) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R13, R31, R40 and R41 live there; this section records what changes here.
-
-- The item of `GET /accounts/{id}/holdings` gains `reservedQuantity` (the open quantity of the Account's live sell orders in that Instrument plus their fills not posted yet) and `availableQuantity` (quantity minus reserved quantity). Neither is stored on `Holdings`; on an External account reserved quantity is always 0 (orders R40, R41).
-- On a Custodial account a sell order and an `Adjustment` that lowers a holding must leave available quantity `≥ 0` (orders R13, R40). A fill, a rebalance and an entitlement posting are not refused by this rule.
-- The type table: on a Custodial account a `Buy` or `Sell` is written by the platform from an order's fill (source `OrderFill`) or by a rebalance; the hand entry is refused. The projection is updated in the same Account-locked transaction (R14), and a fill counts as security activity for R15 (orders R31, R37).
-
----
-
-## Amendment 2026-11-24 (migration batches) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [migration-batches.md](migration-batches.md). Rules R10 and R22 live there; this section records what changes here.
-
-- R8, R11: on a Custodial account an `OpeningHoldings` is written only by a migration batch (`Transaction.PostMigratedHoldings`, source `Migration`, a migration detail), on an empty account, with the cost the batch carries in the instrument's quote currency. The hand `OpeningHoldings` stays refused, with the message of migration-batches R26.
-- A migrated holding's instrument must be quoted in the Account's currency (issue `InstrumentCurrencyMismatch`) and be active (`InstrumentInactive`). The projection is updated in the post's transaction (R14).
-
----
-
-## Amendment 2026-11-24 (in-kind transfers) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R37, R43 and R44 live there; this section records what changes here.
-
-- The item of `GET /accounts/{id}/holdings` gains `unsettledQuantity` (the quantity of the Account's `Posted` buy fills in the Instrument that are not settled and not broken) and `transferableQuantity` (available quantity minus unsettled quantity, never below 0). On an External account they are `0` and the holding's quantity.
-- `reservedQuantity` now also counts the quantity of the Account's open in-kind transfers `Out` in the Instrument; `availableQuantity` is still quantity minus reserved quantity.
-- The type table: on a Custodial account a `StockIn` or `StockOut` is written by an in-kind transfer (source `InKindTransfer`); the projection is updated in the same Account-locked transaction (R14), and it counts as security activity for R15.
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R40 lives there; this section records what changes here.
-
-- A `Dividend` may carry one security leg with a cost: the new shares of a reinvestment add to the holding like a `Buy` with no fee (quantity up by the reinvested quantity, total cost up by the reinvested amount), and a holding sold since the ex-date is created again.
-- "Dividend is ordinary cash" no longer holds for a reinvested dividend. A `Dividend` with no reinvestment still does not touch a holding.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-02 | [customer-portal.md](../customer-portal/customer-portal.md) | R19: a Customer reads the holdings of their own accounts |
+| 2026-11-10 | [leg-accounts.md](leg-accounts.md) | R6, R14, §6: the Account is on each security leg |
+| 2026-11-14 | [utc-instants](../fixes/utc-instants.md) | R18 follows posting R24 |
+| 2026-11-15 | [trade-fees.md](trade-fees.md) | §5: a `Buy` adds the fee to the cost |
+| 2026-11-16 | [ledger-write-guards](../fixes/ledger-write-guards.md) | R15: only the latest security activity is reversed |
+| 2026-11-17 | [custody-modes.md](custody-modes.md) | R8: a hand `OpeningHoldings` is refused on a Custodial account |
+| 2026-11-19 | [adjustments.md](adjustments.md) | §5: an `Adjustment` changes one holding |
+| 2026-11-22 | [corporate-actions.md](corporate-actions.md) | §5, R15: entitlement postings |
+| 2026-11-23 | [orders.md](orders.md) | §8.1: reserved and available quantity. R13: available quantity. §5: fills |
+| 2026-11-24 | [migration-batches.md](migration-batches.md), [in-kind-transfers.md](in-kind-transfers.md), [dividends.md](dividends.md) | R8: migrated holdings. §8.1: unsettled and transferable quantity. §5: in-kind transfers and reinvested dividends |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
