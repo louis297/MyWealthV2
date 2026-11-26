@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-11
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -28,24 +28,15 @@ related:
 
 # Buy / Sell / Stock in-out
 
-Cash + security legs on the existing Transaction aggregate. Public write stays `POST /transactions`. No new table (tables from `0014_holdings.sql`). `0016_transaction_type_stock_in_out.sql` widens the type check so StockIn and StockOut can be stored. Server prices Buy / Sell via `IMarketData` (`InstrumentPrices`) and `IFxRate` (`FxRates`). Stock in/out has no cash leg. Amends the type tables in [posting.md](posting.md) and [holdings.md](holdings.md), and the transaction item shape.
+Cash + security legs on the existing Transaction aggregate: the types `Buy`, `Sell`, `StockIn` and `StockOut`, their legs, and the average-cost rule. Public write stays `POST /transactions`. No new table (tables from `0014_holdings.sql`). `0016_transaction_type_stock_in_out.sql` widens the type check so StockIn and StockOut can be stored. Stock in/out has no cash leg.
+
+Where the numbers of a `Buy` / `Sell` come from depends on the custody mode of the Account. On an External account a person enters the trade with the executed price ([external-caller-numbers.md](external-caller-numbers.md)). On a Custodial account no person enters these types: a `Buy` / `Sell` is the fill of an order ([orders.md](orders.md)), and a `StockIn` / `StockOut` is written by an in-kind transfer ([in-kind-transfers.md](in-kind-transfers.md)). The legs, the cost and the release are the same in every case.
+
+This file states the rules as they are today. §13 lists what changed here, by date.
 
 Split / Bonus / Scrip are accepted in [split.md](split.md). No portal page. No price on the holdings read.
 
 **Status is `accepted` and landed** on repo master `821c715` (2026-10-12). Script `0016_transaction_type_stock_in_out.sql` (`CK_Transactions_Type` widened to 0–11). TestSeed has one `Buy` and one `StockIn` on the demo brokerage. Split / Bonus / Scrip are the next accepted slice on these same tables ([split.md](split.md)).
-
-
-**Amendment 2026-11-10 (leg accounts, accepted, landed):** [leg-accounts.md](leg-accounts.md). Both legs of a `Buy` / `Sell` carry the create body's `accountId`; the header has no Account. R15 "same Account-locked command" means every leg account locked in ascending `Accounts.Id` order. The item JSON in §8.1 is replaced by leg-accounts §8.1 (shown below).
-
-**Amendment 2026-11-15 (trade fees, accepted):** [trade-fees.md](trade-fees.md). Every `Buy` / `Sell` looks up the tenant's trade fee schedule for the instrument's quote currency and the UTC date of `bookedAt`. When the fee is above 0, the trade gets a second cash leg with role `Fee` on the same Account and a fee detail of kind `Brokerage` (trade-fees R7, R14, R18). R9: a `fee` field on the create body → 400. R11: `Buy` cost is `gross + fee`; the `Sell` release in R15 is unchanged. R12: the fee leg uses the principal's rate and rounding. R13: the cash check counts the fee leg. R16: reverse copies the fee leg and its fee detail. Every cash leg in the item carries `role` and `fee` (trade-fees §8.1). "Fees" in §2 Out and §12 is replaced by trade-fees §2 Out.
-
-**Amendment 2026-11-16 (ledger write guards, accepted):** [ledger-write-guards](../fixes/ledger-write-guards.md). R16: a `Buy`, `Sell`, `StockIn` or `StockOut` can be reversed only while it is the latest security activity on its holding. R18 follows posting R24, which now refuses a `bookedAt` in the future.
-
-**Amendment 2026-11-17 (custody modes, accepted, landed):** [custody-modes.md](custody-modes.md). R8: `Buy` and `Sell` are allowed on both custody modes and are priced by the server on both. `StockIn` and `StockOut` are refused on a Custodial account (400 with `errors.Type`). R10, R12 and R18: on a Custodial account the booking time is the server clock, a body that sends `bookedAt` → 400, and the price and the FX rate are read for that instant. An External account is unchanged; caller-supplied prices there are a later slice.
-
-**Amendment 2026-11-18 (External caller numbers, accepted, landed):** [external-caller-numbers.md](external-caller-numbers.md). On an External account: R9 — `security[0].price` (the executed price, `> 0`, at most 8 decimals) is required, `fee` is optional, and a new `fxRate` is required when the instrument's quote currency differs from the Account currency (refused when they match). R10 — no `IMarketData` call; a missing stored price does not matter. R11, R12 — the same formulas with the caller's price and `fxRate`; no `IFxRate` call. The trade gets an FX detail with source `Caller` when it has an `fxRate`. On a Custodial account R9–R12 are unchanged, and `fxRate` → 400. Posted trades are not changed.
-
-**Amendment 2026-11-23 (orders and settlement, accepted):** [orders.md](orders.md). R8: on a Custodial account a hand `Buy` or `Sell` is refused for every caller (400 `errors.Type`, `Trades on a Custodial account go through the broker. Place an order.`). A `Buy` / `Sell` there is written by the platform from the fill of an order (source `OrderFill`), or by a rebalance until roadmap O3. R9–R12 on a fill: the price is the broker's fill price and `IMarketData` is not read; `gross`, the cost, the cash legs and the release use the same formulas (orders R32); the Transaction has an execution detail with the broker's trade date, settlement date and contract note (orders R35). A buy order must be in the Account's currency; a sell fill in another currency is converted as R12 does (orders R9, R34). R13, R14: the cash of a buy and the quantity of a sell are reserved when the order is placed (orders R12, R13). R16: a fill is not hand-reversible, and it counts as security activity on its holding (orders R37). External accounts are unchanged.
 
 ---
 
@@ -53,7 +44,7 @@ Split / Bonus / Scrip are accepted in [split.md](split.md). No portal page. No p
 
 A TenantAdmin or Adviser records a `Buy`, `Sell`, `StockIn`, or `StockOut` on an **Open** Brokerage or Other account of an assigned / same-tenant Customer. SystemAdmin does the same on Scalar for a chosen tenant. Customer receives 403. Bank and Cash refuse every security leg.
 
-The header is the existing Transaction. Each of these types has exactly one security leg. `Buy` / `Sell` also have exactly one cash leg (server-priced). `StockIn` / `StockOut` have no cash leg. The `Holdings` projection is upserted in the same Account-locked command. Cost stays average cost in the instrument quote currency.
+The header is the existing Transaction. Each of these types has exactly one security leg. `Buy` / `Sell` also have one `Principal` cash leg and, when a fee applies, one `Fee` cash leg. `StockIn` / `StockOut` have no cash leg. The `Holdings` projection is upserted in the same Account-locked command. Cost stays average cost in the instrument quote currency.
 
 ---
 
@@ -62,7 +53,7 @@ The header is the existing Transaction. Each of these types has exactly one secu
 **In**
 
 - Domain: types `Buy`, `Sell`, `StockIn`, `StockOut` on the existing `Transaction` aggregate. Exactly one security leg. `Buy` / `Sell` also have exactly one cash leg. Average-cost update on the existing `Holding` projection.
-- Application: extend `CreateTransaction` / `ReverseTransaction` for the four types. Reuse `IMarketData.TryGetPrice` and `IFxRate` for `Buy` / `Sell` only.
+- Application: extend `CreateTransaction` / `ReverseTransaction` for the four types. The price and the rate come from the caller on an External account, and from the broker and `IFxRate` on a fill (R10, R12).
 - No new table or column. Tables and columns from [holdings.md](holdings.md) (`0014_holdings.sql`). Script `0016_transaction_type_stock_in_out.sql` only widens `CK_Transactions_Type` to 0–11.
 - No new policy. Writes reuse `transactions.create`. Holdings read stays `accounts.read`.
 - Isolation tests + Development / TestAppHost `TestSeed` (one `Buy` and one `StockIn` on an existing demo brokerage).
@@ -75,7 +66,7 @@ The header is the existing Transaction. Each of these types has exactly one secu
 - Adviser Portal pages.
 - Price or market value on `GET /accounts/{id}/holdings`. Net worth, snapshots, Dashboard.
 - Live vendor calls on the request path. `IMarketData` and `IFxRate` read local tables.
-- Fees, lots, wash sales, realized-gain reports, short positions.
+- Lots, wash sales, realized-gain reports, short positions. Fees are [trade-fees.md](trade-fees.md).
 - Multi-instrument Buy/Sell (one security leg per header this increment).
 - Cross-account transfer.
 - Property / Credit selectable.
@@ -87,15 +78,15 @@ The header is the existing Transaction. Each of these types has exactly one secu
 
 ## 3. Stories
 
-1. As an Adviser I record a `Buy` of an instrument on a Brokerage account so quantity and cash both move without typing a price.
+1. As an Adviser I record a `Buy` of an instrument on an External Brokerage account, with the price it was executed at, so quantity and cash both move.
 2. As an Adviser I record a `Sell` and the cash increases while the holding quantity falls at average cost.
 3. As an Adviser I cannot Buy or Sell on Bank or Cash (400).
-4. As an Adviser I cannot pick a disabled instrument (400). Missing price → 400. Missing FX pair → 400.
+4. As an Adviser I cannot pick a disabled instrument (400). A trade across currencies without `fxRate` → 400.
 5. As an Adviser I cannot Sell more than the current holding quantity (400). After the command, cash `SUM ≥ 0` and holding quantity `≥ 0`.
 6. As an Adviser I reverse a Buy or Sell. The original row stays. The reverse restores cash and quantity.
 7. As an Adviser I record a `StockIn` (quantity + cost, no cash) so shares arrive from outside without a buy.
 8. As an Adviser I record a `StockOut` so shares leave at average cost without a sell.
-9. As a Customer I receive 403.
+9. As a Customer I receive 403 on every write.
 
 ---
 
@@ -110,17 +101,17 @@ The header is the existing Transaction. Each of these types has exactly one secu
 | R5 | Account must be Open, same tenant, and visible to the caller. Closed → 400. Disabled Customer on create / reverse → 400 `disabled` / `target=user`. |
 | R6 | Account type must be Brokerage or Other. Bank / Cash → 400. |
 | R7 | Instrument must exist, same tenant, and `IsActive`. Disabled or missing → 400. |
-| R8 | Type on create in this increment: `Buy`, `Sell`, `StockIn`, `StockOut` (plus the already-accepted cash set and `OpeningHoldings`). `Split` / `Bonus` / `Scrip` are accepted in [split.md](split.md). Unknown → 400. |
-| R9 | Body `security` is an array of exactly one leg. `Buy` / `Sell` leg fields: `instrumentId`, `quantity` `> 0`. No `cost`, no `price`, no `amount`, no `cash` on that create body → 400 if present. `StockIn` also requires `cost` `≥ 0` (client-supplied, quote currency). `StockOut` is `instrumentId` + `quantity` `> 0` only. |
-| R10 | `Buy` / `Sell` only: server calls `IMarketData.TryGetPrice(instrumentId, bookedAt)` for the UTC date of `bookedAt` ([utc-instants](../fixes/utc-instants.md)). Missing or empty price → 400. Price is not stored on the leg. The port reads `InstrumentPrices`. |
-| R11 | `Buy` / `Sell` cost on the security leg is `quantity × price` in the instrument quote currency. Body must not send a currency. `StockIn` cost is the client amount, same quote currency. |
-| R12 | `Buy` / `Sell` cash-leg currency is `Account.Currency`. If the quote currency differs, server calls `IFxRate`. Missing pair → 400, never treat as 1. Same-currency FX is 1. Cash amount is server-computed: `Buy` decreases cash (`amount < 0`); `Sell` increases cash (`amount > 0`). `StockIn` / `StockOut` have no cash leg; a cash / amount field on those bodies → 400. |
-| R13 | Security-leg quantity is stored signed: `Buy` / `StockIn` `+quantity`; `Sell` / `StockOut` `−quantity`. After insert, quantity `SUM` per `(Account, Instrument)` `≥ 0`. Cash `SUM ≥ 0` on non-Credit accounts. |
+| R8 | The types of this spec are `Buy`, `Sell`, `StockIn` and `StockOut`. On an External account a person enters all four on `POST /transactions`. On a Custodial account the hand entry of each is refused for every caller (400 `errors.Type`, custody-modes §4.2.1): a `Buy` / `Sell` is written by the platform from the fill of an order (source `OrderFill`; orders R48), and a `StockIn` / `StockOut` by an in-kind transfer when the custodian's movement confirms it (source `InKindTransfer`, memo `Transfer in` / `Transfer out`, an in-kind transfer detail; in-kind-transfers R36–R38). `Split` / `Bonus` / `Scrip` are [split.md](split.md). Unknown → 400. |
+| R9 | Body `security` is an array of exactly one leg. `Buy` / `Sell` leg fields: `instrumentId`, `quantity` `> 0`, and `price`, the executed price (`> 0`, at most 8 decimals; required on an External account). The body may carry `fee` and, when the instrument's quote currency differs from the Account currency, must carry `fxRate`; `fxRate` is refused when they match (external-caller-numbers §4.2). No `cost`, no `amount`, no `cash` on that create body → 400 if present. `StockIn` also requires `cost` `≥ 0` (client-supplied, quote currency). `StockOut` is `instrumentId` + `quantity` `> 0` only. |
+| R10 | **Price.** `Buy` / `Sell` only. On an External account the price is the caller's; `IMarketData` is not called, and a missing stored price does not matter. On a fill the price is the broker's fill price, and `IMarketData` is not read either (orders R32). The price is not stored on the leg; a fill keeps it in its execution detail (orders R35). |
+| R11 | `Buy` / `Sell` cost on the security leg is `quantity × price` in the instrument quote currency; a `Buy` with a fee has cost `gross + fee` (trade-fees R16). Body must not send a currency. `StockIn` cost is the client amount, or the transfer's cost, in the same quote currency. `StockOut` releases average cost (R15). |
+| R12 | `Buy` / `Sell` cash-leg currency is `Account.Currency`. If the quote currency differs, the rate is the caller's `fxRate` on an External account, with an FX detail of source `Caller`; on a fill the server calls `IFxRate` for the UTC date of the posting, and a missing pair is never treated as 1 (a buy order must be in the Account's currency; a sell fill in another currency is converted: orders R9, R34). Same-currency FX is 1. Cash amount is server-computed: `Buy` decreases cash (`amount < 0`); `Sell` increases cash (`amount > 0`). A fee is a second cash leg with role `Fee` on the same Account, with the principal's rate and rounding and a fee detail of kind `Brokerage` (trade-fees R7, R14, R18). `StockIn` / `StockOut` have no cash leg; a cash / amount field on those bodies → 400. |
+| R13 | Security-leg quantity is stored signed: `Buy` / `StockIn` `+quantity`; `Sell` / `StockOut` `−quantity`. After insert, quantity `SUM` per `(Account, Instrument)` `≥ 0`. Cash `SUM ≥ 0` on non-Credit accounts. The cash check counts the fee leg. On a Custodial account the cash of a buy and the quantity of a sell are reserved when the order is placed (orders R12, R13). |
 | R14 | `Sell` / `StockOut` quantity must not exceed the current holding quantity for that instrument (400). No holding → 400. `Buy` / `StockIn` may be the first security activity for that instrument (creates the holding). |
-| R15 | Projection upsert in the same Account-locked command. Callers never PUT a holding. `Buy` / `StockIn` add cost. `Sell` / `StockOut` release cost: `released = Round(oldCost × sellQty / oldQty, 4, MidpointRounding.AwayFromZero)`; remaining = oldCost − released. Selling the full quantity leaves remaining 0. Quantity 0 deletes the projection row. Tests assert projection quantity = `SUM` of security-leg quantities and projection cost matches this rule. |
-| R16 | Posted rows are not updated or deleted. Reverse copies the opposite cash amount (if any) and the opposite security quantity and cost. One reversal per original. No client `rowVersion`. Account Open. If the reverse would make cash or quantity `< 0` → 400; original stays. Only the latest security activity on a holding can be reversed: a live later security leg on the same `(Account, Instrument)` → 400 ([ledger-write-guards](../fixes/ledger-write-guards.md)). |
+| R15 | Projection upsert in the same Account-locked command. Callers never PUT a holding. `Buy` / `StockIn` add cost. `Sell` / `StockOut` release cost: `released = Round(oldCost × sellQty / oldQty, 4, MidpointRounding.AwayFromZero)`; remaining = oldCost − released. Selling the full quantity leaves remaining 0. Quantity 0 deletes the projection row. Tests assert projection quantity = `SUM` of security-leg quantities and projection cost matches this rule. "Account-locked" means every leg account locked in ascending `Accounts.Id` order (leg-accounts R11). |
+| R16 | Posted rows are not updated or deleted. Reverse copies the opposite cash amount (if any) and the opposite security quantity and cost. One reversal per original. No client `rowVersion`. Account Open. If the reverse would make cash or quantity `< 0` → 400; original stays. Only the latest security activity on a holding can be reversed: a live later security leg on the same `(Account, Instrument)` → 400 ([ledger-write-guards](../fixes/ledger-write-guards.md)). Reverse copies the fee leg and its fee detail. A fill and the `StockIn` / `StockOut` of an in-kind transfer are not reversed by hand, and each counts as security activity on its holding (orders R37). |
 | R17 | `Idempotency-Key` required on create and reverse, same as posting and holdings. |
-| R18 | `bookedAt` required instant, as [posting](posting.md) R24. Memo optional 1–200. Reference optional, stored, no uniqueness. |
+| R18 | `bookedAt` required instant, as [posting](posting.md) R24. Memo optional 1–200. Reference optional, stored, no uniqueness. On a Custodial account the platform books a fill or a transfer at its own time when it posts. |
 | R19 | Customer has no ledger-write policy → 403. |
 | R20 | Close still requires cash `SUM = 0` and no `Holdings` row (already locked in holdings R16). Buy / Sell do not change that guard. |
 
@@ -137,11 +128,11 @@ Policies: no new names. `transactions.create` for the four types and reverse.
 | `TransactionSecurityLeg` | Entity (existing) | Exactly one instrument. Quantity signed. Cost in quote currency. |
 | `Holding` | Projection (existing) | Per `(Account, Instrument)`. Average cost. Quantity 0 deletes the row. |
 | `TransactionType` | Enum | Accept `Buy`, `Sell`, `StockIn`, `StockOut`. |
-| `IMarketData` / `IFxRate` | Ports (existing) | Read local tables. Used by `Buy` / `Sell` only. |
+| `IMarketData` / `IFxRate` | Ports (existing) | Read local tables. `IFxRate` converts a fill across currencies. `IMarketData` is not read when a `Buy` / `Sell` is posted. |
 
 Invariants:
 
-- `Buy` / `Sell`: client does not supply price, cost, or cash amount. Server prices.
+- `Buy` / `Sell`: the client never supplies the cost or the cash amount. The server computes both from the price (R10–R12).
 - `StockIn`: client supplies cost `≥ 0` in the quote currency. No price call. No cash.
 - `StockOut`: no client cost. Release at average. No cash.
 - Price is not persisted on the leg.
@@ -183,7 +174,7 @@ Create and reverse require `Idempotency-Key`.
 
 ### 8.1 Bodies
 
-`Buy` / `Sell` create (no client price, cost, or cash):
+`Buy` / `Sell` create on an External account. The body below shows the fields this spec owns; it also carries `security[0].price`, the optional `fee` and, across currencies, `fxRate` ([external-caller-numbers.md](external-caller-numbers.md) §8.1). No cost and no cash:
 
 ```json
 {
@@ -268,11 +259,13 @@ None. Pages live in [docs/adviser-portal/](../adviser-portal/). Scalar is enough
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | Signs; server cost on Buy; StockIn client cost; average-cost release rounding (R15); Bank/Cash refuse; cannot mutate posted header; result quantity and cash `≥ 0` |
-| Application.FunctionalTests | No Bearer → 401 not 302; Customer → 403; happy Buy then Sell; StockIn then StockOut; missing price → 400; missing FX → 400; Sell/StockOut over quantity → 400; Buy that would make cash negative → 400; reverse restores; reverse that would go negative → 400; idempotent replay; hash mismatch 409; disabled instrument → 400 |
-| Infrastructure.IntegrationTests | Two-tenant fixture: other tenant’s account or instrument → 404. TestSeed idempotent. Table price used; same-currency FX = 1; missing cross pair is not 1. |
+| Domain.UnitTests | `Entities/BuySellTests.cs`, `Entities/EnteredTradeNumbersTests.cs` |
+| Application.FunctionalTests | `Transactions/BuySellTests.cs`, `Transactions/ExternalTradeTests.cs`; fills in `Orders/` and `Broker/`; in-kind transfers in `InKindTransfers/` |
+| Infrastructure.IntegrationTests | Two-tenant fixture: other tenant's account or instrument → 404 |
 
 TestSeed (Development / TestAppHost only): one `Buy` and one `StockIn` on the existing demo brokerage for an existing TestSeed instrument that has a seeded price. Not an Opening. Functional tests create their own rows.
 
@@ -288,8 +281,8 @@ No new ADR. Decisions 2026-10-11.
 | Caller | TenantAdmin; Adviser (assigned); SystemAdmin (Scalar, `tenantId` on create). Customer 403. |
 | Types | `Buy`, `Sell`, `StockIn`, `StockOut`. `Split` / `Bonus` / `Scrip` are accepted in [split.md](split.md), not as `StockIn` / `StockOut`. |
 | Legs | Exactly one security leg. `Buy` / `Sell`: exactly one cash leg. `StockIn` / `StockOut`: no cash leg. |
-| Price | `Buy` / `Sell` only. `IMarketData.TryGetPrice(instrumentId, bookedAt)`. Reads `InstrumentPrices`. Missing → 400. Not stored. |
-| FX | `Buy` / `Sell` only, when quote ≠ account currency. Missing pair → 400, never 1. |
+| Price | `Buy` / `Sell` only. External account: the caller's executed price. Custodial account: the broker's fill price. Not stored on the leg. |
+| FX | `Buy` / `Sell` only, when quote ≠ account currency. External account: the caller's `fxRate`. A fill: `IFxRate`; a missing pair is never 1. |
 | StockIn cost | Client-supplied, `≥ 0`, quote currency. No price call. |
 | StockOut / Sell release | `released = Round(oldCost × qty / oldQty, 4, MidpointRounding.AwayFromZero)`. Remaining = old − released. Full quantity → remaining 0. |
 | First activity | `Buy` / `StockIn` may create the holding. `Sell` / `StockOut` require an existing holding. |
@@ -306,32 +299,25 @@ Open questions: none that block review.
 
 - **Split / Bonus / Scrip.** Accepted in [split.md](split.md). Not this slice. Same tables, same `POST /transactions`, security-only, **total cost unchanged**. Client sends the new total quantity, not a ratio. Do not model them as `StockIn` / `StockOut`.
 - Price or market value on `GET /accounts/{id}/holdings`. Net worth. Dashboard. Daily snapshots.
-- Fees, lots, wash sales, realized-gain reports, short positions.
+- Lots, wash sales, realized-gain reports, short positions.
 - Live vendor calls on the request path. `IMarketData` and `IFxRate` read local tables.
 - Multi-instrument Buy/Sell.
 - Cross-account transfer. Property / Credit. Customer ledger-write.
-- Client price override on Buy/Sell.
 
 ---
 
-## 13. Suggested commits
+## 13. History
 
-The repository should build after each commit. Agents split each line into red then green.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/buy-sell.md`).
 
-1. Domain: four types + average-cost release (R15) + unit tests.
-2. Application: extend `CreateTransaction` / `ReverseTransaction`; wire `IMarketData` / `IFxRate` (local tables) for Buy/Sell; functional tests (Buy, Sell, StockIn, StockOut, missing price, oversell, cash negative, reverse rejected).
-3. API: bodies; item shape `cash` + `security`; pure-cash item moves to `cash`; isolation tests.
-4. TestSeed one `Buy` and one `StockIn`. Amend posting and holdings type tables and the transaction item shape in the same change that accepts this file.
-
-## Amendment 2026-11-14 (UTC instants)
-
-Accepted with [utc-instants](../fixes/utc-instants.md). R10 prices for the UTC date of `bookedAt`; the `IFxRate` call in R12 uses the same date. R18 follows posting R24. The item example shows the UTC form.
-
----
-
-## Amendment 2026-11-24 (in-kind transfers) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rules R36–R38 and R48 live there; this section records what changes here.
-
-- R8: on a Custodial account a `StockIn` or `StockOut` is written only by an in-kind transfer, when the custodian's movement confirms it: one security leg, `+quantity` with the transfer's cost for a `StockIn`, `−quantity` at the holding's average cost for a `StockOut` (R11, R15), no cash leg, source `InKindTransfer`, memo `Transfer in` / `Transfer out`, and an in-kind transfer detail. The hand entry stays refused, with the message of in-kind-transfers R48.
-- External accounts are unchanged.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-10 | [leg-accounts.md](leg-accounts.md) | R15, §8.1: the Account is on each leg |
+| 2026-11-14 | [utc-instants](../fixes/utc-instants.md) | R10, R12: the UTC date of `bookedAt` |
+| 2026-11-15 | [trade-fees.md](trade-fees.md) | R11–R13, R16: the fee leg |
+| 2026-11-16 | [ledger-write-guards](../fixes/ledger-write-guards.md) | R16: only the latest security activity is reversed |
+| 2026-11-17 | [custody-modes.md](custody-modes.md) | R8: hand `StockIn` / `StockOut` refused on a Custodial account |
+| 2026-11-18 | [external-caller-numbers.md](external-caller-numbers.md) | R9–R12: the caller's price, fee and rate on an External account |
+| 2026-11-23 | [orders.md](orders.md) | R8–R14, R16: on a Custodial account a trade is an order fill |
+| 2026-11-24 | [in-kind-transfers.md](in-kind-transfers.md) | R8: `StockIn` / `StockOut` on a Custodial account |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
