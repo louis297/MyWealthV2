@@ -30,7 +30,7 @@ public sealed record AccountValuation(
     {
         var currency = Code(accountCurrency);
         var lines = position.Lines
-            .Select(line => Value(position.Day, line, currency, decimalPlaces, prices, rates))
+            .Select(line => Value(position.Day, line, currency, decimalPlaces, prices, rates, basisChanges))
             .ToList();
 
         // R16: the totals add the Valued lines only; a line that is not valued is never counted as 0.
@@ -41,14 +41,16 @@ public sealed record AccountValuation(
     }
 
     /// <summary>R14: the first status of the table that applies, in this order: <c>NegativeQuantity</c>,
-    /// <c>NoPrice</c>, <c>StalePrice</c>, <c>NoRate</c>, <c>StaleRate</c>, <c>Valued</c>.</summary>
+    /// <c>NoPrice</c>, <c>StalePrice</c>, <c>PriceBeforeCorporateAction</c>, <c>NoRate</c>, <c>StaleRate</c>,
+    /// <c>Valued</c>.</summary>
     private static ValuationLine Value(
         DateOnly day,
         PositionLine line,
         string accountCurrency,
         IReadOnlyDictionary<string, int> decimalPlaces,
         IReadOnlyDictionary<int, StoredPrice> prices,
-        IReadOnlyDictionary<string, StoredRate> rates)
+        IReadOnlyDictionary<string, StoredRate> rates,
+        IReadOnlyList<BasisChange> basisChanges)
     {
         var quantity = line.LedgerQuantity;
         if (quantity < 0m)
@@ -64,6 +66,25 @@ public sealed record AccountValuation(
         if (!ValuationRules.IsFresh(price.AsOfDate, day))
         {
             return NotValued(line, quantity, ValuationLineStatus.StalePrice, price);
+        }
+
+        // R18: the price is on the new basis from the ex-date, the ledger quantity once the posting is booked.
+        var end = LedgerDay.End(day);
+        foreach (var change in basisChanges
+                     .Where(change => change.InstrumentId == line.InstrumentId)
+                     .OrderBy(change => change.ExDate)
+                     .ThenBy(change => change.BookedAt))
+        {
+            var priceIsNew = price.AsOfDate >= change.ExDate;
+            var quantityIsNew = change.BookedAt < end;
+            if (priceIsNew && !quantityIsNew)
+            {
+                quantity = change.Ratio.Apply(change.Kind, quantity);
+            }
+            else if (!priceIsNew && quantityIsNew)
+            {
+                return NotValued(line, quantity, ValuationLineStatus.PriceBeforeCorporateAction, price);
+            }
         }
 
         // R15: the market value is rounded to the quote currency; the value is worked out from the rounded figure.

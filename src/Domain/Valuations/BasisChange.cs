@@ -1,3 +1,5 @@
+using MyWealthV2.Domain.CorporateActions;
+
 namespace MyWealthV2.Domain.Valuations;
 
 /// <summary>
@@ -10,4 +12,8 @@ public sealed record BasisChange(
     DateTimeOffset BookedAt,
     CorporateActionKind Kind,
     int RatioNew,
-    int RatioHeld);
+    int RatioHeld)
+{
+    /// <summary>The ratio, whose factor is that of corporate-actions R3.</summary>
+    public CorporateActionRatio Ratio => new(RatioNew, RatioHeld);
+}
