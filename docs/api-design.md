@@ -288,7 +288,7 @@ Protocol paths use **OpenIddict defaults. Do not remap.** Portals and `webapi` f
 | Authorize | `GET /connect/authorize` | Authorization code + PKCE. Unauthenticated callers hit hosted login |
 | Token | `POST /connect/token` | Exchange for access / refresh; also used to refresh. No password grant |
 | Revocation | `POST /connect/revocation` | Revoke refresh on logout (default name is revocation, not revoke) |
-| End session | `GET/POST /connect/logout` | Portal returns to registered `{portalOrigin}/`. IdentityHost passthrough requires the SignOut action in identity-auth R21 |
+| End session | `GET/POST /connect/logout` | The client's holder sends `post_logout_redirect_uri`, the client's registered post-logout URI: `{bffOrigin}/` for a portal, `{backOfficeOrigin}/` for Back Office (identity-auth §4.2). IdentityHost passthrough requires the SignOut action in identity-auth R21 |
 | Userinfo | `GET /connect/userinfo` | Library default; Phase 1 portal mainly uses access-token claims |
 | Hosted login | Password page on `identity` | email + password + tenantCode (SystemAdmin omits tenantCode). **Not** a `/connect` protocol endpoint. Razor Pages at `/login` |
 
@@ -895,4 +895,4 @@ One row per change. The text of each change is in git (`git log -p -- docs/api-d
 | 2026-11-26 | Account valuation (§6, §7.6): `GET /accounts/{id}/valuation?date=` with `accounts.read`. No new permission or problem code |
 | 2026-11-26 | Valuation run (§3.1, §6, §7.6, §7.18): `valuation-runs.read` and `valuation-runs.start`; `/valuation-runs`; `GET /accounts/{id}/valuations[/{date}]`; `valuedThrough` on the account item. No problem code |
 | 2026-11-26 | Valuation history (§6, §7.18): `GET /net-worth/funds-under-management`; `folded` on the net-worth reads; `date` of the Adviser Balances Report. No permission or problem code |
-| 2026-11-27 | Docs caught up with the code: §1 diagram shows the BFF between the browser and `webapi`; §2 CORS is none on `webapi`; §4 login failures are uniform (`Invalid login.`), no longer open; §7.8 the Customer's `reports.customer.create` and the Tenant pair; §4.2 `concurrent_modification` marked retired |
+| 2026-11-27 | Docs caught up with the code: §1 diagram shows the BFF between the browser and `webapi`; §2 CORS is none on `webapi`; §4 login failures are uniform (`Invalid login.`), no longer open; §7.8 the Customer's `reports.customer.create` and the Tenant pair; §4.2 `concurrent_modification` marked retired; §5 end session returns to `{bffOrigin}/` |

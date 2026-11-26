@@ -101,7 +101,7 @@ A person may complete authorization only for a client that allows that `Users.Ro
 | R18 | Password change, person disable, tenant disable, and logout revoke tokens. Disable / password change use domain events plus `ITokenRevocation`. Logout revokes on `identity` (R21). The User aggregate does not hold tokens. Password change, person disable and tenant disable revoke when the outbox delivers their event, not inside the request (§4.5). |
 | R19 | Identity may keep its `Email` column (framework). Uniqueness lives on Domain `Users`. |
 | R20 | Client allow-list: `adviser-portal` → TenantAdmin, Adviser. `customer-portal` → Customer. `back-office` → SystemAdmin. `simulator` → SimulatorOperator. Wrong role → no code, uniform failure. Do not say "no identity". The details of each client are in §4.2. |
-| R21 | End session is OpenIddict `GET/POST /connect/logout`. While `EnableEndSessionEndpointPassthrough` is on, IdentityHost **must** expose a matching action: `SignInManager.SignOutAsync()` then `SignOut(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)`. That clears the hosted-login cookie. The portal sends `client_id` and `post_logout_redirect_uri` (registered `{portalOrigin}/`). Revoke the refresh token at `POST /connect/revocation` (`token_type_hint=refresh_token`) before that redirect, or revoke the subject inside the action. Do **not** add `/auth/logout`. Do not remap the path. The caller of revocation and end-session is the client's holder (a BFF, Back Office, the simulator). `/connect/logout` signs out only the identity cookie scheme of its `client_id` (§4.3). |
+| R21 | End session is OpenIddict `GET/POST /connect/logout`. While `EnableEndSessionEndpointPassthrough` is on, IdentityHost **must** expose a matching action: `SignInManager.SignOutAsync()` then `SignOut(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)`. That clears the hosted-login cookie. The client's holder sends `client_id` and `post_logout_redirect_uri` (the client's registered post-logout URI, §4.2: `{bffOrigin}/` for a portal). Revoke the refresh token at `POST /connect/revocation` (`token_type_hint=refresh_token`) before that redirect, or revoke the subject inside the action. Do **not** add `/auth/logout`. Do not remap the path. The caller of revocation and end-session is the client's holder (a BFF, Back Office, the simulator). `/connect/logout` signs out only the identity cookie scheme of its `client_id` (§4.3). |
 
 `RolePermissions` (ADR 0013). This slice registers the map. Customer APIs ship later.
 
@@ -372,15 +372,7 @@ Resource API (`webapi`):
 
 `PUT /users/me/password` body: `{ "currentPassword", "newPassword" }`. 204. No tokens in the body.
 
-Phase 1 client:
-
-| Item | Value |
-| --- | --- |
-| ClientId | `adviser-portal` |
-| Type | Public + PKCE |
-| Grant | Authorization code + refresh |
-| Redirect | `{portalOrigin}/callback` |
-| Post-logout | `{portalOrigin}/` — must be on the OpenIddict client `PostLogoutRedirectUris` |
+Clients: §4.2 lists each client with its holder, grant, redirect and post-logout URIs. Every client is confidential and uses the authorization code + PKCE; the two portal clients are held by their BFF (ADR 0016). There is no public client. A post-logout URI must be on the OpenIddict client's `PostLogoutRedirectUris`.
 
 Keep [api-design.md](../api-design.md) in the same change when the catalog moves.
 
@@ -550,4 +542,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-13 | — | §4.5: `webapi` re-checks person and tenant status. §4.3: the security stamp. §4.4: lockout and one hash per attempt |
 | 2026-11-19 | [simulator.md](simulator.md) | §4.2, §4.3, §4.6, §4.7: client `simulator` and the role `SimulatorOperator` |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
-| 2026-11-27 | — | R3: the uniform failure is locked (§11), so the "until locked" wording is gone. No rule changed |
+| 2026-11-27 | — | R3: the uniform failure is locked (§11), so the "until locked" wording is gone. R21, §8: the post-logout URI is the client's own from §4.2 (`{bffOrigin}/` for a portal); the old public `adviser-portal` client table is gone. No rule changed |
