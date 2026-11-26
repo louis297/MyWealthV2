@@ -27,6 +27,7 @@ related:
   - features/market-data-history.md
   - features/account-valuation.md
   - features/valuation-run.md
+  - features/valuation-history.md
 ---
 
 # Historical valuation roadmap
@@ -152,6 +153,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 - **Changes:** amendments to net-worth (R6 the fold, R10 the date) and reports (R14); page notes under `docs/adviser-portal/` and `docs/customer-portal/`.
 - **Depends on:** V3. The fold also needs V1.
 - **Also decide:** the FX fold (Q7), which net-worth has left open since it was accepted; whether the series covers External accounts, valued on read through V2, or funds under management only (recommended: funds under management first).
+- **Spec:** [valuation-history.md](features/valuation-history.md) (in review since 2026-11-26; twelve points in its §11 wait for an answer). It recommends: a series of funds under management only, from the stored valuations, with no External account (`GET /net-worth/funds-under-management?from=&to=`, under the prefix both BFFs already proxy), every day of a range of at most 366 days up to the last final day; a fold on read, per currency per day, at the stored rate of that day into the Tenant's reporting currency now, with the age limit of a valuation, a currency with no fresh rate left out and the figure marked incomplete; a day also incomplete when an expected account has no stored valuation or an incomplete one, a Closed account not expected after its closure, which would refine valuation-run R26; a top-level `folded` on net worth now; an optional `date` on the Adviser Balances Report (manual only, up to the last final day, Custodial accounts from the stored valuations, External accounts from the valuation read, no cost); charts as plain SVG on both Dashboards and on the page of a Custodial account; no `GET /net-worth?date=`. No script, permission or BFF change.
 
 ---
 
@@ -199,7 +201,7 @@ Each step depends only on earlier steps.
 | 1 | V1 price and rate history | "Historical back-fill" and the deferred read routes of instrument-prices and fx-rates | [market-data-history](features/market-data-history.md) | landed 2026-11-25 |
 | 2 | V2 valuation as of a date | — | [account-valuation](features/account-valuation.md) | landed 2026-11-26 |
 | 3 | V3 daily valuation run and stored valuations | "Still open: daily snapshots" (function-plan §5.4) | [valuation-run](features/valuation-run.md) | landed 2026-11-26 |
-| 4 | V4 net worth history and reports as of a date | "Daily snapshots, historical series" and "FX fold" (net-worth Out) | — | not specified; optional for the business roadmap |
+| 4 | V4 net worth history and reports as of a date | "Daily snapshots, historical series" and "FX fold" (net-worth Out) | [valuation-history](features/valuation-history.md) | review 2026-11-26; optional for the business roadmap |
 
 Steps 1 to 3 are step 3 of the business roadmap. When step 3 here has landed, step 4 of [future-plans.md](future-plans.md) §1 (the advisory fee) can open. Step 4 here can run beside it.
 
