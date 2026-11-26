@@ -332,7 +332,7 @@ Client money account item:
 
 Disable / enable body: `{ "rowVersion": "<base64>" }`.
 
-Account item (other fields as in [accounts.md](accounts.md) §8.1 and its amendments):
+Account item (other fields as in [accounts.md](accounts.md) §8.1):
 
 ```json
 {

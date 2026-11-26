@@ -141,7 +141,7 @@ flowchart LR
 
 Every host runs with `ASPNETCORE_ENVIRONMENT=Production` and `ASPNETCORE_HTTP_PORTS=8080;8081`. Development seeders, the Hangfire dashboard and the dev SPA proxy therefore stay off.
 
-The table lists the keys the compose file sets. Keys marked † are introduced by [features/production-hosting.md](features/production-hosting.md) and ‡ by the [identity-auth.md](features/identity-auth.md) §4.6. production-hosting.md and that amendment are `accepted`, so the † and ‡ names are final.
+The table lists the keys the compose file sets. Keys marked † are introduced by [features/production-hosting.md](features/production-hosting.md) and ‡ by the [identity-auth.md](features/identity-auth.md) §4.6. production-hosting.md and that section are `accepted`, so the † and ‡ names are final.
 
 | Host | Keys |
 | --- | --- |
@@ -224,7 +224,7 @@ GitHub environment `production` also holds two variables that are not secret: `S
 
 - `.env` is created by hand on the VPS from `deploy/.env.example`, `chmod 600`, owned by the deploy user. GitHub does not hold the runtime secrets. To change one, edit `.env` and run `docker compose up -d`.
 - Values in `.env` use letters, digits and `-` only. `$` triggers compose interpolation, and quotes or `;` break the SQL connection string. The exception is `LUCKYPENNY_LICENSE_KEY`: it is a JWT, pasted as issued. Its `.` and `_` are safe because compose interpolates only `$` and the value never enters the connection string.
-- Passwords that become Identity passwords (`BOOTSTRAP_SYSTEMADMIN_PASSWORD`, `BOOTSTRAP_SIMULATOROPERATOR_PASSWORD`, and the smoke passwords of [smoke-test.md](smoke-test.md) §3) must pass the Identity password options: 8+ characters with an upper-case letter, a lower-case letter, a digit and a non-alphanumeric character (only `RequiredLength` differs from the ASP.NET Core Identity defaults). A `-` satisfies the last rule and is safe in `.env`. Otherwise `webapi` refuses to start (identity-auth bootstrap amendment), or the create form rejects the password.
+- Passwords that become Identity passwords (`BOOTSTRAP_SYSTEMADMIN_PASSWORD`, `BOOTSTRAP_SIMULATOROPERATOR_PASSWORD`, and the smoke passwords of [smoke-test.md](smoke-test.md) §3) must pass the Identity password options: 8+ characters with an upper-case letter, a lower-case letter, a digit and a non-alphanumeric character (only `RequiredLength` differs from the ASP.NET Core Identity defaults). A `-` satisfies the last rule and is safe in `.env`. Otherwise `webapi` refuses to start (identity-auth §4.6), or the create form rejects the password.
 - SystemAdmin credentials never leave the owner. CI never signs in as SystemAdmin.
 - Aspire user secrets are for local Development only. They are not a deployment source.
 - The OpenIddict certificates are self-signed and generated on the VPS: RSA 3072, valid 730 days, key usage `digitalSignature` for signing and `keyEncipherment` for encryption. Only the PFX files are kept.
