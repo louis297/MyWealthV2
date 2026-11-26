@@ -34,7 +34,17 @@ Every day the platform values each Custodial account for each day that has not b
 
 New: tables `StoredValuations`, `StoredValuationLines` and `ValuationRuns`, and `Accounts.ValuedThrough`, in script `0059_stored_valuations.sql`; permissions `valuation-runs.read` and `valuation-runs.start`; routes `GET /accounts/{id}/valuations`, `GET /accounts/{id}/valuations/{date}`, `GET|POST /valuation-runs` and `GET /valuation-runs/{id}`; `valuedThrough` on the account item; the `worker` job `valuation-run` on the new queue `valuation`; `TestSeed` history; a Back Office section. No problem code, domain event, `TransactionType`, port, setting or simulator change. No Adviser Portal or Customer Portal page.
 
-**Status is `accepted` (2026-11-26).** The twelve points of §11 were confirmed as recommended. Point 1 refines roadmap Q5, which was reworded.
+**Status is `accepted` (2026-11-26), landed 2026-11-26.** The twelve points of §11 were confirmed as recommended. Point 1 refines roadmap Q5, which was reworded.
+
+Notes from landing:
+
+- §7: `StoreAccountValuations.ValueThroughAsync(account, throughDate, run)` returns what it did for the account (whether it had a day to value, the days stored, how many were incomplete, and the day and error it stopped at) instead of throwing, so `RunValuations` counts R13 and logs R12 with the account PublicId and the day. `RunValuations` also refuses a through date after the last final day itself, so no caller can store a day that is not final (§5 invariants).
+- R6: the day after `valuedThrough` is checked again under the lock inside each day's database transaction; a day another run already stored is skipped and the loop goes on with the next day.
+- R13: `accountsProcessed` counts an account whose next day (the day after `valuedThrough`, or its first day) is on or before its last day; an account with nothing to value is not counted.
+- R15, R17, R22: `throughDate`, `from`, `to` and `{date}` bind as text and are parsed as `yyyy-MM-dd` (as account-valuation R20), so a bad date answers `errors.ThroughDate`, `errors.From`, `errors.To` or `errors.Date` rather than a binding error. A `complete` filter that is not `true` or `false` is refused by binding (400, no `errors` key).
+- R5: `Account.MarkValued` stamps the Account's `LastModified` with each stored day, as `MarkInterestAccrued` does.
+- §9.1: the fixed pattern is a factor `1 + 0.01 × w`, with `w` taken from `0, 1, 2, 1, 0, −1, −2, −1` counting back from 2026-03-31, so each history row is within 2 % of its 2026-01-01 row and the row of 2026-03-31 equals it again; a pair into USD moves the other way. The Sell is booked at 2026-02-17 10:00 +13:00 (UTC day 2026-02-16) at that day's seeded price (VTI 252.50) and the TransferIn at 2026-03-03 10:00 +13:00 (UTC day 2026-03-02). `Created` is the instant of the funding. The two buys of custody-modes §9.1 and the buy of "Demo brokerage" keep the 2026-01-01 prices, so the history does not change them. The demo Custodial account of the second firm gets the same rows.
+- §10: the worked example is booked through the API on an External account, as in account-valuation §10, then made Custodial in the database, because a Custodial `bookedAt` is set by the server. That ledger books T5 on its ex-date, so the restated quantity of Thursday 5 is covered by the Domain tests (`StoredValuationTests`). The job tests record the run of any Tenant that is not part of the test and do not execute it, because the schema test database is shared.
 
 ---
 
@@ -471,17 +481,15 @@ Page contract: [back-office.md](../backoffice/back-office.md) (BO34, BO35), amen
 
 ## 10. Tests
 
-Suggested layout; the tests are the executable form of §4.
+The tests are the executable form of §4. Where they live:
 
-| Project | Where | Assert |
-| --- | --- | --- |
-| Domain.UnitTests | Folder `Valuations/`: `StoredValuationTests`, `ValuationRunTests`, `LastFinalDayTests`, `AccountValuedThroughTests` | `From` copies every figure and line of an `AccountValuation` (§1.1 Thursday 5 and Wednesday 11); `LastFinalDay` is today − 2 and agrees with `MarketDataRow.IsFinal`; `MarkValued` moves one day at a time and refuses an External account; a run completes once |
-| Application.FunctionalTests | Folder `Valuations/`: `ValuationRunTests` | §1.1 as a sequence of runs on a Custodial account with a moved clock: catch-up, as booked, the restated quantity, the incomplete day, a repeat with zero counts, the later price that changes nothing (R6–R13); R3 (first day, a Closed account stops at its closure, a reopened one goes on); R11 (an empty day); R12 (a failure on one account, the next run starts at the failed day); the stored item equals the valuation read of the same day when it is stored (R10) |
-| Application.FunctionalTests | `Valuations/StartValuationRunTests` | R15, R24: 201 and the counts; `throughDate` after the last final day → 400; unknown tenant → 404; a TenantAdmin, Adviser or Customer → 403 |
-| Application.FunctionalTests | `Valuations/GetStoredValuationsTests`, `GetValuationRunsTests` | R17–R23: filters, paging, 404 for a day not stored, an External account answers an empty page, `valuedThrough` on the account item |
-| Application.FunctionalTests | `Valuations/StoredValuationAccessTests` | R1 and the cross-tenant 404: two-tenant fixture; another Tenant's Account or run → 404; an Adviser and an unassigned Customer's Account → 404; a Customer reads own |
-| Infrastructure.IntegrationTests | `AppliedSchema/StoredValuationsSchemaTests.cs`, `ValuationRunJobTests.cs`, `TestSeedValuationTests.cs` | The script: unique `(AccountId, ValuationDate)`, the CHECKs of §6.1, the tenant composite keys, `ValuedThrough` only on a Custodial account; the job registration (queue, cron, no retries) and one Tenant's failure not stopping the others; the seeded history is written once and leaves existing rows |
-| Back Office tests | The tenant configuration page | BO34, BO35 |
+| Project | Where |
+| --- | --- |
+| Domain.UnitTests | Folder `Valuations/`: `StoredValuationTests` (R8, R9, R11), `ValuationRunTests` (R13), `LastFinalDayTests` (R4), `AccountValuedThroughTests` (R5) |
+| Application.FunctionalTests | Folder `Valuations/`: `ValuationRunTests` (§1.1 as a sequence of runs, R2–R13), `StartValuationRunTests` (R1, R15, R24), `GetValuationRunsTests` (R22, R23 and the cross-tenant 404), `GetStoredValuationsTests` (R17–R21), `StoredValuationAccessTests` (R1 and the cross-tenant 404) |
+| Application.FunctionalTests | `BackOffice/`: BO34, BO35 |
+| Infrastructure.IntegrationTests | `AppliedSchema/StoredValuationsSchemaTests` (§6.1), `TenantCompositeKeysSchemaTests` (the four keys), `ValuationRunJobTests` (R14), `TestSeedValuationTests` (§9.1) |
+| Application.UnitTests | `RolePermissionsTests`: the two permissions |
 
 No Simulator.Tests: the simulator does not change.
 
@@ -545,17 +553,4 @@ Made when this spec was accepted (2026-11-26):
 
 [account-valuation.md](account-valuation.md) (R13: a stored valuation is made from the day before yesterday on; §2 Out and "Still open": the V3 rows point here), [accounts.md](accounts.md) (`valuedThrough` on the account item), [account-closure.md](account-closure.md) (a Closed Custodial account is valued through the day its closure completed, note), [custody-mode-grouping.md](custody-mode-grouping.md) and [net-worth.md](net-worth.md) (funds under management of a past day is R26 here; "daily snapshots" in Out point here, the series stays V4), [back-office.md](../backoffice/back-office.md) (BO34, BO35), [api-design.md](../api-design.md) (§3.1 two permission rows, §6 resource rows, a new §7.18 Valuations, a §7.6 note on `valuedThrough` and the two account routes, change log), [domain-model.md](../domain-model.md) (§8.5 `ValuedThrough`, §8.23 the stored valuation and the run), [database-design.md](../database-design.md) (§11.22 and the change log), [architecture.md](../architecture.md) (§10 the `worker` job and queue), [function-plan.md](../function-plan.md) §5.4 ("daily snapshots" is no longer open), [glossary.md](../glossary.md) (the review terms become accepted; "Funds under management" gains its past-day reading; "Final row" and "Valuation" point at the stored valuation), [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §1 (step 3 is done when this lands; step 4 can open), and [valuation-roadmap.md](../valuation-roadmap.md) (Q5 reworded by point 1, §5 V3, §8).
 
----
-
-## 13. Suggested commits
-
-Removed when the slice lands. Each line is one behaviour: a red commit, then a green commit, plus a refactor commit when it changes files. The tree compiles after every commit.
-
-1. Script `0059_stored_valuations.sql`, the EF mappings and the schema tests (§6.1)
-2. Domain: `StoredValuation.From`, `ValuationRun`, `Account.MarkValued`, `ValuationRules.LastFinalDay` (§5)
-3. `StoreAccountValuations` and `RunValuations`: one account through a date, catch-up, exactly once, the days of an account, failures (R2–R13)
-4. The daily job `valuation-run` (R14)
-5. The manual run `POST /valuation-runs` and the run reads (R15, R22–R24)
-6. The stored valuation reads and `valuedThrough` on the account item, with the cross-tenant tests (R1, R17–R21)
-7. `TestSeed` history (§9.1)
-8. Back Office section (BO34, BO35)
+When it landed (2026-11-26): [custody-modes.md](custody-modes.md) §9.1 (the seeded Sell and TransferIn, the open date and the cash balance of the demo Custodial account).
