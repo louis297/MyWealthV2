@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-01
-last_updated: 2026-11-25
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -95,7 +95,7 @@ The Adviser Portal browser talks only to the BFF origin: login/logout on the BFF
 | R4 | The BFF may 302 the **browser** to `/bff/login` or to `identity` authorize when **its own** session is missing. It must not rewrite `webapi` 403 / 404 / 409 / 400 bodies or status codes when proxying. |
 | R5 | Proxy preserves method, path after `/api`, query, JSON body, and product headers (`Idempotency-Key`, `Content-Type`). List envelope, PublicId, and error envelope stay [api-design.md](../api-design.md). |
 | R6 | Refresh lives only in the BFF process (tokens saved by the OIDC handler). The SPA must not call `/connect/token` or `/connect/revocation`. |
-| R7 | On `webapi` 401, the BFF refreshes **once** with the stored refresh token and retries the proxied request. If refresh fails, clear the BFF cookie and return 401 to the SPA. Do not start authorize from an XHR. |
+| R7 | On `webapi` 401, the BFF refreshes **once** with the stored refresh token and retries the proxied request. If refresh fails, clear the BFF cookie and return 401 to the SPA. Do not start authorize from an XHR. At most one refresh grant is in flight per refresh token, and a rotated token is remembered (§4.1). |
 | R8 | Logout order: sign out the BFF cookie → `POST identity /connect/revocation` (`token_type_hint=refresh_token`) → OpenIddict end-session (`/connect/logout` with `client_id` and `post_logout_redirect_uri`). Do not add `/auth/logout`. identity-auth R21 still owns the identity action. IdentityHost clears only the `adviser-portal` scheme cookie (identity-auth §4.3). |
 | R9 | `ClientId` remains `adviser-portal`. Allow-list: TenantAdmin, Adviser. SystemAdmin was removed by identity-auth §4.2 and receives no code. Customer + correct password → no code, uniform failure (identity-auth R4 / R20). |
 | R10 | Client is confidential. Secret only in Aspire / host configuration. Authorization code + PKCE stay on. No password grant. |
@@ -108,13 +108,34 @@ The Adviser Portal browser talks only to the BFF origin: login/logout on the BFF
 | R17 | `/callback` on the SPA is retired. OIDC callback is `/signin-oidc` on the BFF. Deep-link return uses the OIDC handler `state`, still only in-app paths (adviser-portal C14). `returnUrl` must be a relative path: starts with `/`, must not start with `//` or `/\`, must not contain `\`. Redirect URIs registered on the client are exact. A `*.dev.localhost` alias may be upserted only when that host is a browser entry. Do not register a wildcard, the BFF http endpoint, or the Vite origin. `https://localhost:7190` is the current Development dashboard link, not a locked port. |
 | R18 | Mutating browser calls (`POST` / `PUT` / `PATCH` / `DELETE` under `/api`, and `POST /bff/logout`) require header `X-MyWealth-Request: 1`. Missing header → **400**, do not proxy. GET does not require it. This is not a second CSRF token. SameSite=Lax stays. |
 | R19 | Do not proxy `/connect/*` to the browser. The SPA has no identity origin in env for protocol calls. |
-| R20 | Proxy only these `webapi` prefixes: `/users`, `/tenants`, `/currencies`, `/accounts`, `/instruments`, `/transactions`. Any other `/api/*` path → **404**, not forwarded. Do not forward `/scalar`, `/openapi`, `/health`, `/connect`. Destination is Aspire `webapi` only. |
+| R20 | Proxy only the `webapi` prefixes on the allow-list of §8.3: the six of the first slice (`/users`, `/tenants`, `/currencies`, `/accounts`, `/instruments`, `/transactions`) and the prefixes later slices added. Any other `/api/*` path → **404**, not forwarded. Do not forward `/scalar`, `/openapi`, `/health`, `/connect`. Destination is Aspire `webapi` only. A slice that needs a new prefix adds it to the list in `ApiProxy` and to the table in §8.3. |
 | R21 | On the outbound `webapi` request, drop the browser `Cookie` and `Authorization`. Set `Authorization: Bearer <access>` from the ticket in the encrypted session cookie (R22). Forward `Idempotency-Key`, `Content-Type`, `Accept`. |
 | R22 | First slice stores the OIDC ticket in the encrypted authentication cookie (`SaveTokens`). Expose `CookieAuthenticationOptions.SessionStore` so a later amendment can move the ticket to a table without rewriting login or the proxy. No `BffSessions` table in this slice. |
 | R23 | BFF responses include `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and a frame policy of `frame-ancestors 'none'` (or `X-Frame-Options: DENY`). Do not lock `script-src` in this slice. |
 | R24 | Access lifetime stays identity-auth (15 minutes). Refresh stays 14 days absolute. This slice requires refresh rotation: a used refresh is revoked when the next one is issued. Stolen-cookie window is the access lifetime, then rotation or R7 fails the copy. |
 
 `RolePermissions` and `/users/me` do not move. The SPA still paints menus from the proxied `GET /api/users/me` body.
+
+### 4.1 Refresh single-flight
+
+It applies to both BFFs ([bff-customer-portal.md](bff-customer-portal.md) points here) and to Back Office. It tightens R7 and R24.
+
+**Why.** The ticket lives in the browser cookie (R22), so every request the SPA sends before it receives a new cookie carries the same refresh token. IdentityHost rotates refresh tokens with a reuse leeway of zero (identity-auth R5): a second grant for the same refresh token is a replay, fails with `invalid_grant`, and makes OpenIddict revoke the token chain of that authorization, including the refresh token the first grant has just issued. Without the rules below, once the 15-minute access token had expired, any page that loaded two or more queries in parallel signed the person out. The race window is the full round trip of the first request (`webapi` 401, token endpoint, retry), and it also covers a request whose response with the new cookie never reached the browser.
+
+| Id | Rule |
+| --- | --- |
+| RF1 | **Refresh single-flight.** Within one host process, at most one refresh grant is in flight per refresh token. Every proxied request that needs a refresh with that token waits for that one grant and uses its result. |
+| RF2 | **Rotated tokens are remembered.** After a grant succeeds, the host remembers that the presented refresh token was replaced by the result (new access token, new refresh token, access expiry). A later request that presents the replaced refresh token gets that result from memory and does not call the token endpoint. |
+| RF3 | **Chain follow.** When the remembered access token has expired, or expires within one minute, the host follows the remembered chain to the newest refresh token and refreshes that one under RF1. It never presents a replaced refresh token again. |
+| RF4 | **Failure is not remembered.** A failed grant (non-success status, or no `access_token` or `refresh_token` in the body) is returned to every request that waited for it, then dropped. Each of those requests follows R7: clear the cookie, return 401. The next request with that refresh token calls the token endpoint again. |
+| RF5 | **The request that starts the grant cannot cancel it.** The token-endpoint call does not use the request's `RequestAborted`. A waiting request may stop waiting when its own request is aborted; that does not cancel the grant. A grant whose result the browser never receives still lands in memory under RF2. |
+| RF6 | **Retention.** Each remembered entry is dropped 30 minutes (two access lifetimes) after it is written. Time comes from the host's `TimeProvider`. A replaced refresh token presented after that goes to the token endpoint and fails as a replay (R7). Memory holds only recent rotations, not every rotation since start. |
+| RF7 | **Cookie and retry unchanged.** Every request that uses a refreshed result, whether from the grant or from memory, writes the new ticket to its own response cookie and retries `webapi` once with the new access token. R7 still allows one refresh and one retry per proxied request. |
+| RF8 | **Process memory only.** No table, no distributed cache, no new configuration key. Token values are never logged or used as log properties. |
+
+**Left open.** Memory is per process. Two BFF instances behind one origin would not share it, and concurrent requests split across them would race as they do today. Today each BFF runs as one instance (AppHost has no replicas, and `deploy/compose.yml` has one container per BFF). Revisit together with §11 "Production Data Protection key store for a multi-instance BFF" and the session table.
+
+Where it lives: `RefreshTokenExchange` (`src/Shared`), registered as a singleton in each BFF's `BffAuthenticationExtensions` with its own client id, client secret, token endpoint, `HttpClient` and `TimeProvider`, and used by `ApiProxy.TryRefreshAsync`; Back Office delegates to it from `BackOfficeTokenRefresh`. `TryRefreshAsync` keeps the cookie write (RF7) and the `id_token` carry-over. Tests: `RefreshSingleFlightScenarios`, run by `BffRefreshSingleFlightTests` and `CustomerBffRefreshSingleFlightTests`; the Back Office retention case is in `BackOfficeRefreshTests`.
 
 ---
 
@@ -219,6 +240,28 @@ Cross-tenant resource ids remain **404** from `webapi`, passed through.
 | `/api/instruments` | `/instruments` |
 | `/api/transactions` | `/transactions` |
 
+The same mapping, `/api{prefix}` → `{prefix}`, holds for every prefix on the allow-list. `webapi` checks the permission; the BFF does not filter by role, so a caller without the permission gets the 403 from `webapi`. The Customer Portal BFF has its own, shorter list ([bff-customer-portal.md](bff-customer-portal.md)).
+
+| Prefix | Methods | Who has a permission under it | Routes of |
+| --- | --- | --- | --- |
+| `/users`, `/tenants`, `/currencies`, `/accounts`, `/instruments`, `/transactions` | As the routes | TenantAdmin, Adviser | The Phase 1 and ledger specs |
+| `/net-worth` | GET | TenantAdmin, Adviser | [net-worth.md](net-worth.md) |
+| `/reports` | GET, POST, PUT, DELETE | TenantAdmin, Adviser | [reports.md](reports.md) |
+| `/portfolios` | GET, POST, PUT, DELETE | TenantAdmin, Adviser | [portfolios.md](portfolios.md) |
+| `/fees` | GET, POST, PUT, DELETE | TenantAdmin, Adviser | [trade-fees.md](trade-fees.md) |
+| `/statement-lines` | GET, POST | TenantAdmin | [deposit-matching.md](deposit-matching.md). `GET /bank-connections` is not proxied: only SystemAdmin reads it, in the Back Office |
+| `/nominated-bank-accounts`, `/withdrawals` | GET, POST | TenantAdmin, Adviser (verify and approve: TenantAdmin) | [withdrawals.md](withdrawals.md) |
+| `/bank-reconciliations` | GET, POST | TenantAdmin | [bank-reconciliation.md](bank-reconciliation.md) |
+| `/interest` | GET, POST, PUT, DELETE | TenantAdmin, Adviser (writes and runs: TenantAdmin) | [interest-run.md](interest-run.md) |
+| `/corporate-actions` | GET, POST, PUT | TenantAdmin, Adviser (writes: TenantAdmin) | [corporate-actions.md](corporate-actions.md) |
+| `/orders` | GET, POST | TenantAdmin, Adviser | [orders.md](orders.md) |
+| `/trade-settlements` | GET, POST | TenantAdmin | [trade-settlement.md](trade-settlement.md) |
+| `/rebalances` | GET, POST | TenantAdmin, Adviser | [rebalances.md](rebalances.md) |
+| `/migration-batches` | GET, POST, PUT | TenantAdmin | [migration-batches.md](migration-batches.md) |
+| `/in-kind-transfers` | GET, POST | TenantAdmin, Adviser | [in-kind-transfers.md](in-kind-transfers.md) |
+| `/custody-movements`, `/custodian-reconciliations` | GET, POST | TenantAdmin | [in-kind-transfers.md](in-kind-transfers.md) |
+| `/adjustment-requests` | GET, POST | TenantAdmin | [adjustment-review.md](adjustment-review.md) |
+
 R20. There is no open `/api/{**path}` catch-all.
 
 Forward: `Idempotency-Key`, `Content-Type`, `Accept`. Drop browser `Cookie` and `Authorization` (R21). Set `Authorization: Bearer <access>` from the ticket in the encrypted session cookie (R22).
@@ -240,6 +283,29 @@ Forward: `Idempotency-Key`, `Content-Type`, `Accept`. Drop browser `Cookie` and 
 | Cookie | `__Host-bff-adviser-portal` (R13) |
 | Allow-list | TenantAdmin, Adviser |
 
+### 8.5 Serving the SPA build
+
+In Development the BFF serves the SPA through `DevelopmentSpaProxy` (`Spa:DevServerUrl`). In production there is no Vite server, and Caddy has one upstream per portal origin, so the BFF serves the built files itself ([deployment.md](../deployment.md) §13 item 4).
+
+| Id | Rule |
+| --- | --- |
+| P1 | When `Spa:DevServerUrl` is set, the BFF uses `DevelopmentSpaProxy` as today. When it is not set, the BFF serves static files from its `wwwroot` folder. |
+| P2 | A `GET` or `HEAD` request for a path that matches a file in `wwwroot` returns that file with its content type. |
+| P3 | A `GET` or `HEAD` request that matches no endpoint and no file, whose last path segment has no file extension, and that is not under a reserved prefix, returns `wwwroot/index.html` with status 200 and `text/html`. This serves client routes such as `/accounts/{id}` and deep links after sign-in. |
+| P4 | Reserved prefixes never fall back to `index.html`: `/api`, `/bff`, `/signin-oidc`, `/signout-callback-oidc`, `/health`, `/alive`. An unknown path under them returns 404. This is the same list `DevelopmentSpaProxy` uses. |
+| P5 | A missing path whose last segment has a file extension (for example `/assets/missing.js`) returns 404, not `index.html`, so a stale script reference never receives HTML. |
+| P6 | Methods other than `GET` and `HEAD` on a non-endpoint path return 404 or 405, never `index.html`. |
+| P7 | `index.html` (direct or through P3) is sent with `Cache-Control: no-cache`. Files under `/assets/` (Vite hashed output) are sent with `Cache-Control: public, max-age=31536000, immutable`. Other files use the static file defaults. |
+| P8 | Static and fallback responses are anonymous. The SPA itself calls `GET /api/users/me` and starts `/bff/login` when it gets 401 (§4 unchanged). |
+| P9 | `UseBffSecurityHeaders` applies to static and fallback responses, as to every other response. |
+| P10 | If `wwwroot/index.html` does not exist and `Spa:DevServerUrl` is not set, P3 returns 404. The host still starts, so its health check and `/bff/*` keep working. |
+
+**Build.** CI runs `npm ci && npm run build` in `src/AdviserPortal` and copies `dist/` into `src/BffAdviserPortal/wwwroot/` before `dotnet publish` (deployment §4, §9). `src/BffAdviserPortal/wwwroot/` is listed in `.gitignore` and never committed. Local `dotnet run` without a Vite server and without a build therefore serves 404 for client routes (P10).
+
+**Out.** A content-security `script-src` policy (still open in §11). Compression (Caddy does it). Pre-compressed files.
+
+Tests: `Bff/BffSpaStaticFilesTests.cs` and `Bff/BffSpaProxyTests.cs`.
+
 ---
 
 ## 9. UI
@@ -260,14 +326,11 @@ Construction notes (`review`): add a BFF cut to [frontend-implementation-notes.m
 
 ## 10. Tests
 
-| Project | Assert |
-| --- | --- |
-| Domain.UnitTests | none |
-| BFF / Application.FunctionalTests (new host fixture) | No cookie → `/api/users/me` is 401 not 302; login challenge hits `identity` authorize with `client_id=adviser-portal` and PKCE; callback redeems a given `code` once; response bodies to the test browser have no `access_token` / `refresh_token`; `/api/users/me` after login is 200 and the outbound `webapi` request has Bearer and no browser `Cookie`; 401 from `webapi` → one refresh then retry; failed refresh → 401 and cookie cleared; logout revokes then end-session; Customer hosted-login still issues no code (reuse A1, do not duplicate A2–A10); bad `returnUrl` → 400; mutating `/api` or `POST /bff/logout` without `X-MyWealth-Request` → 400 and is not forwarded; `/api/scalar` and `/api/health` → 404; `Idempotency-Key` forwarded; cookie name is `__Host-bff-adviser-portal` with no `Domain` |
-| Infrastructure.IntegrationTests | none (no schema) |
-| Adviser Portal tests | `sessionStorage` has no token keys; API client base is `/api` with credentials; mutating calls send `X-MyWealth-Request`; no `/connect/token` calls; `/callback` gone |
+The tests are the executable form of §4. Where they live:
 
-`webapi` isolation tests and people/ledger tests do not move.
+| Project | Where |
+| --- | --- |
+| Application.FunctionalTests | Folder `Bff/`: `BffLoginTests`, `BffCallbackTests`, `BffLogoutTests`, `BffAllowListTests`, `BffApiTests`, `BffRequestBodyTests`, `BffCorsTests`, `BffRefreshTests`, `BffRefreshSingleFlightTests`, `BffSpaProxyTests`, `BffSpaStaticFilesTests` |
 
 ---
 
@@ -331,243 +394,13 @@ Landed deviation: §11 named YARP. The tree uses `ApiProxy` + `IWebApiTransport`
 
 ---
 
-## Amendment (2026-11-03) — portfolios prefix
-
-Add `/portfolios` to the BFF prefix allow-list so the Adviser Portal can call the landed portfolios endpoints through `/api`.
-
-- Prefix: `/portfolios`
-- Methods: GET, POST, PUT, DELETE (covers list, get, create, update, disable, bulk rebalance, and any future assignment-style paths under this prefix)
-- Who: TenantAdmin, Adviser (same allow-list as other Phase 2 resources). SystemAdmin uses Back Office or Scalar for cross-tenant work.
-- No new cookie or client change. Existing `adviser-portal` confidential client is enough.
-
-This amendment is required for the Adviser Portal portfolios cut (`adviser-portal-portfolios.md`).
-
----
-
-## Amendment 2026-11-15 (fees prefix) — accepted
-
-Add `/fees` to the BFF prefix allow-list so the Adviser Portal can call the fee routes of [trade-fees.md](trade-fees.md) through `/api`.
-
-- Prefix: `/fees`
-- Methods: GET, POST, PUT, DELETE (list, get, create, preview, update, delete of trade fee schedules, and later fee resources under the same namespace)
-- Who: TenantAdmin, Adviser. Permissions are checked by `webapi` (`fees.read` / `fees.manage`, [api-design.md](../api-design.md) §3.1); the BFF does not filter by role.
-- No new cookie or client change.
-- The Customer Portal BFF does not add `/fees`: Customer has no fee permission.
-
----
-
----
-
-## Amendment 2026-11-20 (statement lines prefix) — accepted
-
-Add `/statement-lines` to the BFF prefix allow-list (R20) so the Adviser Portal can call the suspense routes of [deposit-matching.md](deposit-matching.md) through `/api`.
-
-- Prefix: `/statement-lines`
-- Methods: GET, POST
-- Who: TenantAdmin. `webapi` checks `statement-lines.manage`; the BFF does not filter by role, so an Adviser gets the 403 from `webapi`.
-- `GET /bank-connections` is not added: only SystemAdmin reads it, in the Back Office.
-- The Customer Portal BFF does not change.
-
----
-
-## Amendment 2026-11-12 (serve the SPA build) — accepted
-
-Status of this amendment: `accepted`. The rest of this file stays accepted. Item 4 of [deployment.md](../deployment.md) §13. Do not rewrite §2, §7 or §11 in place; this amendment adds the production path next to the Development proxy.
-
-**Why.** Today ``bff-adviser-portal`` serves the SPA only through `DevelopmentSpaProxy` (`Spa:DevServerUrl`). In production there is no Vite server, and Caddy has one upstream per portal origin, so the BFF must serve the built files itself.
-
-| Id | Rule |
-| --- | --- |
-| P1 | When `Spa:DevServerUrl` is set, the BFF uses `DevelopmentSpaProxy` as today. When it is not set, the BFF serves static files from its `wwwroot` folder. |
-| P2 | A `GET` or `HEAD` request for a path that matches a file in `wwwroot` returns that file with its content type. |
-| P3 | A `GET` or `HEAD` request that matches no endpoint and no file, whose last path segment has no file extension, and that is not under a reserved prefix, returns `wwwroot/index.html` with status 200 and `text/html`. This serves client routes such as `/accounts/{id}` and deep links after sign-in. |
-| P4 | Reserved prefixes never fall back to `index.html`: `/api`, `/bff`, `/signin-oidc`, `/signout-callback-oidc`, `/health`, `/alive`. An unknown path under them returns 404. This is the same list `DevelopmentSpaProxy` uses. |
-| P5 | A missing path whose last segment has a file extension (for example `/assets/missing.js`) returns 404, not `index.html`, so a stale script reference never receives HTML. |
-| P6 | Methods other than `GET` and `HEAD` on a non-endpoint path return 404 or 405, never `index.html`. |
-| P7 | `index.html` (direct or through P3) is sent with `Cache-Control: no-cache`. Files under `/assets/` (Vite hashed output) are sent with `Cache-Control: public, max-age=31536000, immutable`. Other files use the static file defaults. |
-| P8 | Static and fallback responses are anonymous. The SPA itself calls `GET /api/users/me` and starts `/bff/login` when it gets 401 (§4 unchanged). |
-| P9 | `UseBffSecurityHeaders` applies to static and fallback responses, as to every other response. |
-| P10 | If `wwwroot/index.html` does not exist and `Spa:DevServerUrl` is not set, P3 returns 404. The host still starts, so its health check and `/bff/*` keep working. |
-
-**Build.** CI runs `npm ci && npm run build` in `src/AdviserPortal` and copies `dist/` into `src/BffAdviserPortal/wwwroot/` before `dotnet publish` (deployment §4, §9). `src/BffAdviserPortal/wwwroot/` is listed in `.gitignore` and never committed. Local `dotnet run` without a Vite server and without a build therefore serves 404 for client routes (P10).
-
-**Out.** A content-security `script-src` policy (still open in §11). Compression (Caddy does it). Pre-compressed files.
-
-**Tests (Application.FunctionalTests).** Start the BFF in Production without `Spa:DevServerUrl`, with a test `wwwroot` that holds an `index.html` and one file under `/assets/`.
-
-| Id | Given | When | Then |
-| --- | --- | --- | --- |
-| P-T1 | Test `wwwroot` | `GET /` and `GET /some/client/route` | 200, `text/html`, body of `index.html`, `Cache-Control: no-cache` |
-| P-T2 | Test `wwwroot` | `GET /assets/app.js` | 200, JavaScript content type, `Cache-Control` with `immutable` |
-| P-T3 | Test `wwwroot` | `GET /assets/missing.js` | 404 |
-| P-T4 | Test `wwwroot` | `GET /bff/unknown`, `GET /api` without session, `GET /health` on the traffic port | Not `index.html` (404 for `/bff/unknown` and `/health`; `/api` keeps its §4 status) |
-| P-T5 | Test `wwwroot` | `POST /some/client/route` | 404 or 405, not `index.html` |
-| P-T6 | Test `wwwroot` | `GET /some/client/route` | Response has the `UseBffSecurityHeaders` headers |
-| P-T7 | No `index.html` | `GET /some/client/route` | 404; `/bff/login` still answers |
-| P-T8 | `Spa:DevServerUrl` set | `GET /some/client/route` | Forwarded to the dev server, as today (existing proxy tests stay green) |
-
-
----
-
-## Amendment 2026-11-13 (refresh single-flight) — accepted
-
-Status of this amendment: `accepted` (2026-11-13). It is a build contract. Landed 2026-11-13: `RefreshTokenExchange` (`src/Shared`), registered in each BFF's `BffAuthenticationExtensions` and used by `ApiProxy.TryRefreshAsync`; Back Office delegates to it from `BackOfficeTokenRefresh`. RF-T1–RF-T7 are in `RefreshSingleFlightScenarios`, run by `BffRefreshSingleFlightTests` and `CustomerBffRefreshSingleFlightTests`; the Back Office retention case is in `BackOfficeRefreshTests`. RF-T3 failed before the change, which confirmed the chain revocation. The rest of this file stays accepted. It tightens R7 and R24. It applies to both BFFs ([bff-customer-portal.md](bff-customer-portal.md) points here) and to the refresh exchange in Back Office ([back-office.md](../backoffice/back-office.md) points here). Do not rewrite R7, R22 or R24, or the identity-auth §4.2, in place.
-
-**Why.** `ApiProxy.TryRefreshAsync` in both BFFs posts a refresh grant for every proxied request that gets 401 from `webapi`. Nothing joins two such requests. The ticket lives in the browser cookie (R22), so every request the SPA sends before it receives the new cookie carries the same refresh token. IdentityHost rotates refresh tokens and sets the reuse leeway to zero (identity-auth §4.2: issuing a new refresh revokes the one presented). The second grant for the same refresh token is therefore a replay. It fails with `invalid_grant`, and OpenIddict revokes the token chain of that authorization, including the refresh token the first grant has just issued.
-
-The BFF then clears the cookie and returns 401 (R7), and the SPA 401 handler starts login. So once the 15-minute access token has expired, any page that loads two or more queries in parallel signs the person out. If the first response's cookie is the one the browser keeps, the person is signed out at the next refresh instead, because that refresh token was revoked with the chain. `webapi` validates the JWT locally, so the new access token keeps working until it expires.
-
-The race window is not one instant. It is the full round trip of the first request (`webapi` 401, token endpoint, retry). It also covers any request whose response with the new cookie never reached the browser (the request was aborted, or the person navigated away).
-
-Back Office does not have this race. `BackOfficeTokenRefresh` already joins concurrent grants and remembers rotated tokens (`ConcurrentPresentations_ExchangeTheRefreshTokenOnce`, `SecondPresentationOfARotatedRefreshToken_DoesNotCallTheTokenEndpoint`). However, its memory never drops an entry.
-
-Today's code: `src/BffAdviserPortal/ApiProxy.cs` and `src/BffCustomerPortal/ApiProxy.cs` (`TryRefreshAsync`, a static method with no shared state, cancelled by `RequestAborted`). `src/IdentityHost/Program.cs` (`SetRefreshTokenReuseLeeway(TimeSpan.Zero)`, reference refresh tokens, rolling refresh). `src/BackOffice/BackOfficeTokenRefresh.cs`. Before this amendment landed, RF-T1–RF-T4 and RF-T7 failed against this code.
-
-| Id | Rule |
-| --- | --- |
-| RF1 | **Refresh single-flight.** Within one host process, at most one refresh grant is in flight per refresh token. Every proxied request that needs a refresh with that token waits for that one grant and uses its result. |
-| RF2 | **Rotated tokens are remembered.** After a grant succeeds, the host remembers that the presented refresh token was replaced by the result (new access token, new refresh token, access expiry). A later request that presents the replaced refresh token gets that result from memory and does not call the token endpoint. |
-| RF3 | **Chain follow.** When the remembered access token has expired, or expires within one minute, the host follows the remembered chain to the newest refresh token and refreshes that one under RF1. It never presents a replaced refresh token again. |
-| RF4 | **Failure is not remembered.** A failed grant (non-success status, or no `access_token` or `refresh_token` in the body) is returned to every request that waited for it, then dropped. Each of those requests follows R7: clear the cookie, return 401. The next request with that refresh token calls the token endpoint again. |
-| RF5 | **The request that starts the grant cannot cancel it.** The token-endpoint call does not use the request's `RequestAborted`. A waiting request may stop waiting when its own request is aborted; that does not cancel the grant. A grant whose result the browser never receives still lands in memory under RF2. |
-| RF6 | **Retention.** Each remembered entry is dropped 30 minutes (two access lifetimes) after it is written. Time comes from the host's `TimeProvider`. A replaced refresh token presented after that goes to the token endpoint and fails as a replay (R7). Memory holds only recent rotations, not every rotation since start. |
-| RF7 | **Cookie and retry unchanged.** Every request that uses a refreshed result, whether from the grant or from memory, writes the new ticket to its own response cookie and retries `webapi` once with the new access token. R7 still allows one refresh and one retry per proxied request. |
-| RF8 | **Process memory only.** No table, no distributed cache, no new configuration key. Token values are never logged or used as log properties. |
-
-**Implementation note.** Move the exchange part of `BackOfficeTokenRefresh` (`ExchangeAsync`, the chain follow, the in-flight map, the remembered map and the grant POST) into one class in `src/Shared`, `RefreshTokenExchange`. Both BFFs' `ApiProxy` and Back Office use that class. Each host registers it as a singleton with its own client id, client secret, token endpoint, `HttpClient` and `TimeProvider`. It needs no ASP.NET Core reference (`HttpClient`, `System.Text.Json`, `TimeProvider`), so `src/Shared` stays a plain class library. Back Office keeps `ValidatePrincipalAsync` and `CookieAccessTokens`. `TryRefreshAsync` keeps the cookie write (RF7) and the `id_token` carry-over.
-
-**Unchanged.** IdentityHost reuse leeway stays zero, and rotation stays on (R24). Access and refresh lifetimes. The SPA 401 handler. R7's one refresh and one retry. The ticket stays in the cookie (R22). No refresh before expiry in the BFFs. No new route, table or schema script.
-
-**Left open.** Memory is per process. Two BFF instances behind one origin would not share it, and concurrent requests split across them would race as they do today. Today each BFF runs as one instance (AppHost has no replicas, and `deploy/compose.yml` has one container per BFF). Revisit together with §11 "Production Data Protection key store for a multi-instance BFF" and the session table.
-
-**Tests.** Application.FunctionalTests, in `BffRefreshTests`, for each BFF host. "Concurrent" means the test holds the first refresh grant open until both proxied requests have received their `webapi` 401. It is never timing-based. Retention moves a fake `TimeProvider` registered in the test host; it never waits.
-
-| Id | Given | When | Then |
-| --- | --- | --- | --- |
-| RF-T1 | Signed-in cookie C0; fake `webapi` answers 401 to the first two calls, then 200 | Two concurrent `GET /api/users/me` with C0 | Both 200. Exactly one refresh grant. Both retries carry the same new Bearer. Both responses set the session cookie |
-| RF-T2 | One request with C0 has refreshed (RT0 replaced by RT1) | `GET /api/users/me` with the old C0; `webapi` 401 then 200 | 200. No new refresh grant. The retry Bearer is the access token from the first grant. The response sets the session cookie |
-| RF-T3 | After RF-T1 | The refresh token from either response cookie is presented to `/connect/token` | Success (the chain was not revoked) |
-| RF-T4 | RT0 replaced by RT1; time moved past the remembered access expiry | `GET` with C0; `webapi` 401 then 200 | 200. One new grant, and it presents RT1, not RT0 |
-| RF-T5 | RT0 replaced by RT1; time moved 30 minutes past the rotation | `GET` with C0; `webapi` 401 | Token endpoint called with RT0, which fails. 401. Cookie cleared |
-| RF-T6 | Refresh token revoked; `webapi` 401 to every call | Two concurrent `GET` with that cookie, then a third `GET` | The first two: 401, cookie cleared. The third: calls the token endpoint again. (That concurrent presentations share one grant is proven on the shared class, `ConcurrentPresentations_ExchangeTheRefreshTokenOnce`. Over HTTP the second request may arrive after the failed grant was dropped, so the grant count is not deterministic there.) |
-| RF-T7 | First grant held open | The client aborts the request that started the grant; the grant is released; then `GET` with C0, `webapi` 401 then 200 | 200 with no further grant |
-
-`BackOfficeRefreshTests` stay green after the move. A Back Office case for RF6 is added there: a rotated refresh token presented 30 minutes after the rotation calls the token endpoint.
-
-**Suggested commits.** The tree builds after each commit. Each behaviour is split into red and green.
-
-1. Move the exchange part of `BackOfficeTokenRefresh` into `src/Shared` `RefreshTokenExchange`; Back Office uses it (refactor; `BackOfficeRefreshTests` green).
-2. Retention (RF6) on the shared class, proven through Back Office.
-3. Adviser Portal BFF: RF-T1–RF-T7 red, then `ApiProxy` uses `RefreshTokenExchange` (green).
-4. Customer Portal BFF: the same.
-5. Mark this amendment landed in this file, `bff-customer-portal.md` and `back-office.md`.
-
----
-
-## Amendment 2026-11-20 (nominated bank accounts and withdrawals prefixes) — accepted
-
-Add `/nominated-bank-accounts` and `/withdrawals` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [withdrawals.md](withdrawals.md) through `/api`.
-
-- Prefixes: `/nominated-bank-accounts`, `/withdrawals`
-- Methods: GET, POST
-- Who: TenantAdmin and Adviser. `webapi` checks the permissions; the BFF does not filter by role, so an Adviser gets the 403 from `webapi` on verify and approve.
-
----
-
-## Amendment 2026-11-21 (bank reconciliations prefix) — accepted
-
-Add `/bank-reconciliations` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [bank-reconciliation.md](bank-reconciliation.md) through `/api`.
-
-- Prefix: `/bank-reconciliations`
-- Methods: GET, POST
-- Who: TenantAdmin. `webapi` checks `bank-reconciliations.manage`; the BFF does not filter by role, so an Adviser gets the 403 from `webapi`.
-- The Tenant-scoped report uses the existing `/reports` prefix.
-- The Customer Portal BFF does not change.
-
----
-
-## Amendment 2026-11-22 (interest prefix) — accepted
-
-Add `/interest` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [interest-run.md](interest-run.md) (`/interest/rate-schedules`, `/interest/runs`) through `/api`.
-
-- Prefix: `/interest`
-- Methods: GET, POST, PUT, DELETE
-- Who: TenantAdmin and Adviser. `webapi` checks `interest-rates.read`, `interest-rates.manage` and `interest-runs.read`; the BFF does not filter by role, so an Adviser gets the 403 from `webapi` on writes and on runs.
-- The tax profile and the accrual rows use the existing `/users` and `/accounts` prefixes.
-- The Customer Portal BFF does not change: it already proxies `/users`, `/accounts` and `/transactions`.
-
----
-
-## Amendment 2026-11-22 (corporate actions prefix) — accepted
-
-Add `/corporate-actions` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [corporate-actions.md](corporate-actions.md) through `/api`.
-
-- Prefix: `/corporate-actions`
-- Methods: GET, POST, PUT
-- Who: TenantAdmin and Adviser. `webapi` checks `corporate-actions.read` and `corporate-actions.manage`; the BFF does not filter by role, so an Adviser gets the 403 from `webapi` on writes.
-- `GET /corporate-action-announcements` is a Back Office route and is not proxied.
-- The Customer Portal BFF does not change: the Customer sees an entitlement through `/transactions`.
-
----
-
-## Amendment 2026-11-23 (orders prefix) — accepted
-
-Add `/orders` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [orders.md](orders.md) through `/api`.
-
-- Prefix: `/orders`
-- Methods: GET, POST
-- Who: TenantAdmin and Adviser. `webapi` checks `orders.read` and `orders.place`; the BFF does not filter by role.
-- `GET /broker-connections` and `GET /execution-reports` are Back Office routes and are not proxied.
-
----
-
-## Amendment 2026-11-23 (trade settlements prefix) — accepted
-
-Add `/trade-settlements` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [trade-settlement.md](trade-settlement.md) through `/api`.
-
-- Prefix: `/trade-settlements`
-- Methods: GET, POST
-- Who: TenantAdmin. `webapi` checks `trade-settlements.manage`; the BFF does not filter by role, so an Adviser gets the 403 from `webapi`.
-- `POST /orders/{id}/fills/{fillId}/resolve-break` is under the existing `/orders` prefix.
-
----
-
-## Amendment 2026-11-23 (rebalances prefix) — accepted
-
-Add `/rebalances` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [rebalances.md](rebalances.md) through `/api`.
-
-- Prefix: `/rebalances`
-- Methods: GET, POST
-- Who: TenantAdmin and Adviser. `webapi` checks `rebalances.read` and `rebalances.confirm`; the BFF does not filter by role.
-- The propose routes (`POST /accounts/{id}/rebalance`, `POST /accounts/{id}/portfolio`) are under the existing `/accounts` prefix.
-
----
-
-## Amendment 2026-11-24 (migration batches prefix) — accepted
-
-Add `/migration-batches` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [migration-batches.md](migration-batches.md) through `/api`.
-
-- Prefix: `/migration-batches`
-- Methods: GET, POST, PUT
-- Who: TenantAdmin. `webapi` checks `migration-batches.manage`; the BFF does not filter by role, so an Adviser gets the 403 from `webapi`.
-- Funding a batch (`POST /statement-lines/{id}/match` with `migrationBatchId`) is under the existing `/statement-lines` prefix.
-
----
-
-## Amendment 2026-11-24 (in-kind transfers prefixes) — accepted
-
-Add `/in-kind-transfers`, `/custody-movements` and `/custodian-reconciliations` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [in-kind-transfers.md](in-kind-transfers.md) through `/api`.
-
-- Prefixes: `/in-kind-transfers`, `/custody-movements`, `/custodian-reconciliations`
-- Methods: GET, POST
-- Who: TenantAdmin and Adviser for `/in-kind-transfers`; TenantAdmin for the other two. `webapi` checks the policies; the BFF does not filter by role, so an Adviser gets the 403 from `webapi`.
-
----
-
-## Amendment 2026-11-25 (adjustment requests prefix) — accepted
-
-Add `/adjustment-requests` to the BFF prefix allow-list (R20) so the Adviser Portal can call the routes of [adjustment-review.md](adjustment-review.md) through `/api`.
-
-- Prefix: `/adjustment-requests`
-- Methods: GET, POST
-- Who: TenantAdmin. `webapi` checks the policy; the BFF does not filter by role, so an Adviser gets the 403 from `webapi`.
+## 13. History
+
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/bff-adviser-portal.md`).
+
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-03 – 11-25 | The spec of each prefix (§8.3) | R20, §8.3: prefixes added to the allow-list, one per slice that needed it |
+| 2026-11-12 | [deployment.md](../deployment.md) | §8.5: the BFF serves the SPA build (P1–P10) |
+| 2026-11-13 | — | §4.1: refresh single-flight (RF1–RF8) |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
