@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-14
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -50,7 +50,7 @@ The worker fetches the latest Frankfurter rates every hour and stores directed p
 - HTTP endpoint for rates (deferred; a read surface is expected later for Scalar / ops, not a permanent exclusion).
 - Real-time or intraday rates.
 - Per-tenant rate overrides.
-- Historical back-fill beyond what the hourly job naturally accumulates.
+- A back-fill before the history floor date. From that date the history job fills every day (R5a; [market-data-history.md](market-data-history.md)).
 - A second rate source or failover provider.
 
 ---
@@ -71,7 +71,8 @@ The worker fetches the latest Frankfurter rates every hour and stores directed p
 | R2 | Job runs hourly via Hangfire recurring job, schedule in **UTC**. Business logic lives in Application; the worker only hosts it. |
 | R3 | Store directed pairs among the **active** currencies in the platform catalog. Seed set is NZD, AUD, USD, EUR, GBP, JPY. Job reads `ICurrencyCatalog` active codes on every run. |
 | R4 | Because Frankfurter supports arbitrary base + symbols and the pair count is small (6 currencies → 30 directed pairs), the job fetches the actual pair rates from the source. Do not derive from a single base in memory. Relative-to-USD is only a fallback if a future source cannot supply pairs. |
-| R5 | Upsert key is `(BaseCurrency, QuoteCurrency, AsOfDate)`. `AsOfDate` is the date the source returns (previous working day on weekends / holidays). On each successful run, if the `AsOfDate` already exists for a pair, update `Rate` and `FetchedAt`; if it is a new date, insert. Keep both columns. |
+| R5 | Upsert key is `(BaseCurrency, QuoteCurrency, AsOfDate)`. `AsOfDate` is the date the source returns (previous working day on weekends / holidays). On each successful run, if the `AsOfDate` already exists for a pair, update `Rate` and `FetchedAt`; if it is a new date, insert. Keep both columns. A row whose `AsOfDate` is two or more days before the platform's UTC date is **final**: it is never updated or deleted, and a missing one may still be inserted. A row dated today or yesterday is updated as above. This holds for both jobs (market-data-history R4–R6). |
+| R5a | **History.** A second `worker` job, `fx-rate-history-sync` on queue `fx`, daily at 11:30 UTC with no automatic retries, asks Frankfurter once per active base for the range from `MarketDataHistory:FloorDate` to yesterday (`/v2/rates?base=X&quotes=…&from=…&to=…`) and stores every record. Frankfurter answers a rate for every calendar day, so weekends have rows of their own. With no floor date set the job ends at once. The hourly `fx-rate-sync` keeps its schedule, its skip rule and its request (market-data-history R12–R16). |
 | R6 | Same currency → `IFxRate` returns 1. No row is required. |
 | R7 | Missing cross pair (no row at all for that pair) → throw `FxRateNotFoundException`. Never return 1. Callers do not catch and substitute. |
 | R8 | Rates are platform data. No `TenantId`. |
@@ -80,7 +81,7 @@ The worker fetches the latest Frankfurter rates every hour and stores directed p
 | R11 | Rate precision is `decimal(18,8)`. |
 | R12 | Inactive currencies are not fetched. Existing rows for a currency that later becomes inactive stay. |
 | R13 | No in-memory cache (`IMemoryCache`) in this slice. The table is the source of truth. |
-| R14 | No HTTP read endpoint in this slice. A read surface (e.g. `GET /fx-rates`) is expected later for Scalar / ops; design it when a consumer needs it. Do not treat the absence as a permanent decision. |
+| R14 | **Read route.** `GET /fx-rates?base=&quote=` (any authenticated caller) lists the stored rates of one directed pair, newest first, with `from`, `to` and paging (market-data-history R20–R22). |
 | R15 | Index on `FetchedAt` for “latest successful sync” observability. |
 | R16 | The hourly job always runs. It calls Frankfurter only when some active directed pair has no row whose `AsOfDate` is today's UTC date. Once every active pair has today's source date, later hours that UTC day do not call Frankfurter. A run that stored an older source date still calls again later the same UTC day. On weekends and holidays the source date is not today, so the job still calls each hour and upserts that `AsOfDate`. |
 
@@ -92,7 +93,7 @@ No new aggregate. `IFxRate` is an existing port (named in domain-model / archite
 
 | Type | Kind | Notes |
 | --- | --- | --- |
-| `IFxRate` | port | `GetRate(from, to, asOf?)`. Same currency = 1. Missing pair → `FxRateNotFoundException`. `GetRateDetail(from, to, asOf)` (added 2026-11-11 for [fx-conversions.md](fx-conversions.md) R9, R14) returns the same row's rate with its `AsOfDate` and `Source`; the directed pair only, missing → `FxRateNotFoundException`. |
+| `IFxRate` | port | `GetRate(from, to, asOf?)`. Same currency = 1. Missing pair → `FxRateNotFoundException`. `GetRateDetail(from, to, asOf)` (added 2026-11-11 for [fx-conversions.md](fx-conversions.md) R9, R14) returns the same row's rate with its `AsOfDate` and `Source`; the directed pair only, missing → `FxRateNotFoundException`. Both read the UTC date of `asOf`, not the date in its own offset ([utc-instants](../fixes/utc-instants.md)). `ListRatesAsync(base, quote, from?, to?, page, pageSize)` lists the stored rows of the directed pair, newest first, with the total count; it does not use the inverse pair. |
 
 Invariants:
 
@@ -163,11 +164,13 @@ None in this slice. Pages live in docs/adviser-portal/ when a consumer needs to 
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Application.UnitTests | Same currency returns 1; missing pair fails; rate selection by as-of date |
-| Infrastructure.IntegrationTests | Script applies; FK rejects unknown currency; upsert by key |
-| Worker / job | Fetch failure leaves previous rows; successful fetch writes expected pairs |
+| Application.UnitTests | Folder `Fx/` |
+| Application.FunctionalTests | `Fx/GetFxRatesTests.cs` |
+| Infrastructure.IntegrationTests | Folder `Fx/`; `AppliedSchema/FxRatesSchemaTests.cs`, `FxRateReadTests.cs`, `FxRateUpsertTests.cs`, `FxRateSyncJobTests.cs` |
 
 No cross-tenant tests (platform data).
 
@@ -220,25 +223,13 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
+## 12. History
 
-The repository should build after each commit. Agents split each line into red then green.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/fx-rates.md`).
 
-1. Script `0021_fx_rates.sql` + EF mapping + integration test that the table exists and the FK rejects an unknown code.
-2. `IFxRate` infrastructure implementation that reads `FxRates` (same currency = 1; missing fails) + unit tests.
-3. `FxRateSyncJob` + Hangfire recurring registration + test that a failed fetch leaves previous rows.
-4. Documentation updates: database-design.md, architecture.md port note, domain-model.md port note, features/README.md, adr/README.md.
-
-## Amendment 2026-11-14 (UTC instants)
-
-Accepted with [utc-instants](../fixes/utc-instants.md). `GetRate` and `GetRateDetail` read the UTC date of `asOf`, not the date in its own offset.
-
-## Amendment 2026-11-25 (market data history) — accepted
-
-Status of this amendment: `accepted` (2026-11-25), together with [market-data-history.md](market-data-history.md). Rules R1, R2, R4–R6, R12–R16, R18 and R20–R22 live there; this section records what changes here.
-
-- **§2 Out, "Historical back-fill".** Replaced. A second `worker` job, `fx-rate-history-sync` on queue `fx`, daily at 11:30 UTC with no automatic retries, asks Frankfurter once per active base for the range from `MarketDataHistory:FloorDate` to yesterday (`/v2/rates?base=X&quotes=…&from=…&to=…`) and stores every record. Frankfurter answers a rate for every calendar day, so weekends have rows of their own. With no floor date set the job ends at once.
-- **R5.** A row whose `AsOfDate` is two or more days before the platform's UTC date is **final**: it is never updated or deleted, and a missing one may still be inserted. A row dated today or yesterday is updated as R5 said. This holds for `fx-rate-sync` and `fx-rate-history-sync`.
-- **R14.** Replaced. `GET /fx-rates?base=&quote=` (any authenticated caller) lists the stored rates of one directed pair, newest first, with `from`, `to` and paging.
-- **§5, `IFxRate`.** Adds `ListRatesAsync(base, quote, from?, to?, page, pageSize)`: the stored rows of the directed pair, newest first, with the total count. It does not use the inverse pair.
-- The hourly `fx-rate-sync` keeps its schedule, its skip rule and its request.
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-11 | [fx-conversions.md](fx-conversions.md) | §5: `GetRateDetail` |
+| 2026-11-14 | [utc-instants](../fixes/utc-instants.md) | §5: the UTC date of `asOf` |
+| 2026-11-25 | [market-data-history.md](market-data-history.md) | R5, R5a, R14, §5: history from the floor date, final rows, `GET /fx-rates` |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
