@@ -247,6 +247,48 @@ else
     </EditForm>
 </MudPaper>
 
+<MudText Typo="Typo.h5" Class="mt-8 mb-2">Valuation runs</MudText>
+
+@if (valuationRuns.Count == 0)
+{
+    <MudText>No valuation runs yet.</MudText>
+}
+else
+{
+    <MudSimpleTable Hover="true" Dense="true" Bordered="true" Class="mt-2">
+        <thead>
+            <tr><th>Through</th><th>Trigger</th><th>Accounts</th><th>Failed</th><th>Days stored</th><th>Incomplete</th></tr>
+        </thead>
+        <tbody>
+        @foreach (var run in valuationRuns)
+        {
+            <tr>
+                <td>@run.ThroughDate.ToString("yyyy-MM-dd")</td>
+                <td>@TriggerLabel(run.Trigger)</td>
+                <td>@run.AccountsProcessed</td>
+                <td class="@(run.AccountsFailed > 0 ? "mud-error-text" : null)">@run.AccountsFailed</td>
+                <td>@run.DaysValued</td>
+                <td>@run.DaysIncomplete</td>
+            </tr>
+        }
+        </tbody>
+    </MudSimpleTable>
+}
+
+<MudText Typo="Typo.h6" Class="mt-6 mb-2">Run through a date</MudText>
+<MudPaper Class="pa-4" Outlined="true">
+    <EditForm Model="valuationForm" OnValidSubmit="StartValuationRun" FormName="valuation-run">
+        <MudStack Spacing="3" Style="max-width: 28rem;">
+            <MudTextField T="string" @bind-Value="valuationForm.ThroughDate" Label="Through date (UTC)" Variant="Variant.Outlined" InputType="InputType.Date"
+                          Error="@HasFieldError("ThroughDate")" ErrorText="@FieldError("ThroughDate")" />
+            <MudStack Row="true" Spacing="2">
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Run</MudButton>
+            </MudStack>
+            <MudText Typo="Typo.body2">Runs every day by itself. Use this after a missed run. A day already stored is never valued again, and the last two days cannot be stored yet.</MudText>
+        </MudStack>
+    </EditForm>
+</MudPaper>
+
 @code {
     [Parameter]
     public Guid TenantId { get; set; }
@@ -258,6 +300,8 @@ else
     private IReadOnlyDictionary<string, string> fieldErrors = new Dictionary<string, string>();
     private readonly ClientMoneyAccountForm newAccount = new();
     private IReadOnlyList<InterestRunItem> interestRuns = [];
+    private IReadOnlyList<ValuationRunItem> valuationRuns = [];
+    private readonly ValuationRunForm valuationForm = new();
     private IReadOnlyList<SafekeepingAccountItem> safekeepingAccounts = [];
     private IReadOnlyList<CustodianConnectionItem> custodianConnections = [];
     private IReadOnlyDictionary<string, string> safekeepingErrors = new Dictionary<string, string>();
@@ -291,6 +335,7 @@ else
             reports = await Api.ListReportGrantsAsync(TenantId);
             clientMoneyAccounts = await Api.ListClientMoneyAccountsAsync(TenantId);
             interestRuns = await Api.ListInterestRunsAsync(TenantId);
+            valuationRuns = await Api.ListValuationRunsAsync(TenantId);
             safekeepingAccounts = await Api.ListSafekeepingAccountsAsync(TenantId);
             error = null;
         }
@@ -448,7 +493,29 @@ else
         }
     }
 
-    /// <summary>BO20: the trigger words of interest-run D60.</summary>
+    /// <summary>BO35: runs the valuations through the date at once; a 400 at ThroughDate is shown at the date.</summary>
+    private async Task StartValuationRun()
+    {
+        if (!DateOnly.TryParse(valuationForm.ThroughDate, System.Globalization.CultureInfo.InvariantCulture, out var throughDate))
+        {
+            fieldErrors = new Dictionary<string, string> { ["ThroughDate"] = "Enter a date." };
+            return;
+        }
+
+        try
+        {
+            await Api.StartValuationRunAsync(TenantId, throughDate);
+            fieldErrors = new Dictionary<string, string>();
+            await Load();
+        }
+        catch (PlatformApiException exception)
+        {
+            fieldErrors = ValidationErrors.From(exception);
+            error = fieldErrors.Count == 0 ? exception.Message : null;
+        }
+    }
+
+    /// <summary>BO20, BO34: the trigger words of interest-run D60, also used for valuation runs.</summary>
     private static string TriggerLabel(string trigger) => trigger switch
     {
         "Scheduled" => "Daily run",
@@ -460,6 +527,12 @@ else
     private static string Totals(InterestRunItem run, Func<InterestRunTotal, decimal> amount) =>
         string.Join(", ", run.Totals.Select(total =>
             $"{amount(total).ToString("0.00##", System.Globalization.CultureInfo.InvariantCulture)} {total.Currency}"));
+
+    /// <summary>BO35: the through date defaults to the last final day, today minus two days (UTC).</summary>
+    private sealed class ValuationRunForm
+    {
+        public string ThroughDate { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-2).ToString("yyyy-MM-dd");
+    }
 
     private sealed class InterestRunForm
     {
