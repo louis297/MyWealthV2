@@ -95,6 +95,7 @@ public sealed class AccountDto
         Closure = closure,
         AccruedInterest = accruedInterest,
         InterestAccruedThrough = account.InterestAccruedThrough,
+        ValuedThrough = account.ValuedThrough,
         ReinvestDividends = account.ReinvestDividends,
         PendingDividends = pendingDividends
     };
