@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-02
-last_updated: 2026-11-23
+last_updated: 2026-11-26
 related:
   - ../function-plan.md
   - ../architecture.md
@@ -92,7 +92,7 @@ The allow-list on IdentityHost is Customer only. A TenantAdmin, Adviser, or Syst
 | R4 | The BFF may 302 the **browser** to `/bff/login` or to `identity` authorize when **its own** session is missing. It must not rewrite `webapi` 403 / 404 / 409 / 400 bodies or status codes when proxying. |
 | R5 | Proxy preserves method, path after `/api`, query, JSON body, and product headers (`Idempotency-Key`, `Content-Type`). List envelope, PublicId, and error envelope stay [api-design.md](../api-design.md). |
 | R6 | Refresh lives only in the BFF process (tokens saved by the OIDC handler). The SPA must not call `/connect/token` or `/connect/revocation`. |
-| R7 | On `webapi` 401, the BFF refreshes **once** with the stored refresh token and retries the proxied request. If refresh fails, clear the BFF cookie and return 401 to the SPA. Do not start authorize from an XHR. |
+| R7 | On `webapi` 401, the BFF refreshes **once** with the stored refresh token and retries the proxied request. If refresh fails, clear the BFF cookie and return 401 to the SPA. Do not start authorize from an XHR. The refresh is single-flight, and a rotated refresh token is remembered: the rules RF1–RF8 of [bff-adviser-portal.md](bff-adviser-portal.md) §4.1 apply to this host unchanged, through the shared `RefreshTokenExchange` with client `customer-portal` in `src/BffCustomerPortal/ApiProxy.cs`. |
 | R8 | Logout order: sign out the BFF cookie → `POST identity /connect/revocation` (`token_type_hint=refresh_token`) → OpenIddict end-session (`/connect/logout` with `client_id` and `post_logout_redirect_uri`). Do not add `/auth/logout`. identity-auth R21 still owns the identity action. IdentityHost clears only the `customer-portal` scheme cookie (identity-auth §4.3). |
 | R9 | `ClientId` is `customer-portal`. Allow-list: Customer only. TenantAdmin, Adviser, or SystemAdmin + correct password → no code, uniform failure (identity-auth R4 / R20 amended). |
 | R10 | Client is confidential. Secret only in Aspire / host configuration. Authorization code + PKCE stay on. No password grant. |
@@ -105,7 +105,7 @@ The allow-list on IdentityHost is Customer only. A TenantAdmin, Adviser, or Syst
 | R17 | There is no SPA `/callback`. OIDC callback is `/signin-oidc` on the BFF. Deep-link return uses the OIDC handler `state`, still only in-app paths. `returnUrl` must be a relative path: starts with `/`, must not start with `//` or `/\`, must not contain `\`. Redirect URIs registered on the client are exact. A `*.dev.localhost` alias may be upserted only when that host is a browser entry. Do not register a wildcard, the BFF http endpoint, or the Vite origin. |
 | R18 | Mutating browser calls (`POST` / `PUT` / `PATCH` / `DELETE` under `/api`, and `POST /bff/logout`) require header `X-MyWealth-Request: 1`. Missing header → **400**, do not proxy. GET does not require it. This is not a second CSRF token. SameSite=Lax stays. |
 | R19 | Do not proxy `/connect/*` to the browser. The SPA has no identity origin in env for protocol calls. |
-| R20 | Proxy only these `webapi` prefixes: `/users`, `/accounts`, `/transactions`, `/net-worth`, `/reports`. Any other `/api/*` path → **404**, not forwarded. Do not forward `/scalar`, `/openapi`, `/health`, `/connect`, `/instruments`, `/tenants`, `/currencies`. Destination is Aspire `webapi` only. |
+| R20 | Proxy only these `webapi` prefixes: `/users`, `/accounts`, `/transactions`, `/net-worth`, `/reports`. Any other `/api/*` path → **404**, not forwarded. Do not forward `/scalar`, `/openapi`, `/health`, `/connect`, `/instruments`, `/tenants`, `/currencies`. Destination is Aspire `webapi` only. Prefixes added by later slices, so the Customer Portal can read the Customer's own data: `/nominated-bank-accounts` and `/withdrawals` ([withdrawals.md](withdrawals.md) C22, C24), `/orders` ([orders.md](orders.md) C32) and `/in-kind-transfers` ([in-kind-transfers.md](in-kind-transfers.md) R29). The portal uses GET only; `webapi` refuses every write for a Customer (403), so the BFF does not filter by role. `/fees`, `/custody-movements` and `/custodian-reconciliations` stay blocked (404). |
 | R21 | On the outbound `webapi` request, drop the browser `Cookie` and `Authorization`. Set `Authorization: Bearer <access>` from the ticket in the encrypted session cookie (R22). Forward `Idempotency-Key`, `Content-Type`, `Accept`. |
 | R22 | First slice stores the OIDC ticket in the encrypted authentication cookie (`SaveTokens`). Expose `CookieAuthenticationOptions.SessionStore` so a later amendment can move the ticket to a table without rewriting login or the proxy. No `BffSessions` table in this slice. |
 | R23 | BFF responses include `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and a frame policy of `frame-ancestors 'none'` (or `X-Frame-Options: DENY`). Do not lock `script-src` in this slice. |
@@ -244,6 +244,10 @@ Forward: `Idempotency-Key`, `Content-Type`, `Accept`. Drop browser `Cookie` and 
 | Cookie | `__Host-bff-customer-portal` (R13) |
 | Allow-list | Customer only |
 
+### 8.5 Serving the SPA build
+
+The BFF serves the built SPA itself when `Spa:DevServerUrl` is not set. The rules are P1–P10 of [bff-adviser-portal.md](bff-adviser-portal.md) §8.5, with `src/CustomerPortal` built into `src/BffCustomerPortal/wwwroot/`. Both BFFs keep their own copy of the code; sharing it is a refactor, not a rule.
+
 ---
 
 ## 9. UI
@@ -262,14 +266,11 @@ Customer Portal pages stay in [customer-portal.md](../customer-portal/customer-p
 
 ## 10. Tests
 
-| Project | Assert |
-| --- | --- |
-| Domain.UnitTests | none |
-| BFF / Application.FunctionalTests (new host fixture) | No cookie → `/api/users/me` is 401 not 302; login challenge hits `identity` authorize with `client_id=customer-portal` and PKCE; callback redeems a given `code` once; response bodies to the test browser have no `access_token` / `refresh_token`; `/api/users/me` after login is 200 and the outbound `webapi` request has Bearer and no browser `Cookie`; 401 from `webapi` → one refresh then retry; failed refresh → 401 and cookie cleared; logout revokes then end-session; TenantAdmin / Adviser / SystemAdmin hosted-login issues no code; bad `returnUrl` → 400; mutating `/api` or `POST /bff/logout` without `X-MyWealth-Request` → 400 and is not forwarded; `/api/instruments` and `/api/tenants` → 404; `Idempotency-Key` forwarded; cookie name is `__Host-bff-customer-portal` with no `Domain` |
-| Infrastructure.IntegrationTests | none (no schema) |
-| Customer Portal tests | `sessionStorage` has no token keys; API client base is `/api` with credentials; mutating calls send `X-MyWealth-Request`; no `/connect/token` calls; no `/callback` |
+The tests are the executable form of §4. Where they live:
 
-`webapi` isolation tests and people/ledger tests do not move.
+| Project | Where |
+| --- | --- |
+| Application.FunctionalTests | Folder `BffCustomer/` |
 
 ---
 
@@ -302,93 +303,13 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
+## 12. History
 
-The repository should build after each commit. Agents split each line into red then green.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/bff-customer-portal.md`).
 
-1. Empty `src/BffCustomerPortal` + Aspire resource `bff-customer-portal` + confidential client upsert for `customer-portal` (IdentityHost allow-list + per-client cookie scheme).
-2. Cookie + OpenID Connect: `/bff/login`, `/signin-oidc`, PKCE, encrypted ticket.
-3. ApiProxy with R20 allow-list, R18 header, R7 refresh-once, R21 drop browser credentials.
-4. Logout + revocation + end-session (IdentityHost clears only the `customer-portal` scheme).
-5. Functional host tests (no tokens in responses; wrong role no code; prefix 404).
-6. Accept change: status, companion edits.
-
----
-
-## Amendment 2026-11-12 (serve the SPA build) — accepted
-
-Status of this amendment: `accepted`. The rest of this file stays accepted. Item 4 of [deployment.md](../deployment.md) §13. Do not rewrite §2, §7 or §11 in place; this amendment adds the production path next to the Development proxy.
-
-**Why.** Today ``bff-customer-portal`` serves the SPA only through `DevelopmentSpaProxy` (`Spa:DevServerUrl`). In production there is no Vite server, and Caddy has one upstream per portal origin, so the BFF must serve the built files itself.
-
-| Id | Rule |
-| --- | --- |
-| P1 | When `Spa:DevServerUrl` is set, the BFF uses `DevelopmentSpaProxy` as today. When it is not set, the BFF serves static files from its `wwwroot` folder. |
-| P2 | A `GET` or `HEAD` request for a path that matches a file in `wwwroot` returns that file with its content type. |
-| P3 | A `GET` or `HEAD` request that matches no endpoint and no file, whose last path segment has no file extension, and that is not under a reserved prefix, returns `wwwroot/index.html` with status 200 and `text/html`. This serves client routes such as `/accounts/{id}` and deep links after sign-in. |
-| P4 | Reserved prefixes never fall back to `index.html`: `/api`, `/bff`, `/signin-oidc`, `/signout-callback-oidc`, `/health`, `/alive`. An unknown path under them returns 404. This is the same list `DevelopmentSpaProxy` uses. |
-| P5 | A missing path whose last segment has a file extension (for example `/assets/missing.js`) returns 404, not `index.html`, so a stale script reference never receives HTML. |
-| P6 | Methods other than `GET` and `HEAD` on a non-endpoint path return 404 or 405, never `index.html`. |
-| P7 | `index.html` (direct or through P3) is sent with `Cache-Control: no-cache`. Files under `/assets/` (Vite hashed output) are sent with `Cache-Control: public, max-age=31536000, immutable`. Other files use the static file defaults. |
-| P8 | Static and fallback responses are anonymous. The SPA itself calls `GET /api/users/me` and starts `/bff/login` when it gets 401 (§4 unchanged). |
-| P9 | `UseBffSecurityHeaders` applies to static and fallback responses, as to every other response. |
-| P10 | If `wwwroot/index.html` does not exist and `Spa:DevServerUrl` is not set, P3 returns 404. The host still starts, so its health check and `/bff/*` keep working. |
-
-**Build.** CI runs `npm ci && npm run build` in `src/CustomerPortal` and copies `dist/` into `src/BffCustomerPortal/wwwroot/` before `dotnet publish` (deployment §4, §9). `src/BffCustomerPortal/wwwroot/` is listed in `.gitignore` and never committed. Local `dotnet run` without a Vite server and without a build therefore serves 404 for client routes (P10).
-
-**Out.** A content-security `script-src` policy (still open in §11). Compression (Caddy does it). Pre-compressed files.
-
-**Tests (Application.FunctionalTests).** Start the BFF in Production without `Spa:DevServerUrl`, with a test `wwwroot` that holds an `index.html` and one file under `/assets/`.
-
-| Id | Given | When | Then |
-| --- | --- | --- | --- |
-| P-T1 | Test `wwwroot` | `GET /` and `GET /some/client/route` | 200, `text/html`, body of `index.html`, `Cache-Control: no-cache` |
-| P-T2 | Test `wwwroot` | `GET /assets/app.js` | 200, JavaScript content type, `Cache-Control` with `immutable` |
-| P-T3 | Test `wwwroot` | `GET /assets/missing.js` | 404 |
-| P-T4 | Test `wwwroot` | `GET /bff/unknown`, `GET /api` without session, `GET /health` on the traffic port | Not `index.html` (404 for `/bff/unknown` and `/health`; `/api` keeps its §4 status) |
-| P-T5 | Test `wwwroot` | `POST /some/client/route` | 404 or 405, not `index.html` |
-| P-T6 | Test `wwwroot` | `GET /some/client/route` | Response has the `UseBffSecurityHeaders` headers |
-| P-T7 | No `index.html` | `GET /some/client/route` | 404; `/bff/login` still answers |
-| P-T8 | `Spa:DevServerUrl` set | `GET /some/client/route` | Forwarded to the dev server, as today (existing proxy tests stay green) |
-
-Same rules as the [bff-adviser-portal.md](bff-adviser-portal.md) amendment 2026-11-12. Both BFFs keep their own copy of the code; sharing it is a refactor, not a rule.
-
-
----
-
-## Amendment 2026-11-13 (refresh single-flight) — accepted
-
-Status of this amendment: `accepted` (2026-11-13). It is a build contract. Landed 2026-11-13 (`CustomerBffRefreshSingleFlightTests`). The rest of this file stays accepted. The rules, tests and commits live in [bff-adviser-portal.md](bff-adviser-portal.md), amendment 2026-11-13 (refresh single-flight), RF1–RF8 and RF-T1–RF-T7. They apply to `bff-customer-portal` unchanged. Do not copy them here.
-
-**Why.** R7 refreshes once per proxied request, with no join between concurrent requests. Together with refresh rotation and a zero reuse leeway (R24, identity-auth §4.2), two requests that hit `webapi` 401 at the same time present the same refresh token twice. The second grant is a replay, OpenIddict revokes the chain, and the person is signed out.
-
-**Here.** `src/BffCustomerPortal/ApiProxy.cs` `TryRefreshAsync` uses the shared `RefreshTokenExchange` with client `customer-portal`. RF-T1–RF-T7 run against this host as well. R7, R20, R22 and R24 are otherwise unchanged.
-
----
-
-## Amendment 2026-11-20 (nominated bank accounts and withdrawals prefixes) — accepted
-
-Add `/nominated-bank-accounts` and `/withdrawals` to the R20 prefix allow-list so the Customer Portal can read the Customer's own nominated bank accounts and withdrawals ([withdrawals.md](withdrawals.md) C22, C24).
-
-- Prefixes: `/nominated-bank-accounts`, `/withdrawals`
-- Methods: GET only is used by the portal. `webapi` refuses every write for a Customer (403), so the BFF forwards the methods it already forwards and does not filter by role.
-
----
-
-## Amendment 2026-11-23 (orders prefix) — accepted
-
-Add `/orders` to the R20 prefix allow-list so the Customer Portal can read the Customer's own orders ([orders.md](orders.md) C32).
-
-- Prefix: `/orders`
-- Methods: GET only is used by the portal. `webapi` refuses every write for a Customer (403), so the BFF forwards the methods it already forwards and does not filter by role.
-- A fill, unsettled cash and reserved quantities are read through `/transactions` and `/accounts`, which are already proxied.
-
----
-
-## Amendment 2026-11-24 (in-kind transfers prefix) — accepted
-
-Add `/in-kind-transfers` to the BFF prefix allow-list (R20) so the Customer Portal can read the Customer's own transfers ([in-kind-transfers.md](in-kind-transfers.md) R29).
-
-- Prefix: `/in-kind-transfers`
-- Methods: GET (a Customer has no write permission; `webapi` answers 403 to any other method)
-- `/custody-movements` and `/custodian-reconciliations` stay blocked (404).
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-12 | [bff-adviser-portal.md](bff-adviser-portal.md) §8.5 | §8.5: the BFF serves the SPA build |
+| 2026-11-13 | [bff-adviser-portal.md](bff-adviser-portal.md) §4.1 | R7: refresh single-flight |
+| 2026-11-20 – 11-24 | [withdrawals.md](withdrawals.md), [orders.md](orders.md), [in-kind-transfers.md](in-kind-transfers.md) | R20: four prefixes added to the allow-list |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
