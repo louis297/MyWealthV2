@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-22
-last_updated: 2026-11-25
+last_updated: 2026-11-26
 related:
   - ../custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -157,9 +157,9 @@ The rule that distinguishes this slice: a Custodial account closes only through 
 | R2 | **Request.** `POST /accounts/{accountId}/closures` with optional `nominatedBankAccountId` and `memo` → 201 `{ "id" }`. `memo` is why the account is closed: trimmed, 1–200 characters, required (400 `errors.Memo`). Requires `Idempotency-Key` (posting R21, ADR 0015): replay with the same hash → the original 201; same key, other hash → 409; missing → 400. The body must not carry `accountId` (the Account is the path's), `status`, an amount, `tenantId` or `id` (400). |
 | R3 | **Account.** The Account of the path must be in scope (else 404), Custodial (else 400 `errors.AccountId`, `Only a Custodial account is closed with an account closure.`), Open (400, the posting R6 message) and its Customer not Disabled (400 `disabled` / `target=user`). |
 | R4 | **Under the Account lock.** The request locks the Account row as every posting does (posting R22). R5–R7 are checked and R8 or R9 is written in one database transaction under that lock, so no posting, withdrawal request or flow on the Account sees the state between them. |
-| R5 | **Nothing in progress.** Each refusal is 400 `errors.AccountId`. A closure `InProgress` on the Account → `This account is already being closed.` An open withdrawal (withdrawals R24) → `Open withdrawals must be paid, rejected or cancelled before the account can be closed.` An Active portfolio assignment → `Unassign the portfolio before closing the account.` Withdrawals are the only instructions today; a later instruction kind (an order, roadmap O1; an in-kind transfer, T1) adds itself to this rule in its own spec. |
-| R6 | **No holdings.** Any holding on the Account → 400 `errors.AccountId`, `Sell every holding before closing the account.` The closure does not sell or move holdings. |
-| R7 | **Payout and remainder.** Let `S` be the cash `SUM` of the Account (`≥ 0` on a Custodial account; R5 means no cash is reserved, so available cash is `S`) and `u = 10^−DecimalPlaces` the currency's minor unit. The **payout** `P` is `S` rounded down to a multiple of `u`; the **remainder** is `S − P`, so `0 ≤ S − P < u`. A remainder exists only because a `Buy` / `Sell` cash leg is rounded to 4 decimals (custody-modes §4.2). |
+| R5 | **Nothing in progress.** Each refusal is 400 `errors.AccountId`. A closure `InProgress` on the Account → `This account is already being closed.` An open withdrawal (withdrawals R24) → `Open withdrawals must be paid, rejected or cancelled before the account can be closed.` An Active portfolio assignment → `Unassign the portfolio before closing the account.` Withdrawals are the only instructions today; a later instruction kind (an order, roadmap O1; an in-kind transfer, T1) adds itself to this rule in its own spec. Refusals added by later specs, each 400 `errors.AccountId`: a live order (an open order, or one with a fill not posted yet) → `Open orders must be filled, cancelled or expired before the account can be closed.`; a fill that is not settled → `Trades must settle before the account can be closed.` (orders R47); a fill with a break of outcome `NotApplied` → `A broken trade on this account waits for a decision.` (trade-settlement R33); an open in-kind transfer → `Open transfers of securities must be completed, rejected, cancelled or set aside before the account can be closed.` (in-kind-transfers R45); a `Pending` entitlement of a dividend → `A dividend is still to be paid on this account. Close it after the payment.` (dividends R46); an open adjustment request → `Open adjustment requests must be approved, rejected or cancelled before the account can be closed.` (adjustment-review R17). An Account with an open rebalance has an Active assignment, so it is refused already; unassign cancels the open rebalance (rebalances R22), and the closure then waits for its open orders. |
+| R6 | **No holdings.** Any holding on the Account → 400 `errors.AccountId`, `Sell every holding before closing the account.` The closure does not sell or move holdings. Since in-kind transfers the message reads `Sell or transfer out every holding before closing the account.` |
+| R7 | **Payout and remainder.** Let `S` be the cash `SUM` of the Account (`≥ 0` on a Custodial account; R5 means no cash is reserved, so available cash is `S`) and `u = 10^−DecimalPlaces` the currency's minor unit. The **payout** `P` is `S` rounded down to a multiple of `u`; the **remainder** is `S − P`, so `0 ≤ S − P < u`. A remainder exists only because a `Buy` / `Sell` cash leg is rounded to 4 decimals (custody-modes §4.2). Before the payout is worked out, after the checks of R3, R5 and R6, under the same Account lock and in the same database transaction, the platform accrues the account through yesterday (UTC) and posts every accrual row not yet posted, whatever its month. When that posts a Transaction it also stores an interest run with trigger `AccountClosure`, that one account and the requester, which is the Transaction's source. The payout and `cashBalanceAtRequest` then include the net interest (interest-run R33). With no live order and no unsettled fill the cash `SUM` is all withdrawable. |
 | R8 | **With a payout (`P > 0`).** `nominatedBankAccountId` is required (400 `errors.NominatedBankAccountId`, `The account has 300.00 USD to pay out. Choose a verified bank account.`) and is checked as withdrawals R20: another Customer's, another tenant's or a missing one → 404; not `Verified` or in another currency → 400 `errors.NominatedBankAccountId`. In the same database transaction the platform creates the closure, `InProgress`, and a withdrawal of `P` to that bank account (withdrawals R18–R24): requested by the caller at the same time, reference the Account's deposit reference (withdrawals R23), memo the closure's memo, linked to the closure. `P` is reserved; available cash is the remainder. From then on the withdrawal is an ordinary withdrawal: a TenantAdmin other than the requester approves it (withdrawals R28), the `worker` sends it, and its payout is posted from the debit line (withdrawals R40). |
 | R9 | **Without a payout (`P = 0`).** No withdrawal and no approval: nothing leaves the trust account. A `nominatedBankAccountId` in the body is not used, checked or stored. In the same database transaction the platform posts the remainder write-off when the remainder is not 0 (R18), closes the Account (`Account.Close()`, which raises `AccountClosed` as today) and creates the closure `Completed`. The Account is Closed when the 201 is sent. |
 | R10 | **The record.** A closure stores the Account, the requester and time, the memo, the cash balance at request, the payout, the nominated bank account and the withdrawal (with a payout), the write-off amount and its Transaction (when there was one), the status, the cancel reason and the time it completed or ended. It has no domain event of its own. |
@@ -168,8 +168,8 @@ The rule that distinguishes this slice: a Custodial account closes only through 
 
 | ID | Rule |
 | --- | --- |
-| R11 | **Closing.** An Account is **closing** while it has a closure `InProgress`. Only R8 makes one; a closure without a payout is never `InProgress`. |
-| R12 | **No new hand activity.** On a closing account each of these is refused → 400 with the message `This account is being closed and accepts no new activity.` under the empty `errors` key (where posting R6 puts the Closed-account message), for every caller: `POST /transactions` (any type); `POST /transactions/transfer`, `POST /transactions/fx` and `POST /transactions/fx/quote` with the account on either side; `POST /transactions/adjustment`; `POST /transactions/{id}/reverse` of a Transaction with a leg on the account; `POST /withdrawals` for the account; `POST /statement-lines/{id}/match` to the account and `POST /statement-lines/{id}/unmatch` of a deposit on it. The check runs under the Account lock directly after the Closed-account check, so it comes before the manual entry matrix (custody-modes R6) and every later check. No idempotency record is written. |
+| R11 | **Closing.** An Account is **closing** while it has a closure `InProgress`. Only R8 makes one; a closure without a payout is never `InProgress`. A closing account is not accrued. When the closure ends with its withdrawal, the next interest run accrues the days in between; when it completes, the account is Closed and earns nothing more. The day of the request and the days the payout is on its way earn no interest. |
+| R12 | **No new hand activity.** On a closing account each of these is refused → 400 with the message `This account is being closed and accepts no new activity.` under the empty `errors` key (where posting R6 puts the Closed-account message), for every caller: `POST /transactions` (any type); `POST /transactions/transfer`, `POST /transactions/fx` and `POST /transactions/fx/quote` with the account on either side; `POST /transactions/adjustment`; `POST /transactions/{id}/reverse` of a Transaction with a leg on the account; `POST /withdrawals` for the account; `POST /statement-lines/{id}/match` to the account and `POST /statement-lines/{id}/unmatch` of a deposit on it. The check runs under the Account lock directly after the Closed-account check, so it comes before the manual entry matrix (custody-modes R6) and every later check. No idempotency record is written. The routes a closing account refuses also include `POST /orders` and `POST /orders/preview` (orders R7), `POST /in-kind-transfers`, and `POST /adjustment-requests`, which took the place of `POST /transactions/adjustment`; the approval of a request checks the same, but no open request can be left on a closing account (R5). |
 | R13 | **Portfolios.** Assigning a portfolio to a closing account → 400 `account_not_eligible` with the message `Only an open Custodial account that is not being closed can be assigned a portfolio.` (custody-modes R14). A closing account has no Active assignment (R5), so no rebalance reaches it. |
 | R14 | **Receipts wait in suspense.** A credit line that deposit matching would post to a closing account (deposit-matching R15–R20) becomes `Unmatched` with the new reason `AccountClosing`, checked directly after `AccountClosed` in the order of deposit-matching R18; nothing is posted. A returned payout of an earlier withdrawal of a closing account (withdrawals R42) becomes `Unmatched` with `AccountClosing` too. The TenantAdmin returns such a line to the payer (bank-returns), or matches it by hand once the closure has ended (to an Account that is Open again; a Closed one needs a reopen first). |
 | R15 | **Flows that lower cash: unchanged.** They keep available cash `≥ 0` (withdrawals R36). A closing account's available cash is its remainder, so a recall of one of its receipts is not covered and waits in suspense (bank-returns R3), as on any account whose cash is reserved for a withdrawal. |
@@ -432,7 +432,7 @@ Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-d
 | ID | Behaviour |
 | --- | --- |
 | D53 | On an Open Custodial account the Close action opens `/accounts/:id/close` instead of calling `POST /accounts/{id}/close`. External accounts unchanged. The type selector (D18, D39) no longer offers CloseOut on a Custodial account. |
-| D54 | `/accounts/:id/close`: a checklist from the account, its holdings, its assignment and `GET /withdrawals?accountId=&status=Requested,Approved,Sent`: "No holdings", "No portfolio", "No open withdrawals", each ticked or with its R5 / R6 sentence and a link (holdings, the portfolio, the withdrawal). Then "Cash balance", "To pay out" (`P`) and, when not 0, "Written off" (the remainder). With a payout: To (the Customer's Verified bank accounts in the currency; none → "No verified bank account in USD. Add one on the customer page." with a link). Memo (required). Review: with a payout, "Pay 300.00 USD to ANZ J Smith ****8900 and close the account when the bank has paid. A firm administrator must approve the payment. Until then the account accepts no new activity."; without, "Close the account now." with "0.004 USD is written off." when there is a remainder. Confirm posts `POST /accounts/{id}/closures` with one `Idempotency-Key` per form open and returns to the account page. Confirm is disabled while a check fails. A 400 is shown at its field. |
+| D54 | `/accounts/:id/close`: a checklist from the account, its holdings, its assignment and `GET /withdrawals?accountId=&status=Requested,Approved,Sent`: "No holdings", "No portfolio", "No open withdrawals", each ticked or with its R5 / R6 sentence and a link (holdings, the portfolio, the withdrawal). Then "Cash balance", "To pay out" (`P`) and, when not 0, "Written off" (the remainder). With a payout: To (the Customer's Verified bank accounts in the currency; none → "No verified bank account in USD. Add one on the customer page." with a link). Memo (required). Review: with a payout, "Pay 300.00 USD to ANZ J Smith ****8900 and close the account when the bank has paid. A firm administrator must approve the payment. Until then the account accepts no new activity."; without, "Close the account now." with "0.004 USD is written off." when there is a remainder. Confirm posts `POST /accounts/{id}/closures` with one `Idempotency-Key` per form open and returns to the account page. Confirm is disabled while a check fails. A 400 is shown at its field. The checklist also has "No open adjustment requests". |
 | D55 | The account page of a closing account (`closure.status` `InProgress`) shows a banner: "Being closed. 300.00 USD is being paid out (<withdrawal status label, D46>). The account accepts no new activity." with a link to `/withdrawals/:closure.withdrawalId`. Every action button is hidden, Withdraw included. A Closed account whose latest closure is `Completed` shows "Closed by account closure on <date>". A `Cancelled` closure shows nothing on the account. |
 | D56 | On the withdrawals list (D46) a closure's withdrawal shows "Account closure" under To. `/withdrawals/:id` of one shows "This withdrawal pays out an account closure." Reject and Cancel on it ask in their dialog: "This also stops the account closure. The account stays open." |
 | D57 | `/transactions/:id` of a write-off: the Source line (D26) shows "Account closure" with a link to the account page. The type is shown as "Close out (rounding)". Reverse is not offered (D27). |
@@ -453,21 +453,13 @@ Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-d
 
 ## 10. Tests
 
-| Project | Assert |
+The tests are the executable form of §4. Where they live:
+
+| Project | Where |
 | --- | --- |
-| Domain.UnitTests | `ClosureAmounts.Split`: USD 300.004 → (300.00, 0.004); 300.00 → (300.00, 0); 0.004 → (0, 0.004); 0 → (0, 0); JPY 1 200.4 → (1 200, 0.4). `AccountClosure`: `StartWithPayout` → InProgress; `CompleteAtOnce` → Completed; `Complete` and `Cancel` only from InProgress, else throws; `Cancel` needs a reason; write-off amount and Transaction set together. `Transaction.PostRemainderWriteOff`: one `CloseOut` leg of `−cashSum`; `cashSum` 0 or at the minor unit → throws; source must be `AccountClosure`. `TransactionSource.AccountClosure(Guid.Empty)` → throws. `CustodyRules`: `CloseOut` on Custodial refused at 0.004 and at 5.00 with the R23 message, allowed on External; `AllowsHandReverse(Custodial, AccountClosure)` false |
-| Application.FunctionalTests — request | No Bearer → 401; SystemAdmin → 403 on all three routes; Customer → 403 on request, own reads only (no memo), another Customer's → 404. Request with a payout → 201, closure InProgress, one withdrawal of `P` Requested with `accountClosureId`, reference the deposit reference, `reservedCash` `P`, `availableCash` the remainder, account `closure` set; replay with the same key → same id, one closure and one withdrawal; other body → 409; no key → 400. Without a payout: 0.004 → 201, Completed, one `CloseOut` write-off (source `AccountClosure`, `CreatedBy` the caller), account Closed, no withdrawal; 0 → 201, Completed, no write-off, account Closed. External → 400; Closed → 400; Disabled Customer → 400 `disabled`; a holding → 400; an Active assignment → 400; an open withdrawal → 400; a closure in progress → 400; a payout without a bank account, with a Pending one, with one in another currency → 400; another Customer's or another tenant's bank account → 404; no memo → 400. Adviser: unassigned Customer's account → 404. Body with `accountId` → 400. Two-tenant: tenant B's account id in the path → 404 on all three routes. A closure id of another Account of the same Customer under this Account's path → 404 |
-| Application.FunctionalTests — closing | On a closing account, for TenantAdmin, Adviser and SystemAdmin as their permissions allow: each route of R12 → 400 with the R12 message, no Transaction, no idempotency record; a transfer and a conversion with the closing account on the to side → 400; reverse of a hand `TransferIn` on it → 400; `POST /withdrawals` → 400; assign a portfolio → 400 `account_not_eligible`. The same writes on another Open Custodial account of the Customer → succeed. With fakes for `IBankFeed`: a receipt quoting the closing account's reference → line Unmatched `AccountClosing`, nothing posted; a returned payout of an earlier withdrawal → Unmatched `AccountClosing`; a manual match to the closing account → 400 |
-| Application.FunctionalTests — completion | With fakes for `IBankPayments` and `IBankFeed`: approve (TenantAdmin, not the requester), send, debit line → in one transaction the payout (`Payment`), the write-off of 0.004 (`AccountClosure`, `CreatedBy` the system name), account Closed, closure Completed, withdrawal Paid; with no remainder → no write-off. Reject the withdrawal → closure Cancelled `WithdrawalRejected`, account Open, R12 writes allowed again; cancel before the attempt → `WithdrawalCancelled`; the bank rejects → `PaymentFailed`. A payout that finds cash above the remainder (set up by a direct database write) → payout posted, closure Cancelled `NotClosable`, account Open. A returned payout after completion → line Unmatched `AccountClosed`, closure still Completed. A hand reverse of the write-off after reopen → 400 |
-| Application.FunctionalTests — close route and matrix | `POST /accounts/{id}/close` on an Open Custodial account → 400 R22 for TenantAdmin, Adviser and SystemAdmin; on a Closed Custodial account → 204; on External → unchanged. `POST /transactions` `CloseOut` on Custodial of 0.004 and of 5.00 → 400 R23; on External → 201; an existing `Manual` `CloseOut` on an Open Custodial account can still be reversed |
-| Infrastructure.IntegrationTests | `0046`: two `InProgress` closures of one Account violate; two Completed allowed; a second closure with the same withdrawal violates; the status, cancel reason, payout and write-off CHECKs; `SourceKind = 5` needs a `SourcePublicId`, `6` violates; `UnmatchedReason = 12` allowed, `13` violates. EF round-trip of `AccountClosures` |
-| Adviser Portal | D53 the Close action by custody mode and no CloseOut type on Custodial; D54 each check and its link, the amounts, the payee list and its empty state, the two review sentences, Confirm disabled on a failed check, one key per form open; D55 the banner, hidden actions, the Closed line; D56 the To label, the detail sentence, the dialog text; D57 the source line, type label, no Reverse |
-| Customer Portal | C26, C27 |
-
-Fan-out in the tests:
-
-- Tests that close a Custodial account with `POST /accounts/{id}/close`, or close out a remainder with a hand `CloseOut`, change to `POST /accounts/{id}/closures` or expect R22 / R23. A helper `CustodialHttp.CloseAsync` requests the closure (as an Adviser), approves its withdrawal (as a TenantAdmin) and feeds the debit line through the fakes, as `CustodialHttp.WithdrawAsync` does.
-- The Adviser Portal `Account` type gains `closure`; `Withdrawal` gains `accountClosureId`.
+| Domain.UnitTests | `Entities/AccountClosureTests.cs`, `RemainderWriteOffTests.cs` |
+| Application.FunctionalTests | Folder `AccountClosures/`; `Interest/AccountClosureInterestTests.cs` |
+| Infrastructure.IntegrationTests | `AppliedSchema/AccountClosuresSchemaTests.cs` |
 
 ---
 
@@ -516,88 +508,20 @@ Still open, not this slice:
 
 ---
 
-## 12. Suggested commits
-
-The repository should build after each commit. Agents split each behaviour into red then green. Start after [bank-reconciliation.md](bank-reconciliation.md) has landed (it has, 2026-11-21).
-
-1. Script `0046`, `AccountClosure` and its enums, `ClosureAmounts`, source kind `AccountClosure`, `PostRemainderWriteOff` + Domain unit tests and the `0046` integration tests.
-2. Request without a payout (R1–R7, R9, R10, R18, R24): permissions, `POST /accounts/{accountId}/closures`, the reads, `closure` on the account item + functional tests, two-tenant.
-3. Request with a payout (R8, R28): the withdrawal, `accountClosureId` on the withdrawal item + functional tests.
-4. The closing refusals (R11–R13) in every hand write + functional tests.
-5. Receipts and returned payouts to a closing account (R14, `AccountClosing`) + functional tests.
-6. Completion with the payout and the not-closable end (R16–R19, R21) + functional tests.
-7. End with the withdrawal (R20) + functional tests.
-8. `POST /accounts/{id}/close` refused and hand `CloseOut` refused on Custodial (R22, R23) + functional tests and the fan-out.
-9. Adviser Portal D53–D57, Customer Portal C26, C27 + frontend tests.
-10. Repo docs: mark this file landed; roadmap §13 step 8 and the §2 matrix; remove the known-issue row.
-
-Do not put interest, fees, orders, in-kind transfers or a closure report in these commits.
-
-### Docs amended when this spec is accepted
+## 12. Docs changed when this spec was accepted
 
 [accounts.md](accounts.md) (R16 and close: a Custodial account closes through an account closure; `closure` on the item), [posting.md](posting.md) (R12, R16, R17: `CloseOut` on a Custodial account is written only by the closure flow), [custody-modes.md](custody-modes.md) (R5 matrix: `CloseOut` refused on Custodial; §4.2.1 message; the `CloseOut` paragraph of §4.2), [transaction-source.md](transaction-source.md) (kind `AccountClosure` = 5, not hand-reversible, check widened), [withdrawals.md](withdrawals.md) (R46 replaced; R40 completes a closure; R27–R30 and R33 end it; R42 `AccountClosing`; `accountClosureId` on the item), [deposit-matching.md](deposit-matching.md) (R18 reason `AccountClosing`; R26 and R30 refused on a closing account), [bank-returns.md](bank-returns.md) (R3 on a closing account, unchanged rule, note), [portfolios.md](portfolios.md) (assign refused while closing), [adjustments.md](adjustments.md) (refused while closing; §2 Out on the B8 write-off), [internal-transfers.md](internal-transfers.md) and [fx-conversions.md](fx-conversions.md) (refused with a closing account on either side), [api-design.md](../api-design.md) (§3.1 two permission rows, the `/accounts` catalog row and §7.6 gain the `closures` sub-resource, change log), [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D53–D57, D18, D39, D46, D47), [customer-portal.md](../customer-portal/customer-portal.md) (C26, C27), [known-issues/custodial-account-gaps.md](../known-issues/custodial-account-gaps.md) (the `CloseOut` row notes this spec; it is removed when the slice lands), [glossary.md](../glossary.md) (the review terms become accepted), [function-plan.md](../function-plan.md) §5, [features/README.md](README.md) row status, the roadmap §5 B8 and §13 status.
 
 ---
 
-## Amendment 2026-11-22 (interest run) — accepted
+## 13. History
 
-Status of this amendment: `accepted` (2026-11-22), together with [interest-run.md](interest-run.md). Rule R33 lives there; this section records what changes here.
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/account-closure.md`).
 
-- R4–R7: when an account closure is requested, after the checks of R3, R5 and R6 and before the payout is worked out (R7), under the same Account lock and in the same database transaction, the platform accrues the account through yesterday (UTC) and posts every accrual row not yet posted, whatever its month. When that posts a Transaction it also stores an interest run with trigger `AccountClosure`, that one account and the requester, which is the Transaction's source. The payout and `cashBalanceAtRequest` then include the net interest (interest-run R33).
-- R11: a closing account is not accrued. When the closure ends with its withdrawal, the next interest run accrues the days in between; when it completes, the account is Closed and earns nothing more. The day of the request and the days the payout is on its way earn no interest.
-- §2 Out and "Still open": interest to the closing date is no longer out or open; it is the step above. The final advisory fee stays open.
-
----
-
-## Amendment 2026-11-23 (orders and settlement) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [orders.md](orders.md). Rules R7 and R47 live there; this section records what changes here.
-
-- R5 gains two refusals, each 400 `errors.AccountId`: a live order (an open order, or one with a fill not posted yet) → `Open orders must be filled, cancelled or expired before the account can be closed.`; a fill that is not settled → `Trades must settle before the account can be closed.` (orders R47). This is the "later instruction kind" R5 named.
-- R7: with no live order and no unsettled fill, the cash `SUM` is all withdrawable, so the payout rule is unchanged.
-- R12: `POST /orders` and `POST /orders/preview` for a closing account → 400 with `This account is being closed and accepts no new activity.` (orders R7).
-- R16 still holds: a closing account has no holding and no live order, so no fill can reach it.
-
----
-
-## Amendment 2026-11-23 (trade settlement and broken trades) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [trade-settlement.md](trade-settlement.md). Rule R33 lives there; this section records what changes here.
-
-- R5 gains a refusal, 400 `errors.AccountId`: `A broken trade on this account waits for a decision.`, while a fill of the account has a break with outcome `NotApplied`.
-
----
-
-## Amendment 2026-11-23 (rebalance through orders) — accepted
-
-Status of this amendment: `accepted` (2026-11-23), together with [rebalances.md](rebalances.md). Rule R22 lives there; this section records what changes here.
-
-- A note: R5 already refuses an Account with an Active assignment, so an Account with an open rebalance cannot be closed. Unassign cancels the open rebalance (rebalances R22); the closure then waits for its open orders as for any order.
-
----
-
-## Amendment 2026-11-24 (in-kind transfers) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [in-kind-transfers.md](in-kind-transfers.md). Rule R45 lives there; this section records what changes here.
-
-- R5: a new refusal, 400 `errors.AccountId`: an open in-kind transfer → `Open transfers of securities must be completed, rejected, cancelled or set aside before the account can be closed.`
-- R6: the message becomes `Sell or transfer out every holding before closing the account.`
-- R12: `POST /in-kind-transfers` joins the routes a closing account refuses.
-
----
-
-## Amendment 2026-11-24 (dividends) — accepted
-
-Status of this amendment: `accepted` (2026-11-24), together with [dividends.md](dividends.md). Rule R46 lives there; this section records what changes here.
-
-- R5 gains a refusal, 400 `errors.AccountId`: a `Pending` entitlement of a dividend on the Account → `A dividend is still to be paid on this account. Close it after the payment.`
-
----
-
-## Amendment 2026-11-25 (adjustment review) — accepted
-
-Status of this amendment: `accepted` (2026-11-25), together with [adjustment-review.md](adjustment-review.md). Rule R17 live there; this section records what changes here.
-
-- R5 gains a refusal, 400 `errors.AccountId`: an open adjustment request on the Account → `Open adjustment requests must be approved, rejected or cancelled before the account can be closed.`
-- R12: `POST /adjustment-requests` for the account takes the place of `POST /transactions/adjustment` in the list of routes a closing account refuses. The approval of a request checks the same, but no open request can be left on a closing account.
-- D54: the checklist gains "No open adjustment requests".
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-22 | [interest-run.md](interest-run.md) | R7, R11: interest to the closing date |
+| 2026-11-23 | [orders.md](orders.md), [trade-settlement.md](trade-settlement.md), [rebalances.md](rebalances.md) | R5, R12: live orders, unsettled fills and broken trades |
+| 2026-11-24 | [in-kind-transfers.md](in-kind-transfers.md), [dividends.md](dividends.md) | R5, R6, R12: open in-kind transfers; a pending dividend |
+| 2026-11-25 | [adjustment-review.md](adjustment-review.md) | R5, R12, D54: open adjustment requests |
+| 2026-11-26 | — | The changes above were folded into the body. No rule changed |
