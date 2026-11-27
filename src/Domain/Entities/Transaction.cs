@@ -255,7 +255,121 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
-        TransactionSource source) => throw new NotImplementedException();
+        TransactionSource source)
+    {
+        if (source.Kind != TransactionSourceKind.Manual)
+        {
+            throw new DomainException("An entered dividend is entered by a person.");
+        }
+
+        if (quantity <= 0m || grossAmount <= 0m)
+        {
+            throw new DomainException("An entered dividend has a quantity and a gross amount above 0.");
+        }
+
+        if (imputationCredit < 0m || imputationCredit > grossAmount)
+        {
+            throw new DomainException("The imputation credit is 0 or more and not above the gross amount.");
+        }
+
+        if (imputationCredit > 0m && taxSource != DividendTaxSource.NewZealand)
+        {
+            throw new DomainException("Only a New Zealand company attaches imputation credits.");
+        }
+
+        if (EnteredTaxes.RefusalOf(taxes) is { } shape)
+        {
+            throw new DomainException(shape.Message);
+        }
+
+        if (EnteredTaxes.RefusalOf(taxes, taxSource) is { } pair)
+        {
+            throw new DomainException(pair.Message);
+        }
+
+        var currency = Money.Create(0m, accountCurrency).Currency;
+        var quote = Money.Create(0m, quoteCurrency).Currency;
+        var converted = !string.Equals(currency, quote, StringComparison.Ordinal);
+        if (converted && fxRate is null)
+        {
+            throw new DomainException("A dividend in another currency than the Account's needs the rate it is converted at.");
+        }
+
+        if (fxRate is not null && (!converted
+            || !string.Equals(fxRate.BaseCurrency, quote, StringComparison.Ordinal)
+            || !string.Equals(fxRate.QuoteCurrency, currency, StringComparison.Ordinal)))
+        {
+            throw new DomainException("The rate must be for the quote currency to the Account's currency.");
+        }
+
+        var gross = ConvertEntered(grossAmount, fxRate, decimalPlaces);
+        var credit = ConvertEntered(imputationCredit, fxRate, decimalPlaces);
+        if (gross <= 0m)
+        {
+            throw new DomainException("A dividend posting needs a gross amount above 0.");
+        }
+
+        var cashLegs = new List<TransactionCashLeg> { TransactionCashLeg.Create(tenantId, accountId, gross, currency) };
+        var taxDetails = EnteredTaxLegs(
+            tenantId, accountId, currency, gross, taxes,
+            tax => ConvertEntered(tax.Amount, fxRate, decimalPlaces),
+            kind => kind == TaxKind.Rwt ? gross + credit : gross,
+            cashLegs);
+
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            Type = TransactionType.Dividend,
+            BookedAt = bookedAt.ToUniversalTime(),
+            Memo = NormaliseMemo(memo),
+            Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
+            PublicId = Guid.NewGuid(),
+            CashLegs = cashLegs,
+            TaxDetails = taxDetails,
+            FxDetail = fxRate is null ? null : TransactionFxDetail.Create(tenantId, fxRate),
+            DividendDetail = TransactionDividendDetail.Create(
+                tenantId, instrumentId, quantity, amountPerShare, quote, taxSource, credit, null, null, exDate, recordDate,
+                paymentDate)
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
+
+    private static decimal ConvertEntered(decimal amount, AppliedFxRate? fxRate, int decimalPlaces) => fxRate is null
+        ? amount
+        : decimal.Round(amount * fxRate.Rate, decimalPlaces, MidpointRounding.AwayFromZero);
+
+    /// <summary>External-income R7, R8: one <c>Tax</c> leg of minus the booked amount per entered tax, added to
+    /// <paramref name="cashLegs"/>, each with its tax detail (the stated rate and <paramref name="basis"/> of its kind). A
+    /// tax booked as 0 has no leg. The booked taxes may not add up to more than <paramref name="gross"/>.</summary>
+    private static List<TransactionTaxDetail> EnteredTaxLegs(
+        int tenantId,
+        int accountId,
+        string currency,
+        decimal gross,
+        IReadOnlyList<EnteredTax> taxes,
+        Func<EnteredTax, decimal> booked,
+        Func<TaxKind, decimal> basis,
+        List<TransactionCashLeg> cashLegs)
+    {
+        var amounts = taxes.Select(tax => (Tax: tax, Amount: booked(tax))).ToList();
+        if (EnteredTaxes.AboveGross(amounts.Select(row => row.Amount), gross))
+        {
+            throw new DomainException(EnteredTaxes.AboveGrossMessage);
+        }
+
+        var details = new List<TransactionTaxDetail>();
+        foreach (var (tax, amount) in amounts.Where(row => row.Amount > 0m))
+        {
+            var detail = TransactionTaxDetail.Create(tenantId, tax.Kind, tax.RatePercent, basis(tax.Kind), amount, currency);
+            cashLegs.Add(TransactionCashLeg.CreateTax(tenantId, accountId, -amount, currency, detail));
+            details.Add(detail);
+        }
+
+        return details;
+    }
 
     /// <summary>R37: <c>Dividend ACME.SIM 0.72 per share</c>, the amount with at least two decimals.</summary>
     private static string DividendMemo(string symbol, decimal amountPerShare) =>
