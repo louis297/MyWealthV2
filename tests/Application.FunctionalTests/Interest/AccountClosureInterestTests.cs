@@ -94,7 +94,9 @@ public class AccountClosureInterestTests : TestBase
         await RunAsync(world.Tenant.Id, Today.AddDays(3));
 
         (await AccruedThroughAsync(account)).ShouldBe(Today.AddDays(3));
-        (await RowsAsync(account)).Where(row => row.PostedTransactionId == null).Select(row => row.Date)
+        // The days from today were accrued by the second run. When today + 3 is a month end, that run also posts the
+        // month, so they are read by date, not by being unposted.
+        (await RowsAsync(account)).Where(row => row.Date >= Today).Select(row => row.Date)
             .ShouldBe(Enumerable.Range(0, 4).Select(Today.AddDays));
     }
 
