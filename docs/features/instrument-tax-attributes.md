@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-27
-last_updated: 2026-11-27
+last_updated: 2026-11-28
 related:
   - ../roadmaps/fif-roadmap.md
   - ../future-plans.md
@@ -211,7 +211,7 @@ The values of R7 and what each states (R13):
 
 | ID | Rule |
 | --- | --- |
-| R23 | **The tax source of a dividend is not checked.** A dividend states its tax source, `NewZealand` or `Foreign` (dividends R3, external-income R11). The issuer country of the Instrument is a second statement, made by another person at another time. No write checks one against the other: not a corporate action entered by a TenantAdmin, not an announcement from the feed, not a dividend entered on an External account. Existing dividends are not looked at. What a tax report does when the two disagree is decided by TR2. |
+| R23 | **The tax source of a dividend is not checked.** A dividend states its tax source, `NewZealand` or `Foreign` (dividends R3, external-income R11). The issuer country of the Instrument is a second statement, made by another person at another time. No write checks one against the other: not a corporate action entered by a TenantAdmin, not an announcement from the feed, not a dividend entered on an External account. Existing dividends are not looked at. When the two disagree, the tax year read gives the dividend as booked with the notice `DividendTaxSourceDisagrees` ([tax-year-events.md](tax-year-events.md) R29). |
 
 ### 4.7 Seeds
 
@@ -517,7 +517,7 @@ Each point states the recommendation, written into the rules above, and the alte
 Still open, not this slice:
 
 - Running Inland Revenue's tool again for BHP, CBA and WOW once it answers for tax year 2027, and replacing the assumed rows of the demo catalog in each tenant that has them (§5.1)
-- Everything that reads the attributes: roadmap TR2 to TR6. TR2 decides what a tax report does with a dividend whose tax source disagrees with the issuer country (R23)
+- Everything that reads the attributes: roadmap TR3 to TR6. TR2 reads them in [tax-year-events.md](tax-year-events.md), which marks a dividend whose tax source disagrees with the issuer country with a notice (its R29)
 - An Instruments page in the Adviser Portal, with the tax attributes, for the TenantAdmin
 - A list of the Instruments not classified for a tax year, and a way to confirm last year's exemptions for the next year in one step
 - An issuer that changes its country of tax residence (point 2)

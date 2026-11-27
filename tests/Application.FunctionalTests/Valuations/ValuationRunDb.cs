@@ -116,5 +116,13 @@ internal static class ValuationRunDb
             failing.Contains(account.Id)
                 ? throw new InvalidOperationException($"Valuation of account {account.Id} failed on purpose.")
                 : inner.ForDayAsync(account, day, cancellationToken);
+
+        public Task<AccountValuationRead> ForPositionAsync(
+            Account account,
+            AccountPosition position,
+            string currency,
+            IReadOnlyList<BasisChange> basisChanges,
+            CancellationToken cancellationToken) =>
+            inner.ForPositionAsync(account, position, currency, basisChanges, cancellationToken);
     }
 }

@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-25
-last_updated: 2026-11-26
+last_updated: 2026-11-28
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -71,7 +71,7 @@ POST /transactions
 
 The header is the business event (`type`, `bookedAt`, `memo`, source). It has no Account: each leg carries the Account it books into ([leg-accounts.md](leg-accounts.md)). A cash leg is the accounting line that the cash `SUM` reads. Application code picks the legs from `type`. The cash types of this spec build exactly one cash leg. `Buy` / `Sell` add a security leg on the **same** header; `Split` / `Bonus` / `Scrip` are the same model with a security leg only.
 
-Write = posted. A Transaction has no status, and no read of the ledger has to leave a row out. Two things come before a Transaction and are not Transactions:
+Write = posted. A Transaction has no status, and no read of the ledger has to leave a row out. One read leaves rows out on purpose: the tax year read takes neither a reversed Transaction nor its Reversal, because tax looks at what happened ([tax-year-events.md](tax-year-events.md) R7). Two things come before a Transaction and are not Transactions:
 
 - An **instruction** to an outside party (a withdrawal, an order, an in-kind transfer) is an aggregate of its own with its own lifecycle. The Transaction it leads to is posted in one step, when the outside party confirms.
 - Where a second person must approve a write, the approval is on a record of its own (an adjustment request, a migration batch) and comes before the Transaction is posted.
@@ -158,7 +158,7 @@ Which types a person may enter by hand depends on the custody mode of the Accoun
 | R11 | A Reversal targets a posted transaction. It has one opposite leg per original leg, each on that leg's Account; R6–R9 apply to every leg account, and there is no partial reverse (leg-accounts R12). Already reversed (`ReversedByTransactionId` is not null) → 400. One reversal per original. Reversal of a Reversal is out (`ReversedByTransactionId` on a Reversal stays null). A Transaction with a security leg can be reversed only while it is the latest security activity on each of its holdings, else 400 ([ledger-write-guards](../fixes/ledger-write-guards.md)). By hand, on a Custodial account only a Transaction with source `Manual` can be reversed (transaction-source R13, rebalances R28), and an `Adjustment` is never reversed on either custody mode (adjustment-review R15); each → 400. A flow reverses its own write through the Domain, not through this route. A Reversal has its own source, not the original's. |
 | R12 | `CloseAccount`: if cash `SUM ≠ 0` → 400 ordinary `errors`. `SUM = 0` (including never booked) may close. This is accounts R16, which also requires that no holding remains. Do not bulk-insert on close. Do not write cash inside `Account.Close()`. On an Open Custodial account `POST /accounts/{id}/close` → 400 (account-closure R22); inside the closure flow the same two conditions hold before `Account.Close()`. |
 | R13 | Closed accounts stay readable. Net worth excludes them (net-worth R5). Balance APIs still return the `SUM` (expected 0 after a successful close). |
-| R14 | List envelope `{ items, page, pageSize, totalCount }`; page default 1, size default 20, max 100. Optional `accountId`, optional `customerId`; each matches a Transaction with at least one leg there (leg-accounts R18). Neither set → tenant scope (Adviser = assigned Customers; Customer = own accounts). A Transaction is returned when the caller can see at least one leg account, with only the legs the caller can see (leg-accounts R7). Sort `bookedAt` then id. |
+| R14 | List envelope `{ items, page, pageSize, totalCount }`; page default 1, size default 20, max 100. Optional `accountId`, optional `customerId`; each matches a Transaction with at least one leg there (leg-accounts R18). Neither set → tenant scope (Adviser = assigned Customers; Customer = own accounts). A Transaction is returned when the caller can see at least one leg account, with only the legs the caller can see (leg-accounts R7). Sort `bookedAt` then id. The same order, `bookedAt` then the internal id, is the ordering key of the tax year walk and of a later ledger replay ([tax-year-events.md](tax-year-events.md) R8). |
 | R15 | A Customer has `transactions.read`: list and get for the caller's own accounts only; another Customer's transaction or account id → 404. A Customer has no `transactions.create` → 403 on create and reverse. |
 | R16 | Type on `POST /transactions`: one of `TransferIn`, `TransferOut`, `Interest`, `CloseOut`, `Opening`, `OpeningHoldings`, `Buy`, `Sell`, `StockIn`, `StockOut`, `Split`, `Bonus`, `Scrip`. `InternalTransfer`, `FxConversion`, `Adjustment`, `Reversal`, `Dividend` and an unknown name → 400 `errors.Type`: the first five are not entered on this route (§5); a hand `Dividend` is `POST /transactions/dividend` ([external-income.md](external-income.md) R10). The matrix then decides by the Account's custody mode (custody-modes R5, R6): on a Custodial account it refuses every type of this route. |
 | R17 | `CloseOut`: cash leaves to an off-books counterparty. Signed amount must be `< 0` and equal in magnitude to the current `SUM`, so after this row `SUM = 0`. Not a cross-account transfer. Not a holdings liquidation. Amount `0` not allowed; already zero → just `Close`. On a Custodial account the only `CloseOut` is the remainder write-off that an account closure posts (account-closure R18); this rule holds for it too. |
@@ -475,3 +475,4 @@ What changed in this file after it landed. The text of each change is in git (`g
 | 2026-11-26 | — | The amendments above were folded into §1–§13. No rule changed |
 | 2026-11-26 | [account-valuation.md](account-valuation.md) | §5: the cash of a past day is read by `bookedAt` |
 | 2026-11-27 | [external-income.md](external-income.md) | R16: `Dividend` is not entered on `POST /transactions`. R20: a hand `Interest` with tax. §5: `Dividend` by hand on `POST /transactions/dividend`; `Interest` may have `Tax` legs |
+| 2026-11-28 | [tax-year-events.md](tax-year-events.md) | R14: the list's sort is the ordering key of the tax year walk. §1: the tax year read leaves a reversed Transaction and its Reversal out |

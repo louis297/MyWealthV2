@@ -3,7 +3,7 @@ title: FIF tax report roadmap
 status: note
 language: en
 created: 2026-11-27
-updated: 2026-11-27
+updated: 2026-11-28
 related:
   - ../future-plans.md
   - ../function-plan.md
@@ -11,6 +11,7 @@ related:
   - custodial-roadmap.md
   - ../features/instruments.md
   - ../features/instrument-tax-attributes.md
+  - ../features/tax-year-events.md
   - ../features/holdings.md
   - ../features/posting.md
   - ../features/buy-sell.md
@@ -122,14 +123,14 @@ A planning summary of the rules for an individual. Sources are in §11; the code
 | Tax residency | The tax profile says `NewZealand` or `Overseas`. Nothing says transitional resident, and nothing has a date | interest-run R2 |
 | What is foreign | An Instrument had a symbol, a name and a quote currency, and no country, exchange, ISIN or kind. Since TR1 (accepted 2026-11-27) it also has an issuer country and a FIF treatment per tax year; exchange, ISIN and kind stay out. A dividend states its tax source (`NewZealand` or `Foreign`), on the dividend; it is not checked against the issuer country | instruments §6.1, instrument-tax-attributes, dividends R39 |
 | Instruments | A Tenant's catalog. There is no platform-wide Instrument | instruments §5 |
-| Quantity on a past instant | The sum of the security legs booked before it. Used per UTC day by the valuation read | account-valuation R4 |
+| Quantity on a past instant | The sum of the security legs booked before it. Used per UTC day by the valuation read. Since TR2 (accepted 2026-11-28) a position can also be cut at an instant, and the tax year read sums a Customer's quantity over all their Accounts at the two instants of a tax year, with reversed Transactions left out | account-valuation R4, R18; tax-year-events R22 |
 | Cost | Average cost per `(Account, Instrument)` in the quote currency, as it is now. No cost on a past day, no cost in NZD, no lots | holdings R10, R14 |
 | Purchases and sales | `Buy` and `Sell` carry a `Principal` cash leg in the Account's currency and a `Fee` cash leg with a fee detail. When the Instrument is quoted in another currency the Transaction stores the FX rate it used | buy-sell, trade-fees, glossary "FX detail" |
 | Holdings that arrive without a purchase | `OpeningHoldings`, `StockIn`, an in-kind transfer and a migration batch carry one cost in the quote currency. Only an in-kind transfer may carry an acquisition date, and no rule reads it | holdings R9, in-kind-transfers R25, migration-batches R4 |
 | Share reorganisations | `Split`, `Bonus` and `Scrip` change the quantity and keep the total cost | split, corporate-actions |
 | Dividends | A `Dividend` Transaction has the gross, a `Tax` leg per tax (`Rwt`, `Nrwt`, `ForeignWithholding`) with its tax detail, the imputation credit, the Instrument and the shares. On a Custodial account RWT is taken from a foreign dividend whatever the Customer's FIF position | dividends R37–R39, external-income R11 |
-| Order of Transactions | `bookedAt` is set by the server on a Custodial account. On an External account the caller sends it, and it may be any past date | custody-modes R10, R11 |
-| Market value on a past day | The valuation read values one Account for one UTC day at the unadjusted close, with a 4-day age limit, in the quote currency and the Account's currency. Stored valuations exist for Custodial accounts only | account-valuation, valuation-run |
+| Order of Transactions | `bookedAt` is set by the server on a Custodial account. On an External account the caller sends it, and it may be any past date. Since TR2 the ordering key of a walk is `bookedAt`, then the internal Transaction id | custody-modes R10, R11; tax-year-events R8 |
+| Market value on a past day | The valuation read values one Account for one UTC day at the unadjusted close, with a 4-day age limit, in the quote currency and the Account's currency. Stored valuations exist for Custodial accounts only. Since TR2 the tax year read values each Account's position at the instant of a tax year's start or end, as of 31 March, in NZD | account-valuation, valuation-run, tax-year-events R22 |
 | FX rates | Daily central bank reference rates from Frankfurter for every pair of active currencies, from the history floor date | ADR 0019, market-data-history |
 | Prices | EODHD daily closes from the history floor date; the free plan serves one year. None for NZX and Tokyo | market-data-history, [known-issues/eodhd-nz-jp-coverage.md](../known-issues/eodhd-nz-jp-coverage.md) |
 | A day | A UTC date everywhere | valuation-roadmap H2 |
@@ -194,7 +195,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 - **What:** a read that turns the ledger of one Customer into what the tax rules see for one tax year, per Instrument: the quantity and the market value at the start and at the end, and between them an ordered list of **tax events**, each with a quantity and an NZD amount. No table and no job.
 - **Why its own item:** it holds every rule about what a Transaction means for tax, where a year starts and how an amount becomes NZD. TR3 and TR4 only compute over its result.
 - **Changes:** the tax year as a pair of instants in New Zealand time (Q3); the ordering key of Transactions within the walk (`bookedAt`, then a tie-break; Q2); the event mapping below; the NZD amount of each event (Q4); the opening and closing market value through the valuation function of [account-valuation](../features/account-valuation.md), cut at the tax year's instants (Q5); the incomplete marks of T5; a read route for one Customer and one tax year (working shape), with the permissions of the Customer's other reads and the usual 404.
-- **Event mapping (working draft, to be settled by the spec):**
+- **Event mapping (settled by the spec, tax-year-events R9):**
 
 | Ledger | Tax event |
 | --- | --- |
@@ -203,11 +204,11 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 | `Dividend` paid in cash | Dividend: gross, foreign tax, RWT or NRWT, imputation credit |
 | `Dividend` with a reinvestment | The dividend, and an acquisition for the reinvested amount |
 | `Split`, `Bonus` | Reorganisation: the quantity changes, no amount. Earlier quantities of the year are restated so that a peak is compared like with like |
-| `Scrip` | Open. On an External account it may be a taxable issue or a reorganisation |
+| `Scrip` | Reorganisation, with a notice: the platform cannot know whether the issue was taxable (tax-year-events R13) |
 | `OpeningHoldings`, `StockIn`, an in-kind transfer in, a migration batch | Arrival without a purchase (Q8) |
 | `StockOut`, an in-kind transfer out | Departure without a sale (Q8) |
-| A move between two Accounts of the same Customer | Nothing (T1) |
-| `Adjustment` with a security leg | Open. A correction is not a trade; it is shown and flagged |
+| A move between two Accounts of the same Customer | One `Move` with no amount, recognised on read (T1; tax-year-events R15) |
+| `Adjustment` with a security leg | Correction, with a notice and no amount. A correction is not a trade (tax-year-events R16) |
 | A Transaction and its `Reversal` | Both left out, wherever they fall. Tax looks at what happened, not at how it was booked. This differs from valuation-roadmap H3, on purpose |
 | Cash-only types, `FxConversion` | Nothing. Cash in a foreign currency is not a FIF. `Interest` is read by TR6 only |
 
@@ -216,6 +217,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 - **Risk to test:** a trade between 11:00 UTC and 24:00 UTC on 31 March. It is in the next tax year (T2) and in the UTC day the valuation run stores. The FIF figures and the stored valuation of that day then differ, correctly.
 - **Amends:** holdings and posting (the walk and its ordering key), account-valuation (a cut at an instant, not only at the end of a UTC day).
 - **Worked example:** one Customer with two Accounts in two currencies over two tax years: a buy and a sell either side of the year end, a split, a cash dividend with foreign tax, a reinvested dividend, a reversal, and a move between the two Accounts.
+- **Spec:** [tax-year-events](../features/tax-year-events.md) (`accepted` and landed, 2026-11-28). It names the events `Acquisition`, `Disposal`, `Dividend`, `Reorganisation`, `Arrival`, `Departure`, `Move` and `Correction`, and calls one Instrument over all Accounts of a Customer a tax holding. It settles the two rows the draft mapping left open: a `Scrip` is a reorganisation with a notice, and an `Adjustment` of a holding is a correction with a notice. A move is recognised on read by a rule, because no Transaction links its two sides. Its points 1 to 17 answer "Also decide" and were confirmed as recommended. Sections EX 51, EX 52 and EX 57 of the Act could not be read; the spec says which rules rest on the guide alone.
 
 ### TR3. Cost in NZD and the threshold test
 
@@ -282,18 +284,18 @@ Every question is **decided** (2026-11-27), as recommended, Q3 with its scope st
 | # | Question | Answer | First needed by |
 | --- | --- | --- | --- |
 | Q1 | One spec or several? | Several: TR1 to TR5, and TR6 if wanted (§1.1) | now |
-| Q2 | Does step 6 open ledger replay or period close? | No. The report walks the Transactions as a read. TR2 decides the ordering key, which a later ledger replay reuses (§1.2) | TR2 |
-| Q3 | Is the tax year cut in New Zealand time or on UTC dates? | New Zealand time, for the tax year of this plan only (TR2 to TR6). The zone is one fixed zone, the same for every Tenant and not a setting, because the tax year is New Zealand law. The year starts at 00:00 on 1 April in New Zealand, which is 11:00 UTC on 31 March. Every other feature keeps the UTC date: the valuation day, the interest run, the date range of a report (valuation-roadmap H2). Not chosen: UTC dates here too, with up to 13 hours of trades in the wrong year | TR2 |
-| Q4 | Which rate turns an amount into NZD? | The actual rate of the day. A cash leg already in NZD is used as it is. Any other amount is converted at the `FxRates` rate of its day. Not chosen: Inland Revenue's own mid-month and end-of-month tables, which are a second rate set with a loader (valuation-roadmap §6 foresaw this); or the rolling 12-month average, which must then be kept every year | TR2 |
-| Q5 | Which price and which rate value a holding at the start and the end of the year? | The unadjusted close of the latest source date on or before 31 March, in the market's own dates, with the age limit of a valuation, converted at the rate of 31 March. The quantity is the one held at the New Zealand instant. The opening value of a year is then the closing value of the year before, by construction | TR2 |
+| Q2 | Does step 6 open ledger replay or period close? | No. The report walks the Transactions as a read. TR2 decides the ordering key, which a later ledger replay reuses (§1.2). Written as tax-year-events R8: `bookedAt`, then the internal Transaction id | TR2 |
+| Q3 | Is the tax year cut in New Zealand time or on UTC dates? | New Zealand time, for the tax year of this plan only (TR2 to TR6). The zone is one fixed zone, the same for every Tenant and not a setting, because the tax year is New Zealand law. The year starts at 00:00 on 1 April in New Zealand, which is 11:00 UTC on 31 March. Every other feature keeps the UTC date: the valuation day, the interest run, the date range of a report (valuation-roadmap H2). Not chosen: UTC dates here too, with up to 13 hours of trades in the wrong year. Written as tax-year-events R3 | TR2 |
+| Q4 | Which rate turns an amount into NZD? | The actual rate of the day. A cash leg already in NZD is used as it is. Any other amount is converted at the `FxRates` rate of its day. Not chosen: Inland Revenue's own mid-month and end-of-month tables, which are a second rate set with a loader (valuation-roadmap §6 foresaw this); or the rolling 12-month average, which must then be kept every year. Written as tax-year-events R18–R21: the rate of the UTC date of `bookedAt` | TR2 |
+| Q5 | Which price and which rate value a holding at the start and the end of the year? | The unadjusted close of the latest source date on or before 31 March, in the market's own dates, with the age limit of a valuation, converted at the rate of 31 March. The quantity is the one held at the New Zealand instant. The opening value of a year is then the closing value of the year before, by construction. Written as tax-year-events R22 | TR2 |
 | Q6 | Who classifies an Instrument? | A person with `instruments.manage`, by hand, per Tenant, because the catalog is the Tenant's. The platform calls no Inland Revenue tool. Not classified is the default and makes a report incomplete. Written as instrument-tax-attributes R2 | TR1 |
-| Q7 | What is one interest? | One Instrument held by one Customer, over all their Accounts (T1) | TR2 |
-| Q8 | How does a holding count that arrives without a purchase (`OpeningHoldings`, `StockIn`, an in-kind transfer in, a migration batch)? | For the threshold it brings the cost it carries, converted at the rate of its acquisition date when one is stated and of its `bookedAt` otherwise. For FDR and CV it is an acquisition at the market value of the day it arrives, and the interest is flagged: the platform cannot know whether it was held on 1 April. Sharesies' holdings report counts a transfer in with the purchases (S11). The remedy is to record the earlier history in an External account. A departure mirrors it | TR2, TR3 |
+| Q7 | What is one interest? | One Instrument held by one Customer, over all their Accounts (T1). Written as tax-year-events R5, the tax holding | TR2 |
+| Q8 | How does a holding count that arrives without a purchase (`OpeningHoldings`, `StockIn`, an in-kind transfer in, a migration batch)? | For the threshold it brings the cost it carries, converted at the rate of its acquisition date when one is stated and of its `bookedAt` otherwise. For FDR and CV it is an acquisition at the market value of the day it arrives, and the interest is flagged: the platform cannot know whether it was held on 1 April. Sharesies' holdings report counts a transfer in with the purchases (S11). The remedy is to record the earlier history in an External account. A departure mirrors it. The market value and the flag are written as tax-year-events R14; the cost it brings stays TR3's | TR2, TR3 |
 | Q9 | Which cost does a disposal remove, for the threshold? | The average cost in NZD of that interest. The guide does not say; check the Act | TR3 |
-| Q10 | Are trade fees part of cost and proceeds? | Yes: a buy fee adds to the cost, a sell fee comes off the proceeds. S2 ¶8 says so for the threshold. For CV, check section EX 51. This answers the question future-plans §1 left for this step | TR2 |
+| Q10 | Are trade fees part of cost and proceeds? | Yes: a buy fee adds to the cost, a sell fee comes off the proceeds. S2 ¶8 says so for the threshold. For CV, check section EX 51. This answers the question future-plans §1 left for this step. Written as tax-year-events R10, with the principal and the fee given apart | TR2 |
 | Q11 | How is the actual gain of a quick sale worked out? | A disposal is matched to the purchases made earlier in the same year, last bought first, and the gain uses the average cost of the year's purchases, with the dividends on the matched shares pro rata (S1 p.15, S9). The sources differ in detail; read sections EX 52 and EX 54 before the spec | TR4 |
 | Q12 | What happens to an interest where FDR is not allowed? | It is listed and not computed, and the report is incomplete. Not chosen: compute it under CV alone, with its loss allowed | TR4 |
-| Q13 | Which tax years can be reported? | A year that has ended and whose 31 March prices and rates are final, as a valuation day is final ([valuation-run](../features/valuation-run.md) R4). No estimate for a year in progress | TR5 |
+| Q13 | Which tax years can be reported? | A year that has ended and whose 31 March prices and rates are final, as a valuation day is final ([valuation-run](../features/valuation-run.md) R4). No estimate for a year in progress. Written early as tax-year-events R4, for the read | TR5 |
 | Q14 | Does the platform store whether the rules apply to the Customer (transitional resident, the choice to opt in)? | No. For a `NewZealand` Customer the report always shows the threshold test and both methods, and the Customer reads the branch that applies. For an `Overseas` Customer the report is refused | TR5 |
 | Q15 | What if an External entry is backdated into a year already reported? | Nothing stops it. The stored execution is what was reported; a new run shows the ledger as it is now, with its own instant. Revisit with period close | TR5 |
 | Q16 | Is a PDF enough? | The PDF is the report. The numbers are also readable as JSON through the TR2 and TR4 reads, which the tests and the portal pages use. No spreadsheet file in the first version | TR5 |
@@ -309,7 +311,7 @@ Each step depends only on earlier steps.
 | Step | Item | Closes | Spec | Status |
 | --- | --- | --- | --- | --- |
 | 1 | TR1 tax attributes of an Instrument | "No ISIN / Exchange / Kind" stays; the country and the FIF treatment are new | [instrument-tax-attributes](../features/instrument-tax-attributes.md) | accepted and landed (2026-11-27) |
-| 2 | TR2 tax year events in NZD | — | — | not started |
+| 2 | TR2 tax year events in NZD | The ordering key of Transactions, for a later ledger replay; the open point on brokerage and the cost base (trade-fees §11) | [tax-year-events](../features/tax-year-events.md) | accepted and landed (2026-11-28) |
 | 3 | TR3 cost in NZD and the threshold test | "Tax lots and a cost in NZD" of custodial-roadmap §10, as far as this step needs it | — | not started |
 | 4 | TR4 FIF income: FDR, quick sale, CV | — | — | not started |
 | 5 | TR5 the FIF report | "A tax statement for the Customer" (interest-run §11 point 19; dividends and external-income Out), for FIF income | — | not started |

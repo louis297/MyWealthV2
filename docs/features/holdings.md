@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-28
-last_updated: 2026-11-26
+last_updated: 2026-11-28
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -114,7 +114,7 @@ Cash position stays the `SUM` of cash legs. An `OpeningHoldings` header has no c
 | R11 | At most one `OpeningHoldings` per `(Account, Instrument)`, including a reversed one until the product says otherwise: a second header that names an instrument already opened → 400. `OpeningHoldings` must be the first security activity for that instrument. |
 | R12 | No auto zero row. Create Account does not insert a holding. |
 | R13 | After insert, quantity `SUM` per `(Account, Instrument)` `≥ 0`. Stored quantity is `decimal(18,8)`. Cost amount is `decimal(18,4)`. On a Custodial account a sell order and an `Adjustment` that lowers a holding must also leave **available quantity** `≥ 0` (orders R13, R40); a fill, a rebalance and an entitlement posting are not refused by this rule. |
-| R14 | Projection upsert in the same command, with every leg account locked in ascending `Accounts.Id` order (leg-accounts R11). The projection key is the security leg's `(AccountId, InstrumentId)` (leg-accounts R15). Callers never PUT a holding. Quantity 0 deletes the projection row. Tests assert projection quantity = `SUM` of security-leg quantities. A platform-side flow that writes a security leg updates the projection in the same Account-locked database transaction. The projection is the quantity now; the quantity of a past day is the sum of the security legs booked before that day ended ([account-valuation](account-valuation.md) R4), not this row. |
+| R14 | Projection upsert in the same command, with every leg account locked in ascending `Accounts.Id` order (leg-accounts R11). The projection key is the security leg's `(AccountId, InstrumentId)` (leg-accounts R15). Callers never PUT a holding. Quantity 0 deletes the projection row. Tests assert projection quantity = `SUM` of security-leg quantities. A platform-side flow that writes a security leg updates the projection in the same Account-locked database transaction. The projection is the quantity now; the quantity of a past day is the sum of the security legs booked before that day ended ([account-valuation](account-valuation.md) R4), not this row. The quantity of a tax holding at an instant is a sum over all the Customer's Accounts, with reversed Transactions left out ([tax-year-events](tax-year-events.md) R22). |
 | R15 | Posted rows are not updated or deleted. Reverse copies the opposite security quantity and cost. One reversal per original. No client `rowVersion`. Account Open. Result must stay `≥ 0`. Only the latest security activity on a holding can be reversed: a live later security leg on the same `(Account, Instrument)` → 400 ([ledger-write-guards](../fixes/ledger-write-guards.md)). An adjustment, an order fill, an entitlement posting, an in-kind transfer and a reinvested dividend all count as security activity. By hand, on a Custodial account only a Transaction with source `Manual` is reversed (transaction-source R13). |
 | R16 | `CloseAccount` rejects unless cash `SUM = 0` and no `Holdings` row remains for that account. Amends accounts R16. `Account.Close()` writes neither cash nor holdings. |
 | R17 | `Idempotency-Key` required on create and reverse, same as posting. |
@@ -281,7 +281,7 @@ TestSeed (Development / TestAppHost only): one `OpeningHoldings` on Demo brokera
 | Read | `GET /accounts/{id}/holdings`, `accounts.read`, `PublicId` |
 | Buy/Sell price | Accepted in [buy-sell.md](buy-sell.md). Server `IMarketData` only |
 | Dividend | Ordinary cash. No instrument. Not this file |
-| Stock in/out | Accepted in [buy-sell.md](buy-sell.md). Not tax |
+| Stock in/out | Accepted in [buy-sell.md](buy-sell.md). What a `StockIn` or `StockOut` means for tax (an arrival, a departure or half of a move) is [tax-year-events.md](tax-year-events.md) R14, R15 |
 
 Still out of this increment: portal pages, net worth, live FX, lots.
 
@@ -305,3 +305,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-24 | [migration-batches.md](migration-batches.md), [in-kind-transfers.md](in-kind-transfers.md), [dividends.md](dividends.md) | R8: migrated holdings. §8.1: unsettled and transferable quantity. §5: in-kind transfers and reinvested dividends |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
 | 2026-11-26 | [account-valuation.md](account-valuation.md) | §2 Out: snapshots. R14: the quantity of a past day is read from the security legs |
+| 2026-11-28 | [tax-year-events.md](tax-year-events.md) | R14: the quantity of a tax holding at an instant. §11: stock in/out for tax points to the tax year read |

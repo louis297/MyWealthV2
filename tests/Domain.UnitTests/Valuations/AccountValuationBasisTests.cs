@@ -155,6 +155,40 @@ public class AccountValuationBasisTests
         (line.Status, line.Quantity).ShouldBe((ValuationLineStatus.NegativeQuantity, -5m));
     }
 
+    [Test]
+    public void APositionOfADay_IsCutAtTheEndOfTheDay() =>
+        new AccountPosition(Thursday, 0m, []).CutAt.ShouldBe(LedgerDay.End(Thursday));
+
+    [Test]
+    public void APositionCutAtAnInstant_APostingBookedBeforeIt_IsOnTheNewBasis()
+    {
+        // Tax-year-events R22: the position is cut at 11:00 UTC; the posting was booked at 09:00, before the cut.
+        var cutAt = LedgerDay.End(Thursday).AddHours(-13);
+        var line = LineCutAt(cutAt, 200m, PriceOn(Thursday), Change(CorporateActionKind.Split, 2, 1, Thursday, cutAt.AddHours(-2))).Single();
+
+        (line.Status, line.Quantity, line.LedgerQuantity).ShouldBe((ValuationLineStatus.Valued, 200m, 200m));
+    }
+
+    [Test]
+    public void APositionCutAtAnInstant_APostingBookedAfterItTheSameDay_IsNotOnTheNewBasis()
+    {
+        // The posting was booked at 14:00, after the cut at 11:00 and before the day ended: the quantity is restated.
+        var cutAt = LedgerDay.End(Thursday).AddHours(-13);
+        var line = LineCutAt(cutAt, 100m, PriceOn(Thursday), Change(CorporateActionKind.Split, 2, 1, Thursday, cutAt.AddHours(3))).Single();
+
+        (line.Status, line.Quantity, line.LedgerQuantity).ShouldBe((ValuationLineStatus.Valued, 200m, 100m));
+        line.MarketValue.ShouldBe(2_000.00m);
+    }
+
+    [Test]
+    public void APositionCutAtAnInstant_APostingBookedAfterIt_WithAPriceBeforeTheExDate_KeepsTheQuantity()
+    {
+        var cutAt = LedgerDay.End(Thursday).AddHours(-13);
+        var line = LineCutAt(cutAt, 100m, PriceOn(Thursday.AddDays(-1)), Change(CorporateActionKind.Split, 2, 1, Thursday, cutAt.AddHours(3))).Single();
+
+        (line.Status, line.Quantity).ShouldBe((ValuationLineStatus.Valued, 100m));
+    }
+
     /// <summary>A posting booked after Thursday ended: the quantity of Thursday is on the old basis.</summary>
     private static DateTimeOffset After() => LedgerDay.End(Thursday).AddHours(12);
 
@@ -165,6 +199,16 @@ public class AccountValuationBasisTests
 
     private static BasisChange Change(CorporateActionKind kind, int ratioNew, int ratioHeld, DateOnly exDate, DateTimeOffset bookedAt) =>
         new(Instrument, exDate, bookedAt, kind, ratioNew, ratioHeld);
+
+    private static IReadOnlyList<ValuationLine> LineCutAt(
+        DateTimeOffset cutAt, decimal ledgerQuantity, StoredPrice price, params BasisChange[] changes) =>
+        AccountValuation.Compute(
+            new AccountPosition(Thursday, 0m, [new PositionLine(Instrument, ledgerQuantity)], cutAt),
+            "NZD",
+            DecimalPlaces,
+            new Dictionary<int, StoredPrice> { [Instrument] = price },
+            new Dictionary<string, StoredRate>(),
+            changes).Lines;
 
     private static IReadOnlyList<ValuationLine> Line(decimal ledgerQuantity, StoredPrice price, params BasisChange[] changes) =>
         AccountValuation.Compute(

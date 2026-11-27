@@ -9,6 +9,9 @@ namespace MyWealthV2.Application.Valuations;
 public interface IAccountPositions
 {
     Task<AccountPositionRead> ReadAsync(Account account, DateOnly day, CancellationToken cancellationToken);
+
+    /// <summary>R18: the entitlement postings on the Account of any <c>bookedAt</c>.</summary>
+    Task<IReadOnlyList<BasisChange>> BasisChangesAsync(Account account, CancellationToken cancellationToken);
 }
 
 /// <summary>The position of a day with the entitlement postings that R18 compares with its prices.</summary>
@@ -56,7 +59,7 @@ public class AccountPositions(IApplicationDbContext db) : IAccountPositions
     /// of its detail. A corporate action from the feed and a hand <c>Split</c> on an External account are not read
     /// (R19).
     /// </summary>
-    private async Task<IReadOnlyList<BasisChange>> BasisChangesAsync(Account account, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<BasisChange>> BasisChangesAsync(Account account, CancellationToken cancellationToken)
     {
         var rows = await (
                 from transaction in db.Transactions.IgnoreQueryFilters()

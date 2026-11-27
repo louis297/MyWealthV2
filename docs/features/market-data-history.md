@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-25
-last_updated: 2026-11-26
+last_updated: 2026-11-28
 related:
   - ../roadmaps/valuation-roadmap.md
   - ../future-plans.md
@@ -134,7 +134,7 @@ So `FxRates` holds a row for the weekend too, and the rate of 2026-01-04 is 1.73
 | ID | Rule |
 | --- | --- |
 | R1 | **History floor date.** `MarketDataHistory:FloorDate` on `worker`, a date as `yyyy-MM-dd`. It is the earliest `AsOfDate` a history read may store, the same date for prices and rates (roadmap Q3). Not set: no history is read, and both sources are asked for the latest value only, as before this slice; R4 and R5 still apply. A value that is not a date, or a date after the platform's UTC date, stops `worker` at start-up, before it listens. The rule reads the configuration, not the environment name. |
-| R2 | **Nothing before the floor.** A history read stores no row with `AsOfDate` before the floor date. Rows that are already stored stay, whatever their date. Setting a later floor deletes nothing and only shortens what is asked for. Setting an earlier floor makes the next daily run ask from the new date. A price read as of a day before the first stored row finds nothing, so the floor date should be some days before the first day anyone needs to value (§1.1). |
+| R2 | **Nothing before the floor.** A history read stores no row with `AsOfDate` before the floor date. Rows that are already stored stay, whatever their date. Setting a later floor deletes nothing and only shortens what is asked for. Setting an earlier floor makes the next daily run ask from the new date. A price read as of a day before the first stored row finds nothing, so the floor date should be some days before the first day anyone needs to value (§1.1). A tax year `Y` can be complete only when the floor date is on or before 27 March `Y − 1`, four days before the day of its opening value, and when the source serves that far back ([tax-year-events.md](tax-year-events.md) §9.1). |
 | R3 | **How far back EODHD is asked.** `Eodhd:HistoryDays` on `worker`: a whole number from 1 to 36500, default 360. EODHD is asked from the later of the floor date and today (UTC) minus that many days. The free plan serves the past year only, so the default keeps the request inside it; a plan with more history sets a larger number. A value outside the range stops `worker` at start-up. Frankfurter has no such limit and is asked from the floor date. |
 
 ### 4.2 Final rows
@@ -378,5 +378,15 @@ Still open, not this slice:
 
 - NZX and Tokyo prices ([known issue](../known-issues/eodhd-nz-jp-coverage.md))
 - A larger EODHD plan, for history older than a year
-- Which rates Inland Revenue accepts for the FIF conversions (roadmap §6, step 6)
+- Which rates Inland Revenue accepts for the FIF conversions (roadmap §6, step 6). The tax year read uses the stored daily rate ([tax-year-events.md](tax-year-events.md) R18); whether section EX 57 accepts it is still to be checked
 - A price history page in a portal
+
+---
+
+## 12. History
+
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/market-data-history.md`).
+
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-28 | [tax-year-events.md](tax-year-events.md) | R2: what the floor date must cover for a tax year |

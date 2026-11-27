@@ -9,6 +9,18 @@ namespace MyWealthV2.Application.Valuations;
 public interface IValueAccount
 {
     Task<AccountValuationRead> ForDayAsync(Account account, DateOnly day, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Values a position it is given, of the Account, in <paramref name="currency"/>, with the given basis changes
+    /// (tax-year-events §7): the prices as of the position's day, the rates of each quote currency into
+    /// <paramref name="currency"/>, then <see cref="AccountValuation.Compute"/>.
+    /// </summary>
+    Task<AccountValuationRead> ForPositionAsync(
+        Account account,
+        AccountPosition position,
+        string currency,
+        IReadOnlyList<BasisChange> basisChanges,
+        CancellationToken cancellationToken);
 }
 
 /// <summary>A valuation with the Instruments of its lines.</summary>
@@ -32,7 +44,18 @@ public class ValueAccount(
     public async Task<AccountValuationRead> ForDayAsync(Account account, DateOnly day, CancellationToken cancellationToken)
     {
         var read = await positions.ReadAsync(account, day, cancellationToken);
-        var ids = read.Position.Lines.Select(line => line.InstrumentId).ToList();
+        return await ForPositionAsync(account, read.Position, account.Currency, read.BasisChanges, cancellationToken);
+    }
+
+    public async Task<AccountValuationRead> ForPositionAsync(
+        Account account,
+        AccountPosition position,
+        string currency,
+        IReadOnlyList<BasisChange> basisChanges,
+        CancellationToken cancellationToken)
+    {
+        var day = position.Day;
+        var ids = position.Lines.Select(line => line.InstrumentId).ToList();
         var instruments = (await db.Instruments.IgnoreQueryFilters().AsNoTracking()
                 .Where(instrument => ids.Contains(instrument.Id))
                 .Select(instrument => new { instrument.Id, instrument.PublicId, instrument.Symbol, instrument.Name, instrument.QuoteCurrency })
@@ -53,14 +76,14 @@ public class ValueAccount(
             }
         }
 
-        var accountCurrency = Code(account.Currency);
+        var target = Code(currency);
         var quotes = instruments.Values.Select(instrument => instrument.QuoteCurrency).Distinct().ToList();
         var rates = new Dictionary<string, StoredRate>();
-        foreach (var quote in quotes.Where(quote => quote != accountCurrency))
+        foreach (var quote in quotes.Where(quote => quote != target))
         {
             try
             {
-                var reading = await fxRates.GetRateDetailAsync(quote, accountCurrency, asOf, cancellationToken);
+                var reading = await fxRates.GetRateDetailAsync(quote, target, asOf, cancellationToken);
                 rates[quote] = new StoredRate(reading.Rate, reading.AsOfDate, reading.Source.Trim());
             }
             catch (FxRateNotFoundException)
@@ -69,13 +92,12 @@ public class ValueAccount(
             }
         }
 
-        var decimalPlaces = quotes.Append(accountCurrency).Distinct().ToDictionary(
+        var decimalPlaces = quotes.Append(target).Distinct().ToDictionary(
             code => code,
             code => currencies.TryGet(code)?.DecimalPlaces
                     ?? throw new InvalidOperationException($"Currency {code} is not in the catalog."));
 
-        var valuation = AccountValuation.Compute(
-            read.Position, accountCurrency, decimalPlaces, prices, rates, read.BasisChanges);
+        var valuation = AccountValuation.Compute(position, target, decimalPlaces, prices, rates, basisChanges);
         return new AccountValuationRead(valuation, instruments);
     }
 

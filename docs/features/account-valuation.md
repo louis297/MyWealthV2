@@ -5,7 +5,7 @@ phase: 3
 language: en
 owner: ""
 created: 2026-11-26
-last_updated: 2026-11-26
+last_updated: 2026-11-28
 related:
   - ../roadmaps/valuation-roadmap.md
   - ../future-plans.md
@@ -173,7 +173,7 @@ What the example shows:
 | R2 | **Valuation day.** A day is a UTC date (roadmap Q1), as everywhere on the platform ([utc-instants](../fixes/utc-instants.md)). Day `d` ends at 00:00 UTC of `d + 1`. A Transaction counts in day `d` when its `bookedAt` is before that instant. The Tenant's local date is not used. |
 | R3 | **Cash of the day.** The sum of the cash legs on the Account, of every role, on Transactions booked before the day ended. This is the day balance of interest-run R16, now for every Account of either custody mode. It is not rounded. Reserved cash and unsettled cash count in full: the money is in the cash balance. |
 | R4 | **Quantity of the day.** For each Instrument, the sum of the signed quantities of the security legs on the Account, on Transactions booked before the day ended: the **ledger quantity**. An Instrument whose sum is 0 is left out. Reserved quantity and unsettled quantity count in full, because the ledger books a trade when it is filled, not when it settles. `Holdings` is not read: it is the quantity now. |
-| R5 | **As booked.** Every Transaction counts from its own `bookedAt`, a Reversal too. `ReversedByTransactionId` is not read. A day between a Transaction and its Reversal shows the original, and stays so. |
+| R5 | **As booked.** Every Transaction counts from its own `bookedAt`, a Reversal too. `ReversedByTransactionId` is not read. A day between a Transaction and its Reversal shows the original, and stays so. The tax year read leaves a reversed Transaction and its Reversal out, on purpose ([tax-year-events.md](tax-year-events.md) R7): its quantity at an instant can differ from a valuation of the same instant. |
 | R6 | **What is not in the position.** Only posted legs count. Not counted: a daily accrual not yet posted, a dividend between its ex-date and its payment, an open order, a fill not posted yet, a withdrawal not paid yet, a bank statement line in suspense. So a valuation understates an account that has earned income not yet paid (roadmap Q8). |
 | R7 | **Any status.** The read does not look at the Account's status. An Account that is Closed today is valued for a day it was Open. For a day after it was closed the cash is 0 and there is no holding, because a close needs both (accounts R16). |
 | R8 | **The past of each custody mode.** On a Custodial account the server sets `bookedAt` (custody-modes R10), so the position of a past day never changes. On an External account the caller sets it (custody-modes R11): a Transaction entered later with an earlier `bookedAt` changes the position of every day from that date on. A valuation of an External account is the ledger as it stands when it is read. Such an entry can also leave the cash or a quantity of a past day below 0. Cash is returned as it is. A quantity below 0 is not valued (R14). |
@@ -213,7 +213,7 @@ Statuses of R14, in the order they are tested:
 
 | ID | Rule |
 | --- | --- |
-| R18 | **The same basis.** A split, a consolidation or a bonus issue changes the price and the quantity by one factor. The price changes with the source's date; the quantity changes when the platform posts the entitlement, which is later (corporate-actions R23–R26). This rule covers an **entitlement posting** on the Account: a `Split` or `Bonus` Transaction with source `CorporateAction`, not reversed, whose corporate action has origin `Manual`. `E` is the `exDate` of its corporate action detail and the factor is that of corporate-actions R3. The price of the line is on the new basis when its `AsOfDate` is on or after `E`. The ledger quantity is on the new basis when the posting was booked before the day ended. |
+| R18 | **The same basis.** A split, a consolidation or a bonus issue changes the price and the quantity by one factor. The price changes with the source's date; the quantity changes when the platform posts the entitlement, which is later (corporate-actions R23–R26). This rule covers an **entitlement posting** on the Account: a `Split` or `Bonus` Transaction with source `CorporateAction`, not reversed, whose corporate action has origin `Manual`. `E` is the `exDate` of its corporate action detail and the factor is that of corporate-actions R3. The price of the line is on the new basis when its `AsOfDate` is on or after `E`. The ledger quantity is on the new basis when the posting was booked before the instant the position was cut at (`AccountPosition.CutAt`). For a position of a day that is the end of the day; the tax year read cuts a position at the start or the end of a tax year ([tax-year-events.md](tax-year-events.md) R22). |
 | | **Price new, quantity old:** the quantity is restated: `quantity = RoundDown(ledgerQuantity × factor, 8)`, the formula of corporate-actions R28, and the line is valued with it. The line shows `quantity` and `ledgerQuantity`. |
 | | **Price old, quantity new:** the line is `PriceBeforeCorporateAction` and is not valued. This happens after "Apply now" (corporate-actions R20), when no price has arrived since the ex-date. |
 | | **Both old or both new:** nothing to do; `quantity` equals `ledgerQuantity`. |
@@ -237,7 +237,7 @@ Policies: none added. `accounts.read` reads the route.
 | Type | Kind | Change |
 | --- | --- | --- |
 | `LedgerDay` | Static rule (new, `src/Domain/Valuations`) | `End(day)`: 00:00 UTC of the next day. `Of(instant)`: the UTC date. The one place that says which day a `bookedAt` belongs to (R2) |
-| `AccountPosition`, `PositionLine` | Value (new) | A day, the cash, and one `PositionLine` (instrument, ledger quantity) per Instrument with a quantity other than 0 (R3, R4) |
+| `AccountPosition`, `PositionLine` | Value (new) | A day, the cash, and one `PositionLine` (instrument, ledger quantity) per Instrument with a quantity other than 0 (R3, R4). `CutAt` is the instant the position was cut at, which R18 compares with: `LedgerDay.End(day)` for a position of a day (tax-year-events §5) |
 | `StoredPrice`, `StoredRate` | Value (new) | The price row and the rate row a line reads, with their date and source (R9, R10) |
 | `ValuationRules` | Static (new) | `MaxAgeDays = 4`; `IsFresh(asOfDate, day)` (R11) |
 | `ValuationLineStatus` | Enum (new) | `Valued = 0`, `NoPrice = 1`, `StalePrice = 2`, `NoRate = 3`, `StaleRate = 4`, `PriceBeforeCorporateAction = 5`, `NegativeQuantity = 6` |
@@ -281,8 +281,8 @@ The position of a day is read from `Transactions` (`BookedAt`), `TransactionCash
 
 | Kind | Name | Change |
 | --- | --- | --- |
-| Service | `AccountPositions` (new) | `ReadAsync(account, day)` → `AccountPosition` (R3–R5), and the basis changes of the Account's lines (R18). It names the Account and its Tenant itself and does not depend on the tenant query filter, so that a `worker` run can call it later |
-| Service | `ValueAccount` (new) | `ForDayAsync(account, day)`: the position, `IMarketData.TryGetPriceDetail` per line, `IFxRate.GetRateDetailAsync` per quote currency, `ICurrencyCatalog` for the decimal places, then `AccountValuation.Compute`. A `FxRateNotFoundException` is caught and passed on as "no rate"; no number takes its place (fx-rates R7). The one place a valuation is worked out; roadmap V3 calls it |
+| Service | `AccountPositions` (new) | `ReadAsync(account, day)` → `AccountPosition` (R3–R5), and the basis changes of the Account's lines (R18), which `BasisChangesAsync(account)` also gives alone. It names the Account and its Tenant itself and does not depend on the tenant query filter, so that a `worker` run can call it later |
+| Service | `ValueAccount` (new) | `ForDayAsync(account, day)`: the position, `IMarketData.TryGetPriceDetail` per line, `IFxRate.GetRateDetailAsync` per quote currency, `ICurrencyCatalog` for the decimal places, then `AccountValuation.Compute`. A `FxRateNotFoundException` is caught and passed on as "no rate"; no number takes its place (fx-rates R7). The one place a valuation is worked out; roadmap V3 calls it. `ForPositionAsync(account, position, currency, basisChanges)` values a position it is given, in any currency: the tax year read values a position cut at an instant in NZD; `ForDayAsync` is the position of the day passed to it with the Account's currency (tax-year-events §7) |
 | Query | `GetAccountValuation` (new) | R1, R20–R22: finds the Account as `GetAccountHoldings` does, checks `date`, calls `ValueAccount`, maps the item |
 | Service | `AccountInterest` (existing) | Takes the end of a day from `LedgerDay`. Its query and its results do not change |
 
@@ -479,3 +479,13 @@ Still open, not this slice:
 Made when this spec was accepted (2026-11-26):
 
 [interest-run.md](interest-run.md) (R16: the day balance is the cash of the position of a day, R2 and R3 here; no rule changes), [holdings.md](holdings.md) (§2 Out "snapshots" and a note under R14: the quantity of a past day is read from the security legs), [posting.md](posting.md) (a note that the cash of a past day is read by `bookedAt`), [corporate-actions.md](corporate-actions.md) (R23: the ex-date in a valuation, R18 here), [fx-rates.md](fx-rates.md) (R7: a valuation catches a missing pair and marks the line), [known-issues/eodhd-nz-jp-coverage.md](../known-issues/eodhd-nz-jp-coverage.md) (its effect on a valuation: `NoPrice`, incomplete), [api-design.md](../api-design.md) (the resource row and the change log), [domain-model.md](../domain-model.md) (the valuation of a day), [architecture.md](../architecture.md) (the two services), [glossary.md](../glossary.md) (the review terms become accepted; "Day balance" covers every Account), [features/README.md](README.md) row status, and [valuation-roadmap.md](../roadmaps/valuation-roadmap.md) (H5 reworded by point 1, §5 V2, §8).
+
+---
+
+## 13. History
+
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/account-valuation.md`).
+
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-28 | [tax-year-events.md](tax-year-events.md) | R18, §5: a position carries the instant it was cut at. §7: `ValueAccount.ForPositionAsync`. R5: the tax year read leaves reversed Transactions out |

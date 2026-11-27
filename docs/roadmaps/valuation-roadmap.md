@@ -3,7 +3,7 @@ title: Historical valuation roadmap
 status: note
 language: en
 created: 2026-11-25
-updated: 2026-11-27
+updated: 2026-11-28
 related:
   - ../future-plans.md
   - ../function-plan.md
@@ -103,7 +103,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 | --- | --- | --- |
 | H1 | **A valuation has three inputs, each with one owner:** positions from the ledger, prices from `InstrumentPrices`, rates from `FxRates`. | No second copy of a price or a quantity that can disagree with the first. |
 | H2 | **A day is a UTC date**, and the position of a day is the sum of the legs booked before 00:00 UTC of the next day. | The interest run already uses this rule for cash (interest-run R16). One rule for cash and quantity. |
-| H3 | **As booked.** A Reversal counts from its own `bookedAt`. A day between a Transaction and its Reversal shows the original. | The ledger is not rewritten; a valuation of a past day must not be either. |
+| H3 | **As booked.** A Reversal counts from its own `bookedAt`. A day between a Transaction and its Reversal shows the original. | The ledger is not rewritten; a valuation of a past day must not be either. The tax year read differs on purpose: it leaves a reversed Transaction and its Reversal out, because tax looks at what happened ([tax-year-events.md](../features/tax-year-events.md) R7). |
 | H4 | **The price is the unadjusted close, and the quantity is the quantity held that day.** An adjusted close is never stored or used. | An adjusted series restates past prices for later splits. Multiplied by the quantity actually held, it gives a wrong value. |
 | H5 | **No invented number.** A holding with no price, or with a price that is too old, is unpriced, and the valuation says it is incomplete. It is not valued at 0. A missing or old rate does the same: the line is not valued and the valuation is incomplete; it does not fail the read ([account-valuation](../features/account-valuation.md) R14). | Net worth may show 0 for a missing price (net-worth R7). A fee base or a tax figure may not. |
 | H6 | **A stored valuation keeps what it used:** the price and its date, the rate and its date. It is never changed. | Fees and reports are computed from it. The platform already stores the rate used on every conversion. |

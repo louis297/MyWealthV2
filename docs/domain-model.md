@@ -3,7 +3,7 @@ title: Domain model
 status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-26
+updated: 2026-11-28
 related:
   - README.md
   - glossary.md
@@ -677,7 +677,7 @@ A read model, not an entity: nothing is stored and no event is raised. Types in 
 | Type | Kind | Notes |
 | --- | --- | --- |
 | `LedgerDay` | Static rule | `End(day)`: 00:00 UTC of the next day. `Of(instant)`: the UTC date. The one place that says which day a `bookedAt` belongs to |
-| `AccountPosition` | Value | A day, the cash, and one ledger quantity per Instrument with a quantity other than 0: the cash legs and the security legs booked before the day ended |
+| `AccountPosition` | Value | A day, the cash, and one ledger quantity per Instrument with a quantity other than 0: the cash legs and the security legs booked before the day ended. `CutAt` is the instant the position was cut at, which the ex-date rule compares a posting's `bookedAt` with: the end of the day for a position of a day; the start or end of a tax year for the tax year read (§8.24) |
 | `ValuationRules` | Static | `MaxAgeDays = 4`; `IsFresh(asOfDate, day)` |
 | `ValuationLineStatus` | Enum | `Valued`, `NoPrice`, `StalePrice`, `NoRate`, `StaleRate`, `PriceBeforeCorporateAction`, `NegativeQuantity` |
 | `BasisChange` | Value | One entitlement posting of a `Manual` corporate action on the Account: Instrument, ex-date, `bookedAt`, kind and ratio |
@@ -709,6 +709,23 @@ Types in `src/Domain/Valuations` and `src/Domain/Entities`. No domain event: a s
 | `ValuationRules.LastFinalDay` | Static | `today` minus 2 days: the latest day a stored valuation may be made for |
 
 Invariants: an `(Account, day)` has at most one stored valuation; an account's stored valuations cover every day from its first day to `ValuedThrough` without a gap; no stored valuation is of a day after the last final day of the moment it was stored; a stored valuation has the invariants of an `AccountValuation` and is never changed; only Custodial accounts have stored valuations. Field rules: [features/valuation-run.md](features/valuation-run.md).
+
+### 8.24 Tax year of a Customer (accepted — tax-year-events slice)
+
+A read model, not an entity: nothing is stored and no event is raised. Types in `src/Domain/Tax`. Field rules: [features/tax-year-events.md](features/tax-year-events.md).
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `TaxYear` | Static rule | `Start(Y)`: 11:00 UTC on 31 March `Y − 1`; `End(Y) = Start(Y + 1)`; `Of(instant)`; `OpeningDay` and `ClosingDay`, the two 31 March dates; `FirstReadable = 2009`. The one place that says which tax year a `bookedAt` belongs to |
+| `LedgerFact` | Value | What the walk needs of one Transaction: its ordering key, `bookedAt`, type, whether it is reversed, its legs with their Account, custody mode, role, amount and currency, and its dividend and in-kind transfer detail. Application fills it |
+| `TaxEventKind` | Enum | `Acquisition`, `Disposal`, `Dividend`, `Reorganisation`, `Arrival`, `Departure`, `Move`, `Correction` |
+| `TaxEvent` | Value | One event: kind, Transaction, Instrument, Account, quantity, the figures in the Account's currency, and for a move its two legs |
+| `TaxLedger` | Static | `Build(facts)`: the tax events of a Customer in the order `bookedAt`, then the internal Transaction id, over every tax year; reversed Transactions and Reversals left out; moves paired. Reads no clock and no store |
+| `TaxHolding` | Value | One Instrument in one tax year: treatment, opening and closing, events with NZD figures and quantities, peak, reasons and notices |
+| `CustomerTaxYear` | Value | The result. `Compute(taxYear, events, treatments, rates, values, decimalPlaces)` turns amounts into NZD and works out the comparable quantities, the peak, the reasons and the notices |
+| `TaxIncompleteReason`, `TaxNotice` | Enums | `NotClassified`, `OpeningNotValued`, `ClosingNotValued`, `AmountMissing`, `NegativeQuantity`, `NoComparableQuantity`; `ExternalFigures`, `ArrivalAtMarketValue`, `DepartureAtMarketValue`, `Move`, `Scrip`, `Correction`, `DividendTaxSourceDisagrees` |
+
+Invariants: a reversed Transaction and a Reversal give no event and count in no quantity; the closing quantity and value of tax year `Y` equal the opening of `Y + 1`; a `Dividend` and a `Move` never change a quantity; an event has an amount only when every figure it is made of could be worked out; a tax holding is complete if and only if it lists no reason; the comparable quantity at the closing equals the quantity.
 
 ## 9. Value objects (Domain assembly; may exist in Phase 1)
 
@@ -753,6 +770,7 @@ One row per change. The text of each change is in git (`git log -p -- docs/domai
 | 2026-11-26 | Valuation run: `StoredValuation`, `StoredValuationLine`, `ValuationRun`, `ValuationRunTrigger`, `ValuationRules.LastFinalDay` (§8.23); `Account.ValuedThrough` and `MarkValued` (§8.5). No event. [features/valuation-run.md](features/valuation-run.md) |
 | 2026-11-26 | Valuation history: `FxFold`, `FoldLine`, `FoldedTotal`, `FoldLineStatus` (§8.22). No entity or event. [features/valuation-history.md](features/valuation-history.md) |
 | 2026-11-27 | Income on External accounts: `EnteredTax`, `EnteredTaxes`, `Transaction.PostEnteredDividend` and `PostEnteredInterest`; the dividend detail's amount per share and ex-date optional; `CustodyRules` allows `Dividend` on an External account. No event. [features/external-income.md](features/external-income.md) |
+| 2026-11-28 | Tax year events in NZD: `TaxYear`, `LedgerFact`, `TaxEventKind`, `TaxEvent`, `TaxLedger`, `TaxHolding`, `CustomerTaxYear`, `TaxIncompleteReason`, `TaxNotice` (§8.24); `AccountPosition.CutAt` (§8.22). No entity or event. [features/tax-year-events.md](features/tax-year-events.md) |
 
 ---
 
