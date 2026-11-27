@@ -50,19 +50,84 @@ public sealed record CustomerTaxYear(
             var end = Point(
                 to, Tax.TaxYear.ClosingDay(taxYear), Of(closing, instrumentId), Lines(values.Closing, instrumentId), needsValue);
 
+            var holdingEvents = ofYear.Where(e => e.InstrumentId == instrumentId).ToList();
+            var comparable = Comparable(Of(opening, instrumentId), holdingEvents);
             var quantity = start.Quantity;
             var yearEvents = new List<TaxYearEvent>();
-            foreach (var taxEvent in ofYear.Where(e => e.InstrumentId == instrumentId))
+            foreach (var taxEvent in holdingEvents)
             {
                 quantity += taxEvent.Changes.Sum(change => change.Quantity);
-                yearEvents.Add(Amounts(yearEvents.Count + 1, taxEvent, rates, values, decimalPlaces) with { QuantityAfter = quantity });
+                yearEvents.Add(Amounts(yearEvents.Count + 1, taxEvent, rates, values, decimalPlaces) with
+                {
+                    QuantityAfter = quantity,
+                    ComparableQuantityAfter = comparable?[yearEvents.Count + 1]
+                });
             }
 
-            holdings.Add(new TaxHolding(instrumentId, treatment, start, end, null, yearEvents, [], []));
+            // R24: at the closing the comparable quantity is the quantity; R25: the peak of the opening and every event.
+            start = start with { ComparableQuantity = comparable?[0] };
+            end = end with { ComparableQuantity = comparable is null ? null : end.Quantity };
+            holdings.Add(new TaxHolding(instrumentId, treatment, start, end, comparable?.Max(), yearEvents, [], []));
         }
 
         var incomplete = holdings.Count(holding => !holding.Complete);
         return new CustomerTaxYear(taxYear, from, to, holdings, incomplete == 0, incomplete);
+    }
+
+    /// <summary>
+    /// R24: the comparable quantity of the opening (index 0) and after each event (index <c>k + 1</c>), or none when a
+    /// reorganisation leg on an Account that holds nothing before it leaves no factor. A reorganisation leg's factor is
+    /// its Account's quantity after the leg over the quantity before it; each Account's quantity at a point is multiplied
+    /// by the factors of its legs after that point, multiplied first and divided after, and cut to 8 decimal places.
+    /// </summary>
+    private static decimal[]? Comparable(IReadOnlyList<TaxQuantity> opening, IReadOnlyList<TaxEvent> events)
+    {
+        var states = new List<Dictionary<int, decimal>> { opening.ToDictionary(q => q.AccountId, q => q.Quantity) };
+        foreach (var taxEvent in events)
+        {
+            var next = new Dictionary<int, decimal>(states[^1]);
+            foreach (var change in taxEvent.Changes)
+            {
+                next[change.AccountId] = next.GetValueOrDefault(change.AccountId) + change.Quantity;
+            }
+
+            states.Add(next);
+        }
+
+        var factors = new List<(int Index, int AccountId, decimal After, decimal Before)>();
+        for (var k = 0; k < events.Count; k++)
+        {
+            if (events[k].Kind != TaxEventKind.Reorganisation)
+            {
+                continue;
+            }
+
+            var accountId = events[k].AccountId;
+            var before = states[k].GetValueOrDefault(accountId);
+            if (before == 0m)
+            {
+                return null;
+            }
+
+            factors.Add((k, accountId, states[k + 1].GetValueOrDefault(accountId), before));
+        }
+
+        var comparable = new decimal[states.Count];
+        for (var point = 0; point < states.Count; point++)
+        {
+            var sum = 0m;
+            foreach (var (accountId, quantity) in states[point])
+            {
+                var later = factors.Where(f => f.AccountId == accountId && f.Index >= point).ToList();
+                var multiplied = later.Aggregate(quantity, (product, f) => product * f.After);
+                var divisor = later.Aggregate(1m, (product, f) => product * f.Before);
+                sum += decimal.Round(multiplied / divisor, 8, MidpointRounding.ToZero);
+            }
+
+            comparable[point] = sum;
+        }
+
+        return comparable;
     }
 
     private static List<TaxQuantity> Of(IReadOnlyList<TaxQuantity> quantities, int instrumentId) =>
