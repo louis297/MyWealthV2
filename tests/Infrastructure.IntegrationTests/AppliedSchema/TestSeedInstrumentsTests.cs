@@ -87,6 +87,53 @@ public class TestSeedInstrumentsTests
                       + Catalog.Count(row => row.Price is not null && !row.Symbol.EndsWith(".SIM", StringComparison.Ordinal)) * HistoryWeekdays);
     }
 
+    // Instrument-tax-attributes R25: the demo catalog as §5.1, ACME.SIM and KIWI.SIM as fixtures, NZD-CASH not classified.
+    [Test]
+    public async Task Seed_ClassifiesTheCatalogAndTheSimulatedInstruments()
+    {
+        await using var db = OpenDb();
+        await EnsureDemoTenantAsync(db);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
+        var first = await LoadTaxAttributesAsync(db);
+        var firstRows = await RowIdsAsync(db);
+        await TestSeed.SeedAsync(db, CancellationToken.None);
+
+        (await LoadTaxAttributesAsync(db)).ShouldBe(first);
+        (await RowIdsAsync(db)).ShouldBe(firstRows);
+        first.Count.ShouldBe(Catalog.Length);
+        first["VTI"].ShouldBe("US|2027 Attributing ");
+        first["AIA"].ShouldBe("NZ|2027 NotForeign ");
+        first["BHP"].ShouldBe("AU|2027 ExemptAsxListed Assumed from tax year 2026: on 2026-11-27 Inland Revenue's FIF Australian listed share exemption tool showed the exemption for 1 April 2025 to 31 March 2026 only.");
+        first["AIR"].ShouldBe("NL|2027 Attributing ");
+        first["ACME.SIM"].ShouldBe("US|2027 Attributing ");
+        first["KIWI.SIM"].ShouldBe("NZ|2027 NotForeign ");
+        first["NZD-CASH"].ShouldBe("|");
+        first.Count(pair => pair.Value != "|").ShouldBe(Catalog.Length - 1);
+    }
+
+    private static async Task<List<int>> RowIdsAsync(ApplicationDbContext db)
+    {
+        var tenant = await db.Tenants.AsNoTracking().SingleAsync(row => row.Code == DevelopmentIdentitySeeder.DemoTenantCode);
+        return await db.InstrumentFifTreatments.AsNoTracking()
+            .Where(row => row.TenantId == tenant.Id)
+            .OrderBy(row => row.Id)
+            .Select(row => row.Id)
+            .ToListAsync();
+    }
+
+    private static async Task<Dictionary<string, string>> LoadTaxAttributesAsync(ApplicationDbContext db)
+    {
+        var tenant = await db.Tenants.AsNoTracking().SingleAsync(row => row.Code == DevelopmentIdentitySeeder.DemoTenantCode);
+        var instruments = await db.Instruments.AsNoTracking().Include(row => row.FifTreatments)
+            .Where(row => row.TenantId == tenant.Id)
+            .ToListAsync();
+        return instruments.ToDictionary(
+            row => row.Symbol,
+            row => $"{row.IssuerCountry}|" + string.Join(",", row.FifTreatments
+                .OrderBy(fif => fif.TaxYear)
+                .Select(fif => $"{fif.TaxYear} {fif.Treatment} {fif.Note}")));
+    }
+
     private static async Task EnsureDemoTenantAsync(ApplicationDbContext db)
     {
         if (await db.Tenants.AnyAsync(row => row.Code == DevelopmentIdentitySeeder.DemoTenantCode))
