@@ -1,3 +1,5 @@
+using MyWealthV2.Domain.Valuations;
+
 namespace MyWealthV2.Domain.Tax;
 
 /// <summary>
@@ -12,20 +14,25 @@ public static class TaxYear
     public const int FirstReadable = 2009;
 
     /// <summary>11:00 UTC on 31 March of the year before <paramref name="taxYear"/>.</summary>
-    public static DateTimeOffset Start(int taxYear) => default;
+    public static DateTimeOffset Start(int taxYear) => new(taxYear - 1, 3, 31, 11, 0, 0, TimeSpan.Zero);
 
     /// <summary>The start of the next tax year.</summary>
-    public static DateTimeOffset End(int taxYear) => default;
+    public static DateTimeOffset End(int taxYear) => Start(taxYear + 1);
 
     /// <summary>The tax year <paramref name="instant"/> belongs to: <c>Start(Y) ≤ instant &lt; End(Y)</c>.</summary>
-    public static int Of(DateTimeOffset instant) => default;
+    public static int Of(DateTimeOffset instant)
+    {
+        var year = instant.UtcDateTime.Year;
+        return instant >= Start(year + 1) ? year + 1 : year;
+    }
 
     /// <summary>The valuation day of the opening value: 31 March of the year before <paramref name="taxYear"/>.</summary>
-    public static DateOnly OpeningDay(int taxYear) => default;
+    public static DateOnly OpeningDay(int taxYear) => new(taxYear - 1, 3, 31);
 
     /// <summary>The valuation day of the closing value: 31 March of <paramref name="taxYear"/>.</summary>
-    public static DateOnly ClosingDay(int taxYear) => default;
+    public static DateOnly ClosingDay(int taxYear) => new(taxYear, 3, 31);
 
     /// <summary>R4: from 2009 on, and only once 31 March of the year is on or before the last final day.</summary>
-    public static bool IsReadable(int taxYear, DateOnly today) => default;
+    public static bool IsReadable(int taxYear, DateOnly today) =>
+        taxYear >= FirstReadable && ClosingDay(taxYear) <= ValuationRules.LastFinalDay(today);
 }
