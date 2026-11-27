@@ -12,17 +12,104 @@ public static class TaxLedger
     /// </summary>
     public static IReadOnlyList<TaxEvent> Build(IEnumerable<LedgerFact> facts)
     {
-        var events = new List<TaxEvent>();
+        var events = new List<(TaxEvent Event, LedgerFact Fact)>();
         foreach (var fact in facts
                      .Where(fact => !fact.Reversed && fact.Type != TransactionType.Reversal)
                      .OrderBy(fact => fact.BookedAt.UtcDateTime)
                      .ThenBy(fact => fact.TransactionId))
         {
-            events.AddRange(EventsOf(fact));
+            events.AddRange(EventsOf(fact).Select(taxEvent => (taxEvent, fact)));
         }
 
-        return events.Select((taxEvent, ordinal) => taxEvent with { Ordinal = ordinal }).ToList();
+        return Paired(events).Select((taxEvent, ordinal) => taxEvent with { Ordinal = ordinal }).ToList();
     }
+
+    /// <summary>The most a departure and an arrival of one move may be apart (R15).</summary>
+    public static readonly TimeSpan MoveWindow = TimeSpan.FromDays(30);
+
+    /// <summary>
+    /// R15: each departure, in the order of R8, takes the arrival nearest in time that is not yet paired, then the
+    /// earlier by R8, when both are of the same Instrument and quantity, on two different Accounts, at most 30 days
+    /// apart, and neither changes the beneficial owner. A pair becomes one move at the place of its later leg.
+    /// </summary>
+    private static IEnumerable<TaxEvent> Paired(IReadOnlyList<(TaxEvent Event, LedgerFact Fact)> events)
+    {
+        var partnerOf = new Dictionary<int, int>();
+        for (var d = 0; d < events.Count; d++)
+        {
+            var departure = events[d];
+            if (departure.Event.Kind != TaxEventKind.Departure || ChangesOwner(departure.Fact))
+            {
+                continue;
+            }
+
+            int? best = null;
+            for (var a = 0; a < events.Count; a++)
+            {
+                var arrival = events[a];
+                if (arrival.Event.Kind != TaxEventKind.Arrival
+                    || partnerOf.ContainsKey(a)
+                    || ChangesOwner(arrival.Fact)
+                    || arrival.Event.InstrumentId != departure.Event.InstrumentId
+                    || arrival.Event.AccountId == departure.Event.AccountId
+                    || arrival.Event.Quantity != -departure.Event.Quantity
+                    || Gap(arrival.Event, departure.Event) > MoveWindow)
+                {
+                    continue;
+                }
+
+                if (best is null || Gap(arrival.Event, departure.Event) < Gap(events[best.Value].Event, departure.Event))
+                {
+                    best = a;
+                }
+            }
+
+            if (best is { } paired)
+            {
+                partnerOf[d] = paired;
+                partnerOf[paired] = d;
+            }
+        }
+
+        for (var i = 0; i < events.Count; i++)
+        {
+            if (!partnerOf.TryGetValue(i, out var partner))
+            {
+                yield return events[i].Event;
+            }
+            else if (i > partner)
+            {
+                var (departure, arrival) = events[i].Event.Kind == TaxEventKind.Departure
+                    ? (events[i].Event, events[partner].Event)
+                    : (events[partner].Event, events[i].Event);
+                yield return Move(events[i].Event, departure, arrival);
+            }
+        }
+    }
+
+    private static TaxEvent Move(TaxEvent later, TaxEvent departure, TaxEvent arrival)
+    {
+        var quantity = arrival.Quantity;
+        return later with
+        {
+            Kind = TaxEventKind.Move,
+            Quantity = 0m,
+            Changes =
+            [
+                new TaxQuantityChange(departure.AccountId, departure.CustodyMode, -quantity),
+                new TaxQuantityChange(arrival.AccountId, arrival.CustodyMode, quantity)
+            ],
+            CarriedCost = null,
+            Move = new TaxMove(quantity, Leg(departure), Leg(arrival))
+        };
+    }
+
+    private static TaxMoveLeg Leg(TaxEvent taxEvent) =>
+        new(taxEvent.AccountId, taxEvent.CustodyMode, taxEvent.TransactionId, taxEvent.TransactionPublicId, taxEvent.BookedAt);
+
+    private static bool ChangesOwner(LedgerFact fact) => fact.InKindTransfer?.ChangesBeneficialOwner == true;
+
+    private static TimeSpan Gap(TaxEvent one, TaxEvent other) => (one.BookedAt - other.BookedAt).Duration();
 
     /// <summary>R9–R17: the events of one Transaction, before they are numbered.</summary>
     private static IEnumerable<TaxEvent> EventsOf(LedgerFact fact)
