@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-19
-last_updated: 2026-11-26
+last_updated: 2026-11-28
 related:
   - ../roadmaps/custodial-roadmap.md
   - transaction-source.md
@@ -122,7 +122,7 @@ The rule that distinguishes this slice: an adjustment is a separate write with i
 | R13 | **Cost is the caller's number.** The server does not read a price, a rate or a fee schedule for an adjustment. The new security leg stores `quantityChange` and `costChange` as they are. It does not call the average-cost release (buy-sell): a negative `costChange` is the cost the TenantAdmin removes. |
 | R14 | **Booking time.** The server sets `bookedAt`: the time of the approval (custody-modes R10, R12; adjustment-review R9). A request body that sends `bookedAt` → 400 `errors.BookedAt` with the custody-modes R10 message. |
 | R15 | **Account and Customer state.** Closed Account → 400 (posting R6). Disabled Customer → 400 `disabled` / `target=user` (posting R7). Checked after the Account is found and locked, before R5. An adjustment on a closing account (an account closure `InProgress`) → 400 with `This account is being closed and accepts no new activity.` under the empty `errors` key, directly after the Closed-account check (account-closure R12). |
-| R16 | **Not a trade.** The portfolio trade lock (portfolios R18) does not apply to an adjustment or its reverse. An Active assignment stays as it is, and no rebalance is enqueued. The next rebalance sees the adjusted holding. |
+| R16 | **Not a trade.** The portfolio trade lock (portfolios R18) does not apply to an adjustment or its reverse. An Active assignment stays as it is, and no rebalance is enqueued. The next rebalance sees the adjusted holding. The tax year read takes an adjustment with a security leg as a `Correction` with a notice and no amount ([tax-year-events.md](tax-year-events.md) R16). |
 
 Order in the handler: request shape (R3, R6–R8, R10 decimal places, R14) → Account found and locked (R1) → R15 → R5 → idempotency → instrument (R10, R12) → R9 cash and R11 holding checks → insert. A refusal after the idempotency check writes no idempotency record, as on the other create routes.
 
@@ -415,3 +415,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-24 | [migration-batches.md](migration-batches.md), [in-kind-transfers.md](in-kind-transfers.md), [dividends.md](dividends.md) | R11: transfers out reserve quantity. §4.2: what an adjustment corrects |
 | 2026-11-25 | [adjustment-review.md](adjustment-review.md) | §1, R2, R4, R14, R17, R18, R20, §8, §11: an adjustment is requested and approved, and never reversed |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
+| 2026-11-28 | [tax-year-events.md](tax-year-events.md) | R16: an adjustment of a holding is a `Correction` in the tax year read |

@@ -5,7 +5,7 @@ phase: 1
 language: en
 owner: ""
 created: 2026-09-14
-last_updated: 2026-11-26
+last_updated: 2026-11-28
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -184,6 +184,8 @@ Authorization: every verb is `customers.manage` **or** `customers.manage-own`. T
 | PUT | `/users/customers/{id}` | same | 204 | 400 / 401 / 403 / 404 / 409 |
 | POST | `/users/customers/{id}/disable` | same | 204 | 400 / 401 / 403 / 404 / 409 |
 | POST | `/users/customers/{id}/enable` | same | 204 | 400 / 401 / 403 / 404 / 409 |
+
+Two reads under `/users/customers/{id}` take `accounts.read` instead, with the scope of the Customer's accounts, a Customer reading themselves too: `GET /users/customers/{id}/net-worth` ([net-worth.md](net-worth.md) R3) and `GET /users/customers/{customerId}/tax-years/{taxYear}` ([tax-year-events.md](tax-year-events.md) R1).
 
 ### 8.1 Item
 
@@ -367,3 +369,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-24 | [dividends.md](dividends.md) | The tax profile decides the withholding on a dividend |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
 | 2026-11-27 | [external-income.md](external-income.md) | The tax profile decides withholding on Custodial accounts only |
+| 2026-11-28 | [tax-year-events.md](tax-year-events.md) | §8: the tax year read under `/users/customers/{customerId}` |

@@ -1,6 +1,6 @@
 ---
 title: Tax year events in NZD
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -54,7 +54,7 @@ The slice computes no tax. The cost in NZD and the threshold test (TR3), FIF inc
 
 New: route `GET /users/customers/{customerId}/tax-years/{taxYear}`; Domain types `TaxYear`, `TaxEvent`, `TaxEventKind`, `TaxHolding`, `CustomerTaxYear` and the functions `TaxLedger.Build` and `CustomerTaxYear.Compute`; Application service `CustomerTaxLedger` and query `GetCustomerTaxYear`; `AccountPosition` carries the instant it was cut at, and `ValueAccount` can value a position it is given. No script, table, permission, problem code, domain event, `TransactionType`, port, job or setting. No write changes. No portal page and no simulator change.
 
-**Status is `review` (2026-11-28).** It is not a build contract. The points of §11 are open until they are confirmed. The changes to accepted docs listed in §12 are a plan; they are made when this spec is accepted.
+**Status is `accepted` (2026-11-28).** The seventeen points of §11 were confirmed on 2026-11-28, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract.
 
 The tax statements in this spec were read again from Inland Revenue on 2026-11-28 (§14). The Income Tax Act refused automated reads again; §14 says which rules rest on the guide alone. Nothing here is tax advice.
 
@@ -576,9 +576,9 @@ No new ADR.
 | Route | `GET /users/customers/{customerId}/tax-years/{taxYear}` (`accounts.read`) |
 | Scripts, permissions, problem codes, events, ports, jobs, settings | None |
 
-### Points to confirm
+### Points confirmed
 
-Each point states the recommendation, written into the rules above, and the alternative.
+Each point states the recommendation, written into the rules above, and the alternative. All seventeen were confirmed as recommended on 2026-11-28.
 
 1. **The tax year is two fixed instants, 11:00 UTC on 31 March, and starts at 2009** (R3, R4). Recommended: roadmap Q3 states the instant; a constant in Domain needs no time zone data on the host, where a missing or old data file fails only at run time; and it has been right on every 1 April since 2008. The cost: tax year 2008 started under the older daylight saving rule, at 12:00 UTC, so it is not offered, and a change of New Zealand's rule needs an amendment here, as a tax rate does. Alternative: look the instant up in the zone `Pacific/Auckland`, which follows a change by itself and depends on the host's zone data.
 2. **Only a tax year that has ended and whose 31 March is final can be read** (R4). Recommended: roadmap Q13 and §7 plan no estimate for a year in progress, and the closing value needs final rows. It writes Q13 one item early, because the read needs an answer. Alternative: also answer the year in progress, with the events so far and no closing.
@@ -622,7 +622,7 @@ Still open, not this slice:
 
 ## 12. Changes to other docs
 
-A plan while this spec is in `review`. Each doc is changed in place when the spec is accepted.
+Each doc was changed in place when this spec was accepted (2026-11-28).
 
 | Doc | Change |
 | --- | --- |

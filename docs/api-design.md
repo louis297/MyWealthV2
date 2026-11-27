@@ -3,7 +3,7 @@ title: API design
 status: accepted
 language: en
 created: 2026-09-11
-updated: 2026-11-27
+updated: 2026-11-28
 related:
   - README.md
   - glossary.md
@@ -332,7 +332,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Current user | `/users/me` | GET, PUT, PUT password | `users.me` |
 | Tenant admins | `/users/tenant-admins` | list / get / create / update / disable / enable | `tenant-admins.manage` |
 | Advisers | `/users/advisers` | same | `advisers.manage` |
-| Customers | `/users/customers` | same; sub-resource `…/{customerId}/tax-profile` GET / PUT (features/interest-run.md) | `customers.manage` or `customers.manage-own` |
+| Customers | `/users/customers` | same; sub-resource `…/{customerId}/tax-profile` GET / PUT (features/interest-run.md); `…/{customerId}/tax-years/{taxYear}` GET (features/tax-year-events.md, `accounts.read`) | `customers.manage` or `customers.manage-own`; the tax year read `accounts.read` |
 | Currencies | `/currencies` | GET | Authenticated |
 | Countries | `/countries` | GET (the ISO 3166-1 alpha-2 list in Domain, `{ code, name }` sorted by name, no paging). See features/instrument-tax-attributes.md | Authenticated |
 | FX rates | `/fx-rates` | GET (the stored rates of one directed pair; platform data). See features/market-data-history.md | Authenticated |
@@ -478,6 +478,8 @@ Rule summary:
 People lists reuse the tenants envelope `{ items, page, pageSize, totalCount }` (page default 1, size default 20, max 100). Currencies, people collections, and instruments use `enabledOnly` (omit / `false` = all, `true` = enabled / Active only). Each person item includes `status`. Create on a disabled tenant uses §4.1.
 
 Tax profile ([features/interest-run.md](features/interest-run.md) R1–R8): sub-resource `GET` / `PUT /users/customers/{customerId}/tax-profile` (`customers.manage` or `customers.manage-own`, scope as every `/users/customers` route; a Customer → 403) and `GET /users/me/tax-profile` (`users.me`; a caller who is not a Customer → 404). The item is `{ taxResidency, irdNumberHeld, rwtRatePercent, withholding: { kind, ratePercent, basis }, updatedBy, updatedAt, rowVersion }`; `PUT` takes the three attributes and `rowVersion` (`null` for the first write) and answers 204; stale → 409 `stale_row_version`. The IRD number itself is never stored.
+
+Tax year ([features/tax-year-events.md](features/tax-year-events.md) R1, R4, R30–R32): `GET /users/customers/{customerId}/tax-years/{taxYear}` (`accounts.read`, the scope of `GET /users/customers/{id}/net-worth`: TenantAdmin the Tenant, Adviser an assigned Customer, a Customer themselves, SystemAdmin any Tenant; any other id → 404). For one Customer and one tax year that has ended and whose 31 March is final, per Instrument: the opening and closing quantity and NZD value and the ordered tax events. No query parameter, no paging, no `Idempotency-Key`. `taxYear` not an integer, before 2009, or not readable yet → 400 `errors.TaxYear`. An incomplete result is 200 with `complete` `false`.
 
 ### 7.5 Instruments
 
@@ -906,3 +908,4 @@ One row per change. The text of each change is in git (`git log -p -- docs/api-d
 | 2026-11-27 | Docs caught up with the code: §1 diagram shows the BFF between the browser and `webapi`; §2 CORS is none on `webapi`; §4 login failures are uniform (`Invalid login.`), no longer open; §7.8 the Customer's `reports.customer.create` and the Tenant pair; §4.2 `concurrent_modification` marked retired; §5 end session returns to `{bffOrigin}/` |
 | 2026-11-27 | Income on External accounts (§7.7): `POST /transactions/dividend`; `taxes` on a hand `Interest`; `POST /transactions` refuses `Dividend`; a hand-entered dividend on the item. No permission or problem code |
 | 2026-11-27 | Tax attributes of an Instrument (§6, §7.2, §7.5): `PUT /instruments/{id}/tax-attributes`; `issuerCountry` and `fifTreatments` on the instrument item; `GET /countries`. No permission or problem code |
+| 2026-11-28 | Tax year events in NZD (§6, §7.4): `GET /users/customers/{customerId}/tax-years/{taxYear}` under `accounts.read`. No permission or problem code |

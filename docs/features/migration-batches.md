@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-24
-last_updated: 2026-11-26
+last_updated: 2026-11-28
 related:
   - ../roadmaps/custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
@@ -240,7 +240,7 @@ Amends [deposit-matching.md](deposit-matching.md) R23, R26 and R30, [bank-return
 | R30 | **On the statement line item.** The item gains `migrationBatchId`: the PublicId of the batch the line funds, else `null`. `method` may be `Migration`. |
 | R31 | **On the transaction item.** A Transaction a batch wrote has `source: { "kind": "Migration", "id": "<batch PublicId>" }` and the new field `migration: { asOfDate, previousProvider }`; `migration` is `null` on every other Transaction. Every caller who can read the Transaction sees both, the Customer included. An Adviser or a Customer cannot read the batch itself. |
 | R32 | **Bank reconciliation.** Amendment to bank-reconciliation R9 and R10. A line `Matched` with method `Migration` to a batch that is not `Posted` is an item of the new kind `MigrationNotPosted` (Timing) with the line's amount: money in the trust account that is not in the ledger yet. A line matched to a `Posted` batch is not an item, like every matched line. The cash legs of a Transaction with source `Migration` are in the ledger through the funding lines of its batch: for a run of client money account A they make no item for the part funded by lines of A, and one item `OtherClientMoneyAccount` (Known) per other client money account whose lines funded the rest. They no longer count in `OtherLedgerCash`. The items of a run still add up to its difference. |
-| R33 | **What does not change.** Cash balance, holdings, net worth, both reports and the Customer's reads add a migrated `Opening` and `OpeningHoldings` like any other. The Customer Transactions Report shows them with their type as today. External accounts, the simulator, the bank feed and every `worker` job are unchanged. |
+| R33 | **What does not change.** Cash balance, holdings, net worth, both reports and the Customer's reads add a migrated `Opening` and `OpeningHoldings` like any other. The Customer Transactions Report shows them with their type as today. External accounts, the simulator, the bank feed and every `worker` job are unchanged. The tax year read takes a migrated `OpeningHoldings` as an arrival at the market value of its day, or as half of a move ([tax-year-events.md](tax-year-events.md) R14, R15). |
 
 Policies: `migration-batches.manage` (new). Grants: TenantAdmin only.
 
@@ -624,3 +624,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-24 | [in-kind-transfers.md](in-kind-transfers.md) | §11: how a migrated holding shows in the custodian reconciliation |
 | 2026-11-24 | [dividends.md](dividends.md) | R13: three match targets |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
+| 2026-11-28 | [tax-year-events.md](tax-year-events.md) | R33: a migrated `OpeningHoldings` is an arrival, or half of a move, in the tax year read |

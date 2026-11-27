@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-10-12
-last_updated: 2026-11-26
+last_updated: 2026-11-28
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -87,7 +87,7 @@ Two endpoints: a firm / adviser list and a single-Customer read. Both return the
 | --- | --- |
 | R1 | Missing / dead Bearer → 401, never 302. Policy fail → 403. TenantAdmin / Adviser: other-tenant, unassigned Customer, missing id → 404. SystemAdmin: missing id → 404; another tenant’s id is allowed. |
 | R2 | Path and JSON `id` are `PublicId`. Internal ints never appear. |
-| R3 | Reads are `GET /net-worth` (firm / adviser scope) and `GET /users/customers/{id}/net-worth` (one Customer). The Customer route sits under the existing people namespace. |
+| R3 | Reads are `GET /net-worth` (firm / adviser scope) and `GET /users/customers/{id}/net-worth` (one Customer). The Customer route sits under the existing people namespace. A second read sits there with the same scope: `GET /users/customers/{customerId}/tax-years/{taxYear}` ([tax-year-events.md](tax-year-events.md) R1). |
 | R4 | TenantAdmin / Adviser omit `tenantId` (400 if present). SystemAdmin may pass `tenantId` on the firm read, same as other ledger lists. The Customer read uses the customer PublicId only. |
 | R5 | Closed accounts are excluded. Open accounts only. |
 | R6 | Results are arrays per currency: `currencies` and every breakdown are not folded. Same-currency FX is not applied. The one folded figure is the top-level `folded`, the `net` of each entry of `currencies` folded into the Tenant's reporting currency at today's rates ([valuation-history.md](valuation-history.md) R14, R15). |
@@ -232,3 +232,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
 | 2026-11-26 | [valuation-run.md](valuation-run.md) | Out: daily snapshots point at the stored valuations |
 | 2026-11-26 | [valuation-history.md](valuation-history.md) | R6 and §8.1: the top-level `folded`; Out, §9 and "Still open": the series and the charts point there |
+| 2026-11-28 | [tax-year-events.md](tax-year-events.md) | R3: a second read under the Customer with the same scope |

@@ -3,7 +3,7 @@ title: Custodial accounts roadmap
 status: note
 language: en
 created: 2026-11-19
-updated: 2026-11-27
+updated: 2026-11-28
 related:
   - ../future-plans.md
   - fif-roadmap.md
@@ -389,7 +389,7 @@ A Custodial `FxConversion` priced by an FX provider with a spread, instead of th
 | Item | What | Note |
 | --- | --- | --- |
 | X1 | Review of an adjustment by a second person | The first status on a Transaction, as [posting.md](../features/posting.md) §1 describes. Balances, holdings and reports must ignore an unapproved row. Large; do after the flows. **Spec:** [adjustment-review.md](../features/adjustment-review.md) (accepted and landed 2026-11-25). Its §11 decides, every point as recommended: the review is on an adjustment request at `/adjustment-requests`, approved before anything is posted, and a Transaction gets no status (this replaces "the first status on a Transaction" and makes the item small); request and approval both take `transactions.adjust`, and the approver is not the requester; only a TenantAdmin requests; the approval posts the `Adjustment` in one database transaction with the new source `AdjustmentRequest`, checked again under the Account lock; a request reserves nothing; `POST /transactions/adjustment` is removed; an `Adjustment` is never reversed by hand, and the opposite request corrects it; an account closure waits for open requests; the Development seed gets a second TenantAdmin in the demo firm. |
-| X2 | Cancel and rebook, replay | Rebuilding positions by replaying Transactions in order. Deferred (future-plans §9). Needed for tax lots and backdating. Moved to the business roadmap (§13.1). |
+| X2 | Cancel and rebook, replay | Rebuilding positions by replaying Transactions in order. Deferred (future-plans §9). Needed for tax lots and backdating. Moved to the business roadmap (§13.1). Its ordering key is decided: `bookedAt`, then the internal Transaction id, as the tax year walk uses it ([tax-year-events.md](../features/tax-year-events.md) R8). |
 | X3 | Period close | A date per Tenant before which nothing may be written. After X2. |
 | X4 | Third-party payments | See D14. |
 
