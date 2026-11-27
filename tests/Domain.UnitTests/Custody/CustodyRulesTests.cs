@@ -18,7 +18,8 @@ public class CustodyRulesTests
             [TransactionType.CloseOut] = true,
             [TransactionType.Opening] = true,
             [TransactionType.Reversal] = true,
-            [TransactionType.Dividend] = false,
+            // External income R21: a dividend an outside party paid, on POST /transactions/dividend.
+            [TransactionType.Dividend] = true,
             [TransactionType.Buy] = true,
             [TransactionType.Sell] = true,
             [TransactionType.OpeningHoldings] = true,
@@ -99,9 +100,8 @@ public class CustodyRulesTests
     }
 
     [Test]
-    public void RefusalMessage_DividendOnAnExternalAccount_StaysNotAccepted() =>
-        CustodyRules.RefusalMessage(CustodyMode.External, TransactionType.Dividend)
-            .ShouldBe("Dividend is reserved and cannot be entered.");
+    public void RefusalMessage_DividendOnAnExternalAccount_IsNull() =>
+        CustodyRules.RefusalMessage(CustodyMode.External, TransactionType.Dividend).ShouldBeNull();
 
     [Test]
     public void RefusalMessage_AdjustmentOnACustodialAccount_IsNull()
@@ -112,11 +112,6 @@ public class CustodyRulesTests
     [TestCaseSource(nameof(Matrix))]
     public void RefusalMessage_IsNullExactlyWhenTheTypeIsAllowed(CustodyMode custodyMode, TransactionType type, bool allowed)
     {
-        if (type == TransactionType.Dividend)
-        {
-            Assert.Pass("Dividend is reserved; no create route accepts it.");
-        }
-
         (CustodyRules.RefusalMessage(custodyMode, type) is null).ShouldBe(allowed);
     }
 
