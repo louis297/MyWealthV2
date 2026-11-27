@@ -116,6 +116,53 @@ internal static class TaxWorkedExample
             taxYear, events, treatments ?? Treatments, RatesFor(events, rates ?? UsdRates), values ?? TaxYearValues.None, 2);
     }
 
+    /// <summary>The stored prices of AAA in §1.1.</summary>
+    public static IReadOnlyList<StoredPrice> AaaPrices => [Price(2025, 3, 31, 53.20m), Price(2026, 3, 31, 31.00m)];
+
+    /// <summary>
+    /// What Application values for the opening and the closing of <paramref name="taxYear"/>: each Account's
+    /// quantity at the instant, valued as of 31 March in NZD by <see cref="AccountValuation.Compute"/>.
+    /// </summary>
+    public static TaxYearValues ValuesOf(
+        int taxYear,
+        IReadOnlyList<TaxEvent> events,
+        IReadOnlyList<StoredPrice>? prices = null,
+        IReadOnlyList<StoredRate>? rates = null,
+        IReadOnlyDictionary<int, ValuationLine>? eventLines = null) =>
+        new(
+            LinesAt(TaxYear.Start(taxYear), TaxYear.OpeningDay(taxYear), events, prices ?? AaaPrices, rates ?? UsdRates),
+            LinesAt(TaxYear.End(taxYear), TaxYear.ClosingDay(taxYear), events, prices ?? AaaPrices, rates ?? UsdRates),
+            eventLines ?? new Dictionary<int, ValuationLine>());
+
+    public static IReadOnlyList<TaxValueLine> LinesAt(
+        DateTimeOffset at, DateOnly day, IReadOnlyList<TaxEvent> events, IReadOnlyList<StoredPrice> prices, IReadOnlyList<StoredRate> rates)
+    {
+        var lines = new List<TaxValueLine>();
+        foreach (var account in TaxLedger.QuantitiesAt(events, at).GroupBy(quantity => (quantity.AccountId, quantity.CustodyMode)))
+        {
+            var position = new AccountPosition(day, 0m, account.Select(q => new PositionLine(q.InstrumentId, q.Quantity)).ToList(), at);
+            var price = prices.Where(row => row.AsOfDate <= day).MaxBy(row => row.AsOfDate);
+            var rate = rates.Where(row => row.AsOfDate <= day).MaxBy(row => row.AsOfDate);
+            var valuation = AccountValuation.Compute(
+                position,
+                "NZD",
+                DecimalPlaces,
+                price is null ? new Dictionary<int, StoredPrice>() : account.ToDictionary(q => q.InstrumentId, _ => price),
+                rate is null ? new Dictionary<string, StoredRate>() : new Dictionary<string, StoredRate> { ["USD"] = rate },
+                []);
+            lines.AddRange(valuation.Lines.Select(line => new TaxValueLine(account.Key.AccountId, account.Key.CustodyMode, line)));
+        }
+
+        return lines;
+    }
+
+    /// <summary>The worked example's tax year with its opening and closing valued.</summary>
+    public static CustomerTaxYear ValuedYear(int taxYear, IReadOnlyList<LedgerFact>? facts = null, IReadOnlyDictionary<int, TaxTreatment>? treatments = null)
+    {
+        var events = TaxLedger.Build(facts ?? Facts);
+        return Year(taxYear, facts, values: ValuesOf(taxYear, events), treatments: treatments);
+    }
+
     public static StoredRate Rate(int year, int month, int day, decimal rate) => new(rate, new DateOnly(year, month, day), "Frankfurter");
 
     public static StoredPrice Price(int year, int month, int day, decimal amount) => new(amount, "USD", new DateOnly(year, month, day), "EODHD");

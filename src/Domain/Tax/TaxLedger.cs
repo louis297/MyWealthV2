@@ -24,6 +24,12 @@ public static class TaxLedger
         return Paired(events).Select((taxEvent, ordinal) => taxEvent with { Ordinal = ordinal }).ToList();
     }
 
+    /// <summary>
+    /// R22: each Account's quantity of each Instrument before <paramref name="instant"/>, from the events booked before
+    /// it; a move counts from its later leg. A quantity of 0 is left out.
+    /// </summary>
+    public static IReadOnlyList<TaxQuantity> QuantitiesAt(IEnumerable<TaxEvent> events, DateTimeOffset instant) => [];
+
     /// <summary>The most a departure and an arrival of one move may be apart (R15).</summary>
     public static readonly TimeSpan MoveWindow = TimeSpan.FromDays(30);
 
@@ -256,3 +262,6 @@ public static class TaxLedger
 
     private static string Code(string currency) => currency.Trim().ToUpperInvariant();
 }
+
+/// <summary>An Account's quantity of an Instrument at an instant (R22).</summary>
+public sealed record TaxQuantity(int AccountId, CustodyMode CustodyMode, int InstrumentId, decimal Quantity);

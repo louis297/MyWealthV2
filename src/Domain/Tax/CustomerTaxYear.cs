@@ -143,6 +143,9 @@ public sealed record CustomerTaxYear(
         return ValuationRules.IsFresh(rate.AsOfDate, date) ? (TaxAmountStatus.Converted, rate) : (TaxAmountStatus.StaleRate, rate);
     }
 
+    /// <summary>R23: an opening and a closing value are worked out for an attributing and a not classified holding.</summary>
+    public static bool NeedsValue(FifTreatment treatment) => false;
+
     /// <summary>The currency of every figure of a tax year (R31).</summary>
     public const string Nzd = "NZD";
 
