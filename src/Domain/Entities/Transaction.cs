@@ -337,6 +337,23 @@ public class Transaction : BaseAuditableEntity
         return transaction;
     }
 
+    /// <summary>
+    /// External-income R22, R23: a hand <c>Interest</c> on an External account with the tax an outside payer withheld.
+    /// One <c>Principal</c> leg of <paramref name="grossAmount"/> (above 0) and one <c>Tax</c> leg per tax with its tax
+    /// detail on the gross; at least one tax; no interest detail. Source <c>Manual</c> only. A hand <c>Interest</c>
+    /// without tax is <see cref="Post"/>.
+    /// </summary>
+    public static Transaction PostEnteredInterest(
+        int tenantId,
+        int accountId,
+        string accountCurrency,
+        decimal grossAmount,
+        IReadOnlyList<EnteredTax> taxes,
+        DateTimeOffset bookedAt,
+        string? memo,
+        string? reference,
+        TransactionSource source) => throw new NotImplementedException();
+
     private static decimal ConvertEntered(decimal amount, AppliedFxRate? fxRate, int decimalPlaces) => fxRate is null
         ? amount
         : decimal.Round(amount * fxRate.Rate, decimalPlaces, MidpointRounding.AwayFromZero);
