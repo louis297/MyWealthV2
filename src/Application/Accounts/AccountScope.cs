@@ -1,6 +1,7 @@
 using MyWealthV2.Application.Common.Interfaces;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
+using NotFoundException = MyWealthV2.Application.Common.Exceptions.NotFoundException;
 
 namespace MyWealthV2.Application.Accounts;
 
@@ -15,6 +16,37 @@ internal static class AccountScope
     /// </summary>
     public static int? SelfCustomerId(ICurrentUser currentUser) =>
         currentUser.Role == UserRole.Customer ? currentUser.Person?.Id ?? 0 : null;
+
+    /// <summary>
+    /// The Customer <paramref name="customerId"/> as the caller may read their accounts (net-worth R1, R9;
+    /// tax-year-events R1): a TenantAdmin any Customer of the Tenant, an Adviser an assigned one, a Customer themselves,
+    /// a SystemAdmin a Customer of any Tenant. Any other id is not found.
+    /// </summary>
+    public static async Task<User> ReadableCustomerAsync(
+        IApplicationDbContext db, ICurrentUser currentUser, Guid customerId, CancellationToken cancellationToken)
+    {
+        if (currentUser.Role == UserRole.Customer && customerId != currentUser.PublicId)
+        {
+            throw new NotFoundException("Customer", customerId);
+        }
+
+        var assignedAdviserId = AssignedAdviserInternalId(currentUser);
+        var customers = db.Users.AsNoTracking()
+            .Where(user => user.PublicId == customerId && user.Role == UserRole.Customer);
+        if (currentUser.Role != UserRole.SystemAdmin)
+        {
+            var tenantId = currentUser.TenantId ?? throw new NotFoundException("Tenant", "current");
+            customers = customers.Where(user => user.TenantId == tenantId);
+        }
+
+        if (assignedAdviserId is not null)
+        {
+            customers = customers.Where(user => user.AdviserId == assignedAdviserId);
+        }
+
+        return await customers.SingleOrDefaultAsync(cancellationToken)
+               ?? throw new NotFoundException("Customer", customerId);
+    }
 
     public static IQueryable<Account> ManagedAccounts(IApplicationDbContext db, ICurrentUser currentUser)
     {
