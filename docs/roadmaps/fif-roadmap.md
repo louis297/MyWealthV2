@@ -120,7 +120,7 @@ A planning summary of the rules for an individual. Sources are in §11; the code
 | --- | --- | --- |
 | Whose tax it is | A Customer is one person. There is no joint holder, trust or company | interest-run §2 Out, ADR 0020 |
 | Tax residency | The tax profile says `NewZealand` or `Overseas`. Nothing says transitional resident, and nothing has a date | interest-run R2 |
-| What is foreign | An Instrument has a symbol, a name and a quote currency. It has no country, exchange, ISIN or kind. A dividend states its tax source (`NewZealand` or `Foreign`), on the dividend and not on the Instrument | instruments §6.1, dividends R39 |
+| What is foreign | An Instrument had a symbol, a name and a quote currency, and no country, exchange, ISIN or kind. Since TR1 (accepted 2026-11-27) it also has an issuer country and a FIF treatment per tax year; exchange, ISIN and kind stay out. A dividend states its tax source (`NewZealand` or `Foreign`), on the dividend; it is not checked against the issuer country | instruments §6.1, instrument-tax-attributes, dividends R39 |
 | Instruments | A Tenant's catalog. There is no platform-wide Instrument | instruments §5 |
 | Quantity on a past instant | The sum of the security legs booked before it. Used per UTC day by the valuation read | account-valuation R4 |
 | Cost | Average cost per `(Account, Instrument)` in the quote currency, as it is now. No cost on a past day, no cost in NZD, no lots | holdings R10, R14 |
@@ -180,14 +180,14 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 
 ### TR1. Tax attributes of an Instrument
 
-- **What:** an Instrument can say what the FIF rules need to know about it: the country its issuer is tax resident in, and its FIF treatment for a tax year. Working values of the treatment: not foreign (a New Zealand company or fund), exempt as an ASX-listed Australian share, attributing with FDR allowed, attributing with FDR not allowed, and not classified.
+- **What:** an Instrument can say what the FIF rules need to know about it: the country its issuer is tax resident in, and its FIF treatment for a tax year. Values of the treatment (as accepted): `NotForeign` (a New Zealand company or fund), `ExemptAsxListed` (an ASX-listed Australian share), `ExemptOther` (another exemption, named in a note), `Attributing` (FDR allowed) and `AttributingNoFdr` (FDR not allowed); with no row for a tax year the Instrument is not classified.
 - **Why first:** every later item starts by asking which holdings count. Nothing else depends on fewer things.
 - **Changes:** fields on the Instrument and on its read and write routes; a treatment that can differ from one tax year to the next, because the ASX exemption is tested per year; the default "not classified" for every existing Instrument; a classification for the 18 Instruments of the demo catalog; the Back Office page that edits an Instrument ([back-office-instruments.md](../backoffice/back-office-instruments.md)).
 - **Depends on:** nothing.
 - **Also decide:** who classifies (Q6); whether the country is free text, an ISO code or a catalog; whether the treatment is one value with a year from which it applies or one row per year; whether a dividend's tax source must agree with the Instrument's country, or only a warning is shown; what happens to two Instrument rows for one company listed on two exchanges (recommended: two interests, as entered).
 - **Amends:** instruments, demo-tenant-seed, back-office-instruments.
 - **Worked example:** the demo catalog classified by hand, each Australian symbol checked in Inland Revenue's lookup tool for one year.
-- **Spec:** [instrument-tax-attributes](../features/instrument-tax-attributes.md) (`review`, 2026-11-27). It names the values `NotForeign`, `ExemptAsxListed`, `Attributing` and `AttributingNoFdr`, and adds `ExemptOther` for the exemptions of §7 that the platform does not check. Its points 1 to 13 answer "Also decide" and wait for confirmation. The three Australian symbols are not yet checked in the lookup tool, which refused automated reads.
+- **Spec:** [instrument-tax-attributes](../features/instrument-tax-attributes.md) (`accepted`, 2026-11-27). It names the values `NotForeign`, `ExemptAsxListed`, `Attributing` and `AttributingNoFdr`, and adds `ExemptOther` for the exemptions of §7 that the platform does not check. Its points 1 to 13 answer "Also decide" and were confirmed as recommended. A person checked the three Australian symbols in the lookup tool on 2026-11-27: it answered for tax year 2026 only, so the 2027 rows of the demo catalog are assumed from 2026.
 
 ### TR2. Tax year events in NZD
 
@@ -286,7 +286,7 @@ Every question is **decided** (2026-11-27), as recommended, Q3 with its scope st
 | Q3 | Is the tax year cut in New Zealand time or on UTC dates? | New Zealand time, for the tax year of this plan only (TR2 to TR6). The zone is one fixed zone, the same for every Tenant and not a setting, because the tax year is New Zealand law. The year starts at 00:00 on 1 April in New Zealand, which is 11:00 UTC on 31 March. Every other feature keeps the UTC date: the valuation day, the interest run, the date range of a report (valuation-roadmap H2). Not chosen: UTC dates here too, with up to 13 hours of trades in the wrong year | TR2 |
 | Q4 | Which rate turns an amount into NZD? | The actual rate of the day. A cash leg already in NZD is used as it is. Any other amount is converted at the `FxRates` rate of its day. Not chosen: Inland Revenue's own mid-month and end-of-month tables, which are a second rate set with a loader (valuation-roadmap §6 foresaw this); or the rolling 12-month average, which must then be kept every year | TR2 |
 | Q5 | Which price and which rate value a holding at the start and the end of the year? | The unadjusted close of the latest source date on or before 31 March, in the market's own dates, with the age limit of a valuation, converted at the rate of 31 March. The quantity is the one held at the New Zealand instant. The opening value of a year is then the closing value of the year before, by construction | TR2 |
-| Q6 | Who classifies an Instrument? | A person with `instruments.manage`, by hand, per Tenant, because the catalog is the Tenant's. The platform calls no Inland Revenue tool. Not classified is the default and makes a report incomplete | TR1 |
+| Q6 | Who classifies an Instrument? | A person with `instruments.manage`, by hand, per Tenant, because the catalog is the Tenant's. The platform calls no Inland Revenue tool. Not classified is the default and makes a report incomplete. Written as instrument-tax-attributes R2 | TR1 |
 | Q7 | What is one interest? | One Instrument held by one Customer, over all their Accounts (T1) | TR2 |
 | Q8 | How does a holding count that arrives without a purchase (`OpeningHoldings`, `StockIn`, an in-kind transfer in, a migration batch)? | For the threshold it brings the cost it carries, converted at the rate of its acquisition date when one is stated and of its `bookedAt` otherwise. For FDR and CV it is an acquisition at the market value of the day it arrives, and the interest is flagged: the platform cannot know whether it was held on 1 April. Sharesies' holdings report counts a transfer in with the purchases (S11). The remedy is to record the earlier history in an External account. A departure mirrors it | TR2, TR3 |
 | Q9 | Which cost does a disposal remove, for the threshold? | The average cost in NZD of that interest. The guide does not say; check the Act | TR3 |
@@ -308,7 +308,7 @@ Each step depends only on earlier steps.
 
 | Step | Item | Closes | Spec | Status |
 | --- | --- | --- | --- | --- |
-| 1 | TR1 tax attributes of an Instrument | "No ISIN / Exchange / Kind" stays; the country and the FIF treatment are new | [instrument-tax-attributes](../features/instrument-tax-attributes.md) | spec in review (2026-11-27) |
+| 1 | TR1 tax attributes of an Instrument | "No ISIN / Exchange / Kind" stays; the country and the FIF treatment are new | [instrument-tax-attributes](../features/instrument-tax-attributes.md) | spec accepted (2026-11-27) |
 | 2 | TR2 tax year events in NZD | — | — | not started |
 | 3 | TR3 cost in NZD and the threshold test | "Tax lots and a cost in NZD" of custodial-roadmap §10, as far as this step needs it | — | not started |
 | 4 | TR4 FIF income: FDR, quick sale, CV | — | — | not started |

@@ -4,12 +4,13 @@ status: accepted
 phase: 2
 language: en
 date: 2026-08-31
-updated: 2026-09-20
+updated: 2026-11-27
 related:
   - 0009-currencies-catalog.md
   - 0011-ledger-cash-holdings-reversal.md
   - 0013-roles-authorization-single-user-table.md
   - ../function-plan.md
+  - ../features/instrument-tax-attributes.md
   - ../domain-model.md
   - ../features/instruments.md
 ---
@@ -48,3 +49,7 @@ Free-text name/symbol on a holding cannot be de-duplicated and cannot attach a q
 ## Consequences
 
 Instruments come before accounts and holdings. Later slices must not store a free-text symbol on a holding. Port implementations read local caches (EODHD for prices, Frankfurter for FX); request paths do not call vendors.
+
+## Amendment 2026-11-27: tax attributes on the catalog
+
+[features/instrument-tax-attributes.md](../features/instrument-tax-attributes.md) adds two tax attributes to the catalog: `Instruments.IssuerCountry` (an ISO 3166-1 alpha-2 code, optional) and the table `InstrumentFifTreatments` (one FIF treatment per Instrument and tax year), in script `0061_instrument_tax_attributes.sql`. They stay the Tenant's: each Tenant classifies its own rows by hand, and nothing is shared between Tenants. ISIN, exchange and kind stay out, as decided above.

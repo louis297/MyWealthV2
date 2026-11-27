@@ -4,12 +4,13 @@ status: accepted
 phase: 2
 language: en
 created: 2026-11-09
-updated: 2026-11-26
+updated: 2026-11-27
 related:
   - README.md
   - back-office.md
   - ../features/instruments.md
   - ../features/currencies.md
+  - ../features/instrument-tax-attributes.md
   - ../adr/0010-instrument-catalog.md
   - ../adr/0013-roles-authorization-single-user-table.md
 ---
@@ -27,6 +28,7 @@ Backend prerequisites (landed):
 - Create and list for SystemAdmin require `tenantId` (tenant PublicId). Get / PUT / disable / enable use the instrument PublicId only and may cross tenants.
 - `QuoteCurrency` immutable after create. Symbol unique per tenant (including disabled). No physical delete. `rowVersion` on PUT / disable / enable.
 - Adviser Portal has no Instruments management page. Catalog management is Scalar or this host.
+- Tax attributes ([instrument-tax-attributes.md](../features/instrument-tax-attributes.md)): `PUT /instruments/{id}/tax-attributes` (`instruments.manage`) and `GET /countries` (any authenticated caller). The instrument item carries `issuerCountry` and `fifTreatments`.
 
 Session is the Back Office cookie. Calls go to `webapi` with Bearer. No BFF. No new policy.
 
@@ -42,10 +44,11 @@ Session is the Back Office cookie. Calls go to `webapi` with Bearer. No BFF. No 
 - Disable / enable with `rowVersion`.
 - Search and `enabledOnly` on the list.
 - Display of `isActive`, `quoteCurrency`, `tenantId`.
+- Tax attributes of an instrument: the issuer country and the FIF treatment per tax year, on the detail page, and two list columns ("Tax attributes" below).
 
 **Out**
 
-- Price display or price edit (catalog HTTP does not return a price; `IMarketData` is server-side only). The item names the market data connection that prices it ("Market data connection" below below); that is not a price.
+- Price display or price edit (catalog HTTP does not return a price; `IMarketData` is server-side only). The item names the market data connection that prices it ("Market data connection" below); that is not a price.
 - Changing `QuoteCurrency` after create.
 - Physical delete.
 - Cross-tenant ledger pages (Accounts, Transactions, Holdings, Net worth) — separate later slice.
@@ -79,7 +82,7 @@ Consumes existing endpoints. Field rules and validation live in `features/instru
 - Tenant picker (required). Source: existing `GET /tenants` (or a local cache of tenants already loaded).
 - List: `GET /instruments?tenantId={tenantPublicId}` (envelope).
 - Query: `enabledOnly` (default all; `true` = active only), optional `search` (Symbol / Name contains CI or PublicId exact), `page` / `pageSize` (default 1 / 20, max 100).
-- Columns: Symbol, Name, QuoteCurrency, IsActive, actions (open).
+- Columns: Symbol, Name, QuoteCurrency, IsActive, Country, FIF treatment, actions (open). The two tax columns are BO-I12.
 - Sort is server-side (symbol then name). The page does not re-sort.
 - Create button navigates to `/instruments/new` with the selected tenant pre-filled.
 - Empty state: “No instruments” when the tenant has none (distinct from “choose a tenant”).
@@ -103,6 +106,7 @@ Consumes existing endpoints. Field rules and validation live in `features/instru
 - Enable: `POST /instruments/{id}/enable` with `{ rowVersion }` when `isActive` is false.
 - Already-disabled + disable, or already-enabled + enable, is 204 (idempotent). The UI may hide the irrelevant action.
 - Conflict: 409 on stale `rowVersion` → reload the item and show a short conflict message.
+- Tax attributes: the section of BO-I9 to BO-I11, under the rename form.
 - No price column. No “view holdings” action in this slice (ledger inspection is separate).
 
 QuoteCurrency is never editable. Physical delete is never offered. Disable is the only removal path.
@@ -139,6 +143,19 @@ Back Office tests assert routes, the tenant-required list, and that the UI clien
 
 ---
 
+## Tax attributes
+
+Field rules: [instrument-tax-attributes.md](../features/instrument-tax-attributes.md) §4, §8. Rules R9 to R12 there.
+
+| ID | Behaviour |
+| --- | --- |
+| BO-I9 | The detail page `/instruments/{id}` has a section "Tax attributes" under the rename form. It shows "Issuer country", a picker filled from `GET /countries` that shows the name and the code and can be cleared, and a table "FIF treatment" with one line per row of `fifTreatments`: Tax year, Treatment and Note. "Add tax year" adds a line; each line can be removed. Under the table the page says: "A treatment that is not an exemption stands for the later tax years until the next line. An exemption stands for its own tax year only." With no line it says "Not classified". |
+| BO-I10 | The Treatment options read "Not foreign (New Zealand issuer)", "Exempt: ASX-listed Australian share", "Exempt: other (name it in the note)", "Attributing interest" and "Attributing interest, FDR not allowed". The page does not fill in a treatment from the country or from the quote currency, and it offers no check against an outside tool. |
+| BO-I11 | "Save tax attributes" sends `PUT /instruments/{id}/tax-attributes` with the country, every line and the `rowVersion` of the loaded item, then reloads the item. A 400 is shown at its input; `errors.FifTreatments` under the table. A 409 reloads the item and shows the short conflict message of BO-I5. The rename form and the disable / enable actions do not send a tax attribute. |
+| BO-I12 | The list `/instruments` gains two columns: "Country" (the code, or empty) and "FIF treatment", which shows the row with the latest tax year as "<label> from <year>" for a treatment that stands for later years and "<label> <year>" for an exemption, or "Not classified" with no row. The create page `/instruments/new` does not change. |
+
+---
+
 ## Market data connection
 
 Field rules: [simulated-instruments.md](../features/simulated-instruments.md). Rule R6 there; [back-office.md](back-office.md) BO22.
@@ -157,3 +174,4 @@ What changed in this file after it was accepted. Each row is a section above. Th
 | --- | --- | --- |
 | 2026-11-22 | [simulated-instruments.md](../features/simulated-instruments.md) | Market data connection |
 | 2026-11-26 | — | The amendments became the sections above. No behaviour changed |
+| 2026-11-27 | [instrument-tax-attributes.md](../features/instrument-tax-attributes.md) | Backend prerequisites, Current slice, List, Detail, Tax attributes (BO-I9 to BO-I12) |

@@ -46,7 +46,7 @@ Accepted 2026-10-25. SystemAdmin still uses Scalar for the same verbs. The Back 
 - Pages for Tenant manage and TenantAdmin manage (list / create / update / disable / enable)
 - Tenant configuration: report grants for active catalog rows only (enable / disable a report for a tenant). A platform-inactive report is not shown
 - Report catalog page `/reports`: platform IsActive (disable cascades revoke of every tenant grant for that report) and AllowedTriggers (removing `"scheduled"` disables existing schedules for that report). List is `GET /reports/catalog`
-- Instruments catalog management for a chosen tenant: list / create / rename / disable / enable. Contract: [back-office-instruments.md](back-office-instruments.md)
+- Instruments catalog management for a chosen tenant: list / create / rename / disable / enable, and the tax attributes of an instrument. Contract: [back-office-instruments.md](back-office-instruments.md)
 - Direct calls to existing `webapi` endpoints under policy `tenants.manage` (and `tenant-admins.manage`) and the instrument policies (`instruments.read` / `instruments.create` / `instruments.manage`)
 
 **Out**
@@ -92,7 +92,7 @@ Redirect URI and post-logout follow the same pattern as the Adviser Portal BFF (
 | `/reports` | SystemAdmin | Platform catalog. `GET /reports/catalog`. Set IsActive and AllowedTriggers |
 | `/instruments` | SystemAdmin | Tenant instrument catalog. Requires tenant selection. See [back-office-instruments.md](back-office-instruments.md) |
 | `/instruments/new` | SystemAdmin | Create instrument for the chosen tenant |
-| `/instruments/{id}` | SystemAdmin | Detail + rename / disable / enable |
+| `/instruments/{id}` | SystemAdmin | Detail + rename / disable / enable, and the tax attributes section |
 | `/market-data` | SystemAdmin | Market data connections and the state of each price feed. `GET /market-data-connections`. See "Simulated instruments" below (BO22, BO23); the corporate action feed and the newest announcements are in "Corporate actions" (BO24, BO25) |
 | `/broker` | SystemAdmin | Broker connections, the state of each execution report feed and the newest execution reports. `GET /broker-connections`, `GET /execution-reports`. See "Orders and settlement" below (BO26–BO28) |
 | `/tenant-admins` | SystemAdmin | List (filter by tenant, search); links to create / detail |
@@ -163,6 +163,7 @@ Tenant instrument catalog for a chosen tenant. Full field bindings and acceptanc
 - List: `GET /instruments?tenantId=` (required). Search, `enabledOnly`, paging.
 - Create: `POST /instruments` with `tenantId`, `symbol`, `name`, `quoteCurrency`.
 - Detail: `GET /instruments/{id}`. Rename via `PUT` (symbol and/or name + `rowVersion`). Disable / enable via `POST …/disable` and `POST …/enable` with `rowVersion`.
+- Tax attributes: a section on the detail page for the issuer country (picker from `GET /countries`) and the FIF treatment per tax year, saved with `PUT /instruments/{id}/tax-attributes`; the list shows Country and FIF treatment columns ([back-office-instruments.md](back-office-instruments.md) BO-I9 to BO-I12, [instrument-tax-attributes.md](../features/instrument-tax-attributes.md)).
 - QuoteCurrency immutable. No price. No physical delete. No ledger navigation from this page.
 
 ---

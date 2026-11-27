@@ -1,6 +1,6 @@
 ---
 title: Tax attributes of an Instrument
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -37,9 +37,9 @@ After this slice a person with `instruments.manage` states two things about an I
 
 New: route `PUT /instruments/{id}/tax-attributes`; route `GET /countries`; fields `issuerCountry` and `fifTreatments` on the instrument item; Domain enum `FifTreatment`, child entity `InstrumentFifTreatment`, constant list `Countries`, and `Instrument.SetTaxAttributes` and `Instrument.FifTreatmentFor`; script `0061_instrument_tax_attributes.sql`; a tax attributes section on the Back Office instrument page; the demo catalog classified. No new permission, problem code, domain event, job, port or setting. The simulator, the two portals and the BFFs do not change.
 
-**Status is `review` (2026-11-27).** It is not a build contract. The points of §11 are open until they are confirmed. The changes to accepted docs listed in §12 are a plan; they are made when this spec is accepted.
+**Status is `accepted` (2026-11-27).** The thirteen points of §11 were confirmed on 2026-11-27, every one as recommended, and are written into the rules. For point 9 a person checked the three ASX rows in Inland Revenue's tool, which gave an answer for tax year 2026 only; §1.1 and §5.1 say what the seed writes. The changes to the docs listed in §12 were made when it was accepted. It is a build contract.
 
-The tax statements in this spec were read again from Inland Revenue's guide on 2026-11-27 (§14). The Act and Inland Revenue's lookup tool refused automated reads on the day; §14 says what follows from that. Nothing here is tax advice.
+The tax statements in this spec were read again from Inland Revenue's guide on 2026-11-27 (§14). The Act and Inland Revenue's lookup tool refused automated reads on the day; a person then ran the tool by hand for BHP, CBA and WOW (§14 S5). Nothing here is tax advice.
 
 ---
 
@@ -68,7 +68,7 @@ Roadmap T12 asks for a worked example before the spec. This is the demo catalog 
 | AIA | Auckland International Airport | `NZ` | `NotForeign` | Resident in New Zealand, so not a foreign company (S1 p.24) |
 | FPH | Fisher & Paykel Healthcare | `NZ` | `NotForeign` | As AIA |
 | MEL | Meridian Energy | `NZ` | `NotForeign` | As AIA |
-| BHP | BHP Group | `AU` | `ExemptAsxListed` | Australian resident and on the official list of ASX (S1 p.7). **To be checked in Inland Revenue's tool by a person (§11 point 9)** |
+| BHP | BHP Group | `AU` | `ExemptAsxListed` | Australian resident and on the official list of ASX (S1 p.7). Inland Revenue's tool, run by a person on 2026-11-27, showed the exemption for 1 April 2025 to 31 March 2026 (tax year 2026) only; 2027 is assumed from it (§11 point 9) |
 | CBA | Commonwealth Bank of Australia | `AU` | `ExemptAsxListed` | As BHP |
 | WOW | Woolworths Group | `AU` | `ExemptAsxListed` | As BHP |
 | SAP | SAP SE | `DE` | `Attributing` | As AAPL |
@@ -81,7 +81,7 @@ Roadmap T12 asks for a worked example before the spec. This is the demo catalog 
 | 6758 | Sony Group | `JP` | `Attributing` | As AAPL |
 | 9984 | SoftBank Group | `JP` | `Attributing` | As AAPL |
 
-The countries come from general knowledge of each company. They were not checked against a company register on 2026-11-27, and the three ASX rows were not checked in Inland Revenue's tool, which refused automated reads (§14). Point 9 of §11 asks a person to confirm the table before this spec is accepted.
+The countries come from general knowledge of each company. They were not checked against a company register; a person read the table and confirmed it on 2026-11-27 (§11 point 9). The same person ran Inland Revenue's tool for BHP, CBA and WOW on 2026-11-27. It showed each exempt for 1 April 2025 to 31 March 2026, which is tax year 2026, and gave no answer for tax year 2027. The seed still writes `ExemptAsxListed` for 2027, with a note that says it is assumed from 2026 (§5.1).
 
 What the rows mean for other tax years (R10, R11):
 
@@ -275,14 +275,14 @@ Every row is for tax year 2027. The table is that of §1.1 without the reasons.
 | --- | --- | --- | --- |
 | VTI, AAPL, MSFT | `US` | `Attributing` | — |
 | AIA, FPH, MEL | `NZ` | `NotForeign` | — |
-| BHP, CBA, WOW | `AU` | `ExemptAsxListed` | `Checked in Inland Revenue's FIF Australian listed share exemption tool on <date>.` The date is the day a person checked (§11 point 9) |
+| BHP, CBA, WOW | `AU` | `ExemptAsxListed` | `Assumed from tax year 2026: on 2026-11-27 Inland Revenue's FIF Australian listed share exemption tool showed the exemption for 1 April 2025 to 31 March 2026 only.` (§11 point 9) |
 | SAP | `DE` | `Attributing` | — |
 | AIR | `NL` | `Attributing` | — |
 | OR | `FR` | `Attributing` | — |
 | SHEL, HSBA, ULVR | `GB` | `Attributing` | — |
 | 7203, 6758, 9984 | `JP` | `Attributing` | — |
 
-The three ASX rows stand for tax year 2027 only (R10). For tax year 2028 the three Instruments are not classified until a person checks them again and adds a row. That is the rule working, not a gap in the seed.
+The three ASX rows stand for tax year 2027 only (R10). For tax year 2028 the three Instruments are not classified until a person checks them again and adds a row. That is the rule working, not a gap in the seed. The 2027 rows are an assumption until the tool answers for that year; a person replaces their note, or the row, through the Back Office once it does.
 
 ---
 
@@ -479,9 +479,9 @@ No new ADR. [ADR 0010](../adr/0010-instrument-catalog.md) stays as written: the 
 | Script | `0061_instrument_tax_attributes.sql` |
 | Permissions, problem codes, events, jobs, ports, settings | None added |
 
-### Points to confirm
+### Points confirmed
 
-Each point states the recommendation, which the rules above already follow, and the alternative.
+Each point states the recommendation, written into the rules above, and the alternative. All thirteen were confirmed as recommended on 2026-11-27.
 
 1. **The country is an ISO 3166-1 alpha-2 code from a constant list in Domain** (R5, R6). Recommended: the later report groups foreign tax by country (roadmap Q17) and Inland Revenue's overseas income summary is by country, so the value must be one of a known set; free text gives `UK`, `GB` and `Britain` for one country. A list in code needs no table, flag or write route, and nothing about a country changes per Tenant. Alternative A: free text. Alternative B: a `Countries` table like `Currencies`, worth it only when a country gets an attribute of its own, such as a treaty rate.
 2. **One issuer country per Instrument, not one per tax year** (R4, §2 Out). Recommended: an issuer almost never changes its country, a single field can be set before anyone classifies, and a later check against a dividend needs no tax year. The cost: an issuer that moves to or from New Zealand cannot be stated for the years before the move, because R12 holds for every row. Alternative: the country on each treatment row, which states that case and makes the country need a tax year.
@@ -491,7 +491,7 @@ Each point states the recommendation, which the rules above already follow, and 
 6. **The country and the treatments must agree, as a 400** (R12). Recommended: the three rules follow from the definitions (a foreign company is one not resident in New Zealand; the ASX exemption needs an Australian resident), so a body that breaks one is a typing error, and a tax figure built on it would be wrong without a sign. Alternative: store what is sent and let the report flag it.
 7. **The tax source of a dividend is not checked against the issuer country** (R23). Recommended: a dividend records what a payer did, and on an External account every number is the caller's (external-income R4); the feed cannot be refused; existing dividends may already disagree; and the country may not be set. The tax report is where the two statements meet, so TR2 decides whether a disagreement is a flag. Alternative A: 400 on hand entry when the Instrument has a country that disagrees. Alternative B: a warning on the two entry forms of the Adviser Portal.
 8. **`GET /countries` for any authenticated caller** (R6). Recommended: the Back Office picker needs the names, the Back Office does not reference Domain, and the later report pages in the portals will need the same names. Alternative: no route; the Back Office takes the two letters in a text field and shows no name.
-9. **The demo classification of §1.1 and §5.1, for tax year 2027, after a person has checked it.** Recommended: accept the table once a person has looked up BHP, CBA and WOW in Inland Revenue's tool for the year that began on 1 April 2026 and has read the fifteen countries. The tool refused automated reads on 2026-11-27 (§14), and its page does not say how it names a financial year. If the tool does not say exempt for one of the three, that row becomes `Attributing`. Alternative: seed the three as not classified and classify them by hand in the Back Office.
+9. **The demo classification of §1.1 and §5.1, for tax year 2027, after a person has checked it.** Recommended: accept the table once a person has looked up BHP, CBA and WOW in Inland Revenue's tool and has read the fifteen countries. The tool refused automated reads on 2026-11-27 (§14). Result, 2026-11-27: a person ran the tool by hand, and it showed the exemption for 1 April 2025 to 31 March 2026 only, which is tax year 2026. It gave no answer for the year that began on 1 April 2026. The three rows stay `ExemptAsxListed` for 2027, and their note says that they are assumed from 2026. Alternative: seed the three as not classified and classify them by hand in the Back Office.
 10. **The seeds classify an existing demo instrument that has no tax attribute** (R24). Recommended: the production demo tenant already has its 18 instruments, so a seed that only classifies what it creates would classify nothing there. The seed still never overwrites a statement a person made. Alternative: keep demo-tenant-seed R6 as it is and classify the production demo tenant by hand.
 11. **A tax year from 2008 to the server's calendar year plus 1** (R9). Recommended: bounds that catch a typing error without a clock rule in the schema. On 2026-11-27 the tax year in progress is 2027, so the upper bound allows it. Alternative: no upper bound, so that a treatment can be entered for a year that has not begun.
 12. **No domain event and no history of earlier classifications** (R20, §2 Out). Recommended: nothing subscribes, and a report keeps what it used (R28), so the question "what was this Instrument classified as when the report ran" is answered by the report. The audit columns say who wrote a row last. Alternative: an `InstrumentTaxAttributesChanged` event, or rows that are closed and never updated.
@@ -499,6 +499,7 @@ Each point states the recommendation, which the rules above already follow, and 
 
 Still open, not this slice:
 
+- Running Inland Revenue's tool again for BHP, CBA and WOW once it answers for tax year 2027, and replacing the assumed rows of the demo catalog in each tenant that has them (§5.1)
 - Everything that reads the attributes: roadmap TR2 to TR6. TR2 decides what a tax report does with a dividend whose tax source disagrees with the issuer country (R23)
 - An Instruments page in the Adviser Portal, with the tax attributes, for the TenantAdmin
 - A list of the Instruments not classified for a tax year, and a way to confirm last year's exemptions for the next year in one step
@@ -507,18 +508,18 @@ Still open, not this slice:
 - ISIN, exchange and kind (instruments §11)
 - A platform-wide Instrument, or a classification shared between Tenants
 
-### Found while writing, not changed here
+### Found while writing
 
 - Roadmap §2 says, from S7, that the ASX listing is tested at the start of the income year, or on the day of acquisition for a share first bought during the year. The guide read for this spec (S1 p.7) lists the four conditions and gives no test date, and S7 and section EX 31 could not be read again (§14). R10 does not depend on the date: it says only that an exemption is confirmed per tax year. TR2 should read section EX 31 before it relies on the date.
-- Roadmap §6 TR1 lists four working values and "not classified", and roadmap §7 adds "classified by hand as exempt" for the other exemptions. The two do not match; point 4 settles it with `ExemptOther`.
-- [glossary.md](../glossary.md) "Demo seed" says "its two report grants", and the row of demo-tenant-seed in [features/README.md](README.md) says "both report grants". The seed grants three (demo-tenant-seed R8).
-- [back-office-instruments.md](../backoffice/back-office-instruments.md) "Out" has the words "below below".
+- Roadmap §6 TR1 lists four working values and "not classified", and roadmap §7 adds "classified by hand as exempt" for the other exemptions. The two did not match; point 4 settles it with `ExemptOther`, and roadmap §6 TR1 now lists the five values.
+- [glossary.md](../glossary.md) "Demo seed" says "its two report grants", and the row of demo-tenant-seed in [features/README.md](README.md) says "both report grants". The seed grants three (demo-tenant-seed R8). Both were corrected when this spec was accepted.
+- [back-office-instruments.md](../backoffice/back-office-instruments.md) "Out" had the words "below below". Corrected when this spec was accepted.
 
 ---
 
 ## 12. Changes to other docs
 
-A plan while this spec is in review. Each doc is changed in place when this spec is accepted.
+Each doc was changed in place when this spec was accepted (2026-11-27).
 
 | Doc | Change |
 | --- | --- |
@@ -560,11 +561,11 @@ Read on 2026-11-27. Codes are those of [fif-roadmap.md](../roadmaps/fif-roadmap.
 | # | Source | Used for | Read |
 | --- | --- | --- | --- |
 | S1 | Inland Revenue, *Guide to foreign investment funds*, IR461, April 2026 edition, the PDF linked from `ird.govt.nz/fif` | What a FIF is and is not (p.4); attributing interests (p.5); the exemptions and their sections (p.6–7); the four conditions of the ASX exemption (p.7); the fair dividend rate method needs an ordinary share (p.14) and the kinds it cannot be used for (p.16); foreign company, foreign unit trust and when a company is resident in New Zealand (p.24–25); stapled stock (p.26) | Yes, in full text |
-| S5 | Inland Revenue, "Foreign investment fund Australian listed share exemption tool" (`ird.govt.nz/fif-australia-tool`, last updated 5 October 2026) | The tool takes an ASX ticker code and a financial year, and answers whether the shareholding is exempt | The page: yes. The tool itself (`myir.ird.govt.nz/tools`): refused automated reads (403). No ticker was looked up |
+| S5 | Inland Revenue, "Foreign investment fund Australian listed share exemption tool" (`ird.govt.nz/fif-australia-tool`, last updated 5 October 2026) | The tool takes an ASX ticker code and a financial year, and answers whether the shareholding is exempt | The page: yes. The tool itself (`myir.ird.govt.nz/tools`): refused automated reads (403). A person ran it by hand on 2026-11-27 for BHP, CBA and WOW: each was shown exempt for 1 April 2025 to 31 March 2026, and the tool gave no answer for a later year |
 | S2 | Inland Revenue, fact sheet IS 24/10 FS 1 | The naming of an income year (R8) | Not read again; taken from roadmap §2 |
 | S7 | Inland Revenue Tax Technical, "Technical amendments to the offshore portfolio share investment rules" | When the ASX listing is tested | Not read again; the site's search could not be used. See "Found while writing" |
 | — | Income Tax Act 2007, sections EX 31, EX 32, EX 46 and YA 1 | The exemptions and the definitions in the Act's own words | Not read: `legislation.govt.nz` and NZLII refused automated reads (403) |
 
-What follows from the two refusals: the meaning of each value in §4.3 is quoted from the guide, which is Inland Revenue's summary of the Act and not the Act. No rule of this slice computes anything from those meanings; they tell the classifier what a value states. The three ASX rows of the demo catalog are unchecked until a person runs the tool (§11 point 9).
+What follows from the two refusals: the meaning of each value in §4.3 is quoted from the guide, which is Inland Revenue's summary of the Act and not the Act. No rule of this slice computes anything from those meanings; they tell the classifier what a value states. The three ASX rows of the demo catalog are checked for tax year 2026 and assumed for 2027 (§11 point 9).
 
 ISO 3166-1 is the standard of the International Organization for Standardization for country codes. The list of R6 is taken from it when the slice is built; it was not read for this spec.
