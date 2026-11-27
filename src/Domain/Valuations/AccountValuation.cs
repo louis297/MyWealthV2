@@ -30,7 +30,7 @@ public sealed record AccountValuation(
     {
         var currency = Code(accountCurrency);
         var lines = position.Lines
-            .Select(line => Value(position.Day, line, currency, decimalPlaces, prices, rates, basisChanges))
+            .Select(line => Value(position.Day, position.CutAt, line, currency, decimalPlaces, prices, rates, basisChanges))
             .ToList();
 
         // R16: the totals add the Valued lines only; a line that is not valued is never counted as 0.
@@ -45,6 +45,7 @@ public sealed record AccountValuation(
     /// <c>Valued</c>.</summary>
     private static ValuationLine Value(
         DateOnly day,
+        DateTimeOffset cutAt,
         PositionLine line,
         string accountCurrency,
         IReadOnlyDictionary<string, int> decimalPlaces,
@@ -68,15 +69,15 @@ public sealed record AccountValuation(
             return NotValued(line, quantity, ValuationLineStatus.StalePrice, price);
         }
 
-        // R18: the price is on the new basis from the ex-date, the ledger quantity once the posting is booked.
-        var end = LedgerDay.End(day);
+        // R18: the price is on the new basis from the ex-date, the ledger quantity once the posting is booked before the
+        // position was cut.
         foreach (var change in basisChanges
                      .Where(change => change.InstrumentId == line.InstrumentId)
                      .OrderBy(change => change.ExDate)
                      .ThenBy(change => change.BookedAt))
         {
             var priceIsNew = price.AsOfDate >= change.ExDate;
-            var quantityIsNew = change.BookedAt < end;
+            var quantityIsNew = change.BookedAt < cutAt;
             if (priceIsNew && !quantityIsNew)
             {
                 quantity = change.Ratio.Apply(change.Kind, quantity);
