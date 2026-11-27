@@ -21,7 +21,8 @@ const refusedOnCustodial: ReadonlySet<string> = new Set([
   "Split",
   "Bonus",
   "Scrip",
-  // dividends D100 (R43): a dividend is paid by the platform from the company's announcement.
+  // dividends D100 (R43): a dividend is paid by the platform from the company's announcement. On an External account
+  // it is entered by hand on POST /transactions/dividend (external-income D111).
   "Dividend",
 ]);
 

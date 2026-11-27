@@ -8,13 +8,25 @@ import { useGetAccountHoldingsQuery, useGetAccountQuery } from "@/features/accou
 import { allowsManualEntry, isCustodial, transferSentence } from "@/features/accounts/custodyRules";
 import { useGetAccountPortfolioQuery } from "@/features/portfolios/portfoliosApi";
 import { useGetInstrumentsQuery } from "@/features/instruments/instrumentsApi";
-import { useCreateTransactionMutation } from "@/features/transactions/transactionsApi";
+import { useCreateDividendMutation, useCreateTransactionMutation } from "@/features/transactions/transactionsApi";
+import {
+  netText,
+  type TaxRow,
+  TaxRowsInput,
+  taxErrors,
+  taxesBody,
+  taxKindsFor,
+  type TaxRowErrors,
+} from "@/features/transactions/TaxRowsInput";
 import { toUtcIso } from "@/shared/time/instant";
 
 const securityTypes = ["Buy", "Sell", "StockIn", "StockOut", "Split", "Bonus", "Scrip"] as const;
 // D53 (account-closure R23): CloseOut is not offered; on a Custodial account the account closure writes off a remainder.
-const cashTypes = ["TransferIn", "TransferOut"] as const;
-const types = [...securityTypes, ...cashTypes] as const;
+// external-income D112: a hand Interest, with the taxes an outside payer withheld.
+const cashTypes = ["TransferIn", "TransferOut", "Interest"] as const;
+// external-income D111: a dividend an outside party paid, on any account type, on its own route.
+const incomeTypes = ["Dividend"] as const;
+const types = [...securityTypes, ...incomeTypes, ...cashTypes] as const;
 
 function initialType(value: string | null) {
   if (value !== null && types.includes(value as (typeof types)[number])) {
@@ -27,10 +39,61 @@ function isCashType(value: string): value is (typeof cashTypes)[number] {
   return (cashTypes as readonly string[]).includes(value);
 }
 
-function cashSignError(type: (typeof cashTypes)[number], amount: number) {
+function cashSignError(type: (typeof cashTypes)[number], amount: number, taxed: boolean) {
+  if (type === "Interest") {
+    // posting R20: a hand Interest is either sign; with a tax it is the gross (external-income R22).
+    return taxed && !(amount > 0) ? "Gross interest must be above 0." : null;
+  }
   // TransferOut is negative.
   const invalid = type === "TransferIn" ? !(amount > 0) : !(amount < 0);
   return invalid ? "Amount sign is not valid for this transaction type." : null;
+}
+
+const companies = [
+  { value: "NewZealand", label: "New Zealand" },
+  { value: "Foreign", label: "Foreign" },
+] as const;
+
+/** external-income D111: the dividend fields whose 400 is shown at their input, by the error key. */
+const dividendFieldKeys = {
+  quantity: "quantity",
+  grossAmount: "grossamount",
+  amountPerShare: "amountpershare",
+  taxSource: "taxsource",
+  imputationCredit: "imputationcredit",
+  fxRate: "fxrate",
+} as const;
+type DividendFieldErrors = Partial<Record<keyof typeof dividendFieldKeys, string[]>>;
+
+function dividendProblem(error: unknown): {
+  messages: string[];
+  fields: DividendFieldErrors;
+  taxList: string[];
+  taxRows: TaxRowErrors;
+} {
+  const base = { messages: [] as string[], fields: {}, taxList: [] as string[], taxRows: {} };
+  if (isNotFound(error)) {
+    return { ...base, messages: ["Not found"] };
+  }
+  const data = typeof error === "object" && error !== null && "data" in error
+    ? (error as { data?: { errors?: Record<string, string[]>; detail?: string } }).data
+    : undefined;
+  if (!data?.errors) {
+    return data?.detail ? { ...base, messages: [data.detail] } : base;
+  }
+  const { list, rows, rest } = taxErrors(data.errors);
+  const fields: DividendFieldErrors = {};
+  const messages: string[] = [];
+  for (const [key, values] of Object.entries(rest)) {
+    const field = (Object.keys(dividendFieldKeys) as (keyof typeof dividendFieldKeys)[])
+      .find((name) => dividendFieldKeys[name] === key.toLowerCase());
+    if (field) {
+      fields[field] = values;
+    } else {
+      messages.push(...values);
+    }
+  }
+  return { messages, fields, taxList: list, taxRows: rows };
 }
 
 function isNotFound(error: unknown) {
@@ -97,12 +160,25 @@ export function CreateTransactionPage() {
   const [memo, setMemo] = useState("");
   const [bookedAt, setBookedAt] = useState("");
   const [messages, setMessages] = useState<string[]>([]);
+  const [reference, setReference] = useState("");
+  const [taxRows, setTaxRows] = useState<TaxRow[]>([]);
+  const [taxListErrors, setTaxListErrors] = useState<string[]>([]);
+  const [taxRowErrors, setTaxRowErrors] = useState<TaxRowErrors>({});
+  const [grossAmount, setGrossAmount] = useState("");
+  const [amountPerShare, setAmountPerShare] = useState("");
+  const [company, setCompany] = useState("");
+  const [imputationCredit, setImputationCredit] = useState("");
+  const [exDate, setExDate] = useState("");
+  const [recordDate, setRecordDate] = useState("");
+  const [paymentDate, setPaymentDate] = useState("");
+  const [dividendErrors, setDividendErrors] = useState<DividendFieldErrors>({});
   const account = useGetAccountQuery(accountId ?? "", { skip: !accountId });
   const custodial = isCustodial(account.data);
   const assignment = useGetAccountPortfolioQuery(accountId ?? "", { skip: !accountId });
   const holdings = useGetAccountHoldingsQuery(accountId ?? "", { skip: !accountId });
   const instruments = useGetInstrumentsQuery();
   const [createTransaction] = useCreateTransactionMutation();
+  const [createDividend] = useCreateDividendMutation();
   const pickedInstrument = (instruments.data?.items ?? []).find((item) => item.id === instrumentId);
   const quoteCurrency = pickedInstrument?.quoteCurrency;
   const accountCurrency = account.data?.currency;
@@ -110,10 +186,62 @@ export function CreateTransactionPage() {
   // D22: an External trade carries the caller's numbers; the inputs appear once an instrument is picked.
   const callerNumbers = pricedType && !custodial && quoteCurrency !== undefined;
   const crossCurrency = callerNumbers && accountCurrency !== undefined && quoteCurrency !== accountCurrency;
+  const dividend = type === "Dividend";
+  // D111: the FX rate only when the instrument's quote currency differs from the Account currency.
+  const dividendCrossCurrency = dividend && quoteCurrency !== undefined && accountCurrency !== undefined
+    && quoteCurrency !== accountCurrency;
+  // D112: only a hand Interest takes the tax list on POST /transactions.
+  const taxedInterest = type === "Interest" && taxRows.length > 0;
+
+  function optional(value: string) {
+    const trimmed = value.trim();
+    return trimmed.length === 0 ? null : trimmed;
+  }
+
+  async function submitDividend() {
+    setDividendErrors({});
+    setTaxListErrors([]);
+    setTaxRowErrors({});
+    try {
+      await createDividend({
+        idempotencyKey,
+        body: {
+          accountId: accountId!,
+          instrumentId,
+          quantity: Number(quantity),
+          grossAmount: Number(grossAmount),
+          ...(amountPerShare.trim().length > 0 ? { amountPerShare: Number(amountPerShare) } : {}),
+          taxSource: company,
+          ...(company === "NewZealand" && imputationCredit.trim().length > 0
+            ? { imputationCredit: Number(imputationCredit) }
+            : {}),
+          ...taxesBody(taxRows),
+          ...(dividendCrossCurrency ? { fxRate: Number(fxRate) } : {}),
+          ...(exDate ? { exDate } : {}),
+          ...(recordDate ? { recordDate } : {}),
+          ...(paymentDate ? { paymentDate } : {}),
+          bookedAt: toUtcIso(bookedAt),
+          memo: optional(memo),
+          reference: optional(reference),
+        },
+      }).unwrap();
+      void navigate(`/accounts/${accountId}`);
+    } catch (error: unknown) {
+      const result = dividendProblem(error);
+      setMessages(result.messages);
+      setDividendErrors(result.fields);
+      setTaxListErrors(result.taxList);
+      setTaxRowErrors(result.taxRows);
+    }
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!accountId) {
+      return;
+    }
+    if (dividend) {
+      await submitDividend();
       return;
     }
     if (assignment.isSuccess && assignment.data?.status === "Active" && !isCashType(type)) {
@@ -123,20 +251,35 @@ export function CreateTransactionPage() {
     const trimmedMemo = memo.trim();
     const booking = { bookedAt: toUtcIso(bookedAt) };
     if (isCashType(type)) {
-      const signError = cashSignError(type, Number(amount));
+      const signError = cashSignError(type, Number(amount), taxedInterest);
       if (signError) {
         setMessages([signError]);
         return;
       }
     }
     setFieldErrors({});
+    setTaxListErrors([]);
+    setTaxRowErrors({});
     try {
-      if (isCashType(type)) {
+      if (type === "Interest") {
         await createTransaction({
           idempotencyKey,
           body: {
             accountId,
             type,
+            amount: Number(amount),
+            ...booking,
+            memo: trimmedMemo.length === 0 ? null : trimmedMemo,
+            reference: optional(reference),
+            ...taxesBody(taxRows),
+          },
+        }).unwrap();
+      } else if (isCashType(type)) {
+        await createTransaction({
+          idempotencyKey,
+          body: {
+            accountId,
+            type: type as Exclude<(typeof cashTypes)[number], "Interest">,
             amount: Number(amount),
             ...booking,
             memo: trimmedMemo.length === 0 ? null : trimmedMemo,
@@ -166,9 +309,15 @@ export function CreateTransactionPage() {
       }
       void navigate(`/accounts/${accountId}`);
     } catch (error: unknown) {
-      const result = problem(error);
+      const data = typeof error === "object" && error !== null && "data" in error
+        ? (error as { data?: { errors?: Record<string, string[]> } }).data
+        : undefined;
+      const taxes = taxErrors(data?.errors ?? {});
+      const result = problem(data?.errors ? { ...(error as object), data: { ...data, errors: taxes.rest } } : error);
       setMessages(result.messages);
       setFieldErrors(result.fields);
+      setTaxListErrors(taxes.list);
+      setTaxRowErrors(taxes.rows);
     }
   }
 
@@ -178,6 +327,8 @@ export function CreateTransactionPage() {
   const offerCash = !account.data || account.data.status === "Open";
   const offeredTypes = [
     ...(offerSecurity ? securityTypes : []),
+    // D111 (external-income R10): a dividend on any account type that can be opened.
+    ...(offerCash ? incomeTypes : []),
     ...(offerCash ? cashTypes : []),
   ].filter((item) => !account.data || allowsManualEntry(account.data.custodyMode, item));
   // D39: a type the account does not take (for example TransferIn on a Custodial account, from the address) is not
@@ -190,7 +341,7 @@ export function CreateTransactionPage() {
     // offeredKey stands for offeredTypes, which is rebuilt on every render.
   }, [account.data, offeredKey, type]);
   const cashType = isCashType(type);
-  const securityBlocked = assignment.isSuccess && assignment.data?.status === "Active" && !cashType;
+  const securityBlocked = assignment.isSuccess && assignment.data?.status === "Active" && !cashType && !dividend;
 
   if (isNotFound(account.error)) {
     return <Muted>Not found</Muted>;
@@ -246,15 +397,59 @@ export function CreateTransactionPage() {
               <p>Manual security trades are blocked while a portfolio is assigned.</p>
             ) : (
               <>
-                {cashType ? (
+                {dividend ? (
+                  <DividendFields
+                    instruments={instruments.data?.items ?? []}
+                    instrumentId={instrumentId}
+                    onInstrument={setInstrumentId}
+                    quoteCurrency={quoteCurrency}
+                    accountCurrency={accountCurrency}
+                    crossCurrency={dividendCrossCurrency}
+                    values={{ quantity, grossAmount, amountPerShare, company, imputationCredit, fxRate, exDate, recordDate, paymentDate, memo, reference }}
+                    setters={{
+                      quantity: setQuantity,
+                      grossAmount: setGrossAmount,
+                      amountPerShare: setAmountPerShare,
+                      company: setCompany,
+                      imputationCredit: setImputationCredit,
+                      fxRate: setFxRate,
+                      exDate: setExDate,
+                      recordDate: setRecordDate,
+                      paymentDate: setPaymentDate,
+                      memo: setMemo,
+                      reference: setReference,
+                    }}
+                    errors={dividendErrors}
+                    taxRows={taxRows}
+                    onTaxRows={setTaxRows}
+                    taxListErrors={taxListErrors}
+                    taxRowErrors={taxRowErrors}
+                  />
+                ) : cashType ? (
                   <>
                     <TextField
                       id="transaction-amount"
-                      label="Amount"
+                      label={type === "Interest"
+                        ? `${taxedInterest ? "Gross interest" : "Amount"} (${accountCurrency ?? ""})`
+                        : "Amount"}
                       value={amount}
                       onChange={(event) => setAmount(event.target.value)}
                       required
                     />
+                    {type === "Interest" ? (
+                      <>
+                        <TaxRowsInput
+                          idPrefix="interest"
+                          rows={taxRows}
+                          onChange={setTaxRows}
+                          kinds={taxKindsFor(null)}
+                          currency={accountCurrency}
+                          listErrors={taxListErrors}
+                          rowErrors={taxRowErrors}
+                        />
+                        {taxedInterest ? <p className="text-sm">{netText(amount, taxRows, accountCurrency)}</p> : null}
+                      </>
+                    ) : null}
                     <TextField
                       id="transaction-memo"
                       label="Memo"
@@ -262,6 +457,15 @@ export function CreateTransactionPage() {
                       onChange={(event) => setMemo(event.target.value)}
                       maxLength={200}
                     />
+                    {type === "Interest" ? (
+                      <TextField
+                        id="transaction-reference"
+                        label="Reference"
+                        value={reference}
+                        onChange={(event) => setReference(event.target.value)}
+                        maxLength={100}
+                      />
+                    ) : null}
                   </>
                 ) : (
                   <>
@@ -348,3 +552,169 @@ export function CreateTransactionPage() {
     </Page>
   );
 }
+
+type DividendValues = {
+  quantity: string;
+  grossAmount: string;
+  amountPerShare: string;
+  company: string;
+  imputationCredit: string;
+  fxRate: string;
+  exDate: string;
+  recordDate: string;
+  paymentDate: string;
+  memo: string;
+  reference: string;
+};
+
+/**
+ * external-income D111: the dividend form. Amounts are in the instrument's quote currency; the form shows the net as
+ * display text and works out nothing else.
+ */
+function DividendFields({
+  instruments,
+  instrumentId,
+  onInstrument,
+  quoteCurrency,
+  accountCurrency,
+  crossCurrency,
+  values,
+  setters,
+  errors,
+  taxRows,
+  onTaxRows,
+  taxListErrors,
+  taxRowErrors,
+}: {
+  instruments: { id: string; symbol: string; name: string }[];
+  instrumentId: string;
+  onInstrument: (id: string) => void;
+  quoteCurrency: string | undefined;
+  accountCurrency: string | undefined;
+  crossCurrency: boolean;
+  values: DividendValues;
+  setters: Record<keyof DividendValues, (value: string) => void>;
+  errors: DividendFieldErrors;
+  taxRows: TaxRow[];
+  onTaxRows: (rows: TaxRow[]) => void;
+  taxListErrors: string[];
+  taxRowErrors: TaxRowErrors;
+}) {
+  const quote = quoteCurrency ?? "";
+  const field = (name: keyof DividendFieldErrors) => (errors[name] ? `dividend-${idOf[name]}-error` : undefined);
+  const net = netText(values.grossAmount, taxRows, quoteCurrency);
+
+  return (
+    <>
+      <SelectField
+        id="transaction-instrument"
+        label="Instrument"
+        value={instrumentId}
+        onChange={(event) => onInstrument(event.target.value)}
+        required
+      >
+        <SelectItem value="">Select an instrument</SelectItem>
+        {instruments.map((item) => (
+          <SelectItem key={item.id} value={item.id}>
+            {item.symbol} {item.name}
+          </SelectItem>
+        ))}
+      </SelectField>
+      <TextField
+        id="dividend-quantity"
+        label="Shares"
+        value={values.quantity}
+        onChange={(event) => setters.quantity(event.target.value)}
+        aria-describedby={field("quantity")}
+        required
+      />
+      <FieldError id="dividend-quantity-error" messages={errors.quantity} />
+      <TextField
+        id="dividend-gross"
+        label={`Gross amount (${quote})`}
+        value={values.grossAmount}
+        onChange={(event) => setters.grossAmount(event.target.value)}
+        aria-describedby={field("grossAmount")}
+        required
+      />
+      <FieldError id="dividend-gross-error" messages={errors.grossAmount} />
+      <TextField
+        id="dividend-per-share"
+        label={`Amount per share (${quote})`}
+        value={values.amountPerShare}
+        onChange={(event) => setters.amountPerShare(event.target.value)}
+        aria-describedby={field("amountPerShare")}
+      />
+      <FieldError id="dividend-per-share-error" messages={errors.amountPerShare} />
+      <SelectField
+        id="dividend-company"
+        label="Company"
+        value={values.company}
+        onChange={(event) => setters.company(event.target.value)}
+        required
+      >
+        <SelectItem value="">Select the company</SelectItem>
+        {companies.map((item) => (
+          <SelectItem key={item.value} value={item.value}>
+            {item.label}
+          </SelectItem>
+        ))}
+      </SelectField>
+      <FieldError id="dividend-company-error" messages={errors.taxSource} />
+      {values.company === "NewZealand" ? (
+        <>
+          <TextField
+            id="dividend-credit"
+            label={`Imputation credit (${quote})`}
+            value={values.imputationCredit}
+            onChange={(event) => setters.imputationCredit(event.target.value)}
+            aria-describedby={field("imputationCredit")}
+          />
+          <FieldError id="dividend-credit-error" messages={errors.imputationCredit} />
+        </>
+      ) : null}
+      <TaxRowsInput
+        idPrefix="dividend"
+        rows={taxRows}
+        onChange={onTaxRows}
+        kinds={taxKindsFor(values.company || null)}
+        currency={quoteCurrency}
+        listErrors={taxListErrors}
+        rowErrors={taxRowErrors}
+      />
+      {net ? <p className="text-sm">{net}</p> : null}
+      {crossCurrency ? (
+        <>
+          <TextField
+            id="dividend-fx-rate"
+            label={`FX rate (1 ${quote} = ? ${accountCurrency})`}
+            value={values.fxRate}
+            onChange={(event) => setters.fxRate(event.target.value)}
+            aria-describedby={field("fxRate")}
+            required
+          />
+          <FieldError id="dividend-fx-rate-error" messages={errors.fxRate} />
+        </>
+      ) : null}
+      <TextField id="dividend-ex-date" label="Ex-date" type="date" value={values.exDate}
+        onChange={(event) => setters.exDate(event.target.value)} />
+      <TextField id="dividend-record-date" label="Record date" type="date" value={values.recordDate}
+        onChange={(event) => setters.recordDate(event.target.value)} />
+      <TextField id="dividend-payment-date" label="Payment date" type="date" value={values.paymentDate}
+        onChange={(event) => setters.paymentDate(event.target.value)} />
+      <TextField id="dividend-memo" label="Memo" value={values.memo}
+        onChange={(event) => setters.memo(event.target.value)} maxLength={200} />
+      <TextField id="dividend-reference" label="Reference" value={values.reference}
+        onChange={(event) => setters.reference(event.target.value)} maxLength={100} />
+    </>
+  );
+}
+
+const idOf: Record<keyof DividendFieldErrors, string> = {
+  quantity: "quantity",
+  grossAmount: "gross",
+  amountPerShare: "per-share",
+  taxSource: "company",
+  imputationCredit: "credit",
+  fxRate: "fx-rate",
+};

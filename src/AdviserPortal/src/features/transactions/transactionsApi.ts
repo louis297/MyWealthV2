@@ -134,7 +134,9 @@ export type TransactionExecution = {
   brokenAt?: string | null;
 };
 
-/** dividends R39: the dividend a Dividend pays. Amounts are in `currency`, the dividend's currency. */
+/**
+ * dividends R39: the dividend a Dividend pays. Amounts are in `currency`, the dividend's currency.
+ */
 export type TransactionDividend = {
   corporateActionId: string;
   instrument: { id: string; symbol: string; name: string };
@@ -201,6 +203,39 @@ export type CreateCashTransactionBody = {
   memo: string | null;
 };
 
+/** external-income R5: one tax an outside payer withheld, as entered. */
+export type EnteredTaxBody = { kind: string; ratePercent: number; amount: number };
+
+/** external-income R22: a hand Interest; with `taxes` the amount is the gross. */
+export type CreateInterestBody = {
+  accountId: string;
+  type: "Interest";
+  amount: number;
+  bookedAt?: string;
+  memo: string | null;
+  reference: string | null;
+  taxes?: EnteredTaxBody[];
+};
+
+/** external-income R11: `POST /transactions/dividend`. Amounts are in the instrument's quote currency. */
+export type CreateDividendBody = {
+  accountId: string;
+  instrumentId: string;
+  quantity: number;
+  grossAmount: number;
+  amountPerShare?: number;
+  taxSource: string;
+  imputationCredit?: number;
+  taxes?: EnteredTaxBody[];
+  fxRate?: number;
+  exDate?: string;
+  recordDate?: string;
+  paymentDate?: string;
+  bookedAt?: string;
+  memo: string | null;
+  reference: string | null;
+};
+
 export type CreateInternalTransferBody = {
   fromAccountId: string;
   toAccountId: string;
@@ -239,7 +274,7 @@ export type CreateFxConversionBody = FxQuoteBody & {
   reference: string | null;
 };
 
-export type CreateTransactionBody = CreateSecurityTransactionBody | CreateCashTransactionBody;
+export type CreateTransactionBody = CreateSecurityTransactionBody | CreateCashTransactionBody | CreateInterestBody;
 
 export const transactionsApi = api.injectEndpoints({
   endpoints: (builder) => ({
@@ -271,6 +306,15 @@ export const transactionsApi = api.injectEndpoints({
     >({
       query: ({ body, idempotencyKey }) => ({
         url: "/transactions",
+        method: "POST",
+        body,
+        headers: { "Idempotency-Key": idempotencyKey },
+      }),
+      invalidatesTags: ["Transaction", "Account"],
+    }),
+    createDividend: builder.mutation<{ id: string }, { body: CreateDividendBody; idempotencyKey: string }>({
+      query: ({ body, idempotencyKey }) => ({
+        url: "/transactions/dividend",
         method: "POST",
         body,
         headers: { "Idempotency-Key": idempotencyKey },
@@ -321,6 +365,7 @@ export const {
   useGetTransactionsQuery,
   useGetTransactionQuery,
   useCreateTransactionMutation,
+  useCreateDividendMutation,
   useCreateInternalTransferMutation,
   useGetFxQuoteQuery,
   useCreateFxConversionMutation,

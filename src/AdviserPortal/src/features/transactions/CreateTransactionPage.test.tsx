@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { sessionSlice, setCurrentUser, type CurrentUser } from "@/features/session/sessionSlice";
 import { CreateTransactionPage } from "@/features/transactions/CreateTransactionPage";
 import { api } from "@/shared/api/api";
-import { chooseOption, openSelect } from "@/test/chooseOption";
+import { chooseOption, openSelect, pickOption } from "@/test/chooseOption";
 
 const accountId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const instrumentId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
@@ -944,7 +944,7 @@ describe("CreateTransactionPage", () => {
       expect(await screen.findByRole("option", { name: "Foreign tax" })).toBeInTheDocument();
       expect(screen.getByRole("option", { name: "RWT" })).toBeInTheDocument();
       expect(screen.queryByRole("option", { name: "NRWT" })).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole("option", { name: "Foreign tax" }));
+      await pickOption("Foreign tax");
       fireEvent.change(taxRow(1).getByLabelText("Rate %"), { target: { value: "15" } });
       fireEvent.change(taxRow(1).getByLabelText("Amount (USD)"), { target: { value: "0.39" } });
       expect(screen.getByText("Net 2.21 USD")).toBeInTheDocument();
@@ -1025,7 +1025,8 @@ describe("CreateTransactionPage", () => {
       await chooseOption("Type", "Interest");
       fireEvent.change(screen.getByLabelText("Amount (NZD)"), { target: { value: "12.34" } });
       await addTax(1, "RWT", "33", "4.07", "NZD");
-      expect(screen.queryByLabelText("Amount (NZD)")).not.toBeInTheDocument();
+      // The only "Amount" left is the tax row's: the interest's own input is now the gross.
+      expect(screen.getAllByLabelText("Amount (NZD)")).toEqual([taxRow(1).getByLabelText("Amount (NZD)")]);
       expect(screen.getByLabelText("Gross interest (NZD)")).toHaveValue("12.34");
       expect(screen.getByText("Net 8.27 NZD")).toBeInTheDocument();
       fireEvent.change(screen.getByLabelText("Reference"), { target: { value: "STMT-11" } });
