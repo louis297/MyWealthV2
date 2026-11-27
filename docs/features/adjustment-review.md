@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-25
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - adjustments.md
   - posting.md
   - transaction-source.md
@@ -28,7 +28,7 @@ related:
 
 # Adjustment review
 
-A second person approves every adjustment on `webapi`. It is step 17 of [custodial-roadmap.md](../custodial-roadmap.md) §13 and covers roadmap item **X1**. It amends [adjustments.md](adjustments.md), [posting.md](posting.md) §1, [transaction-source.md](transaction-source.md), [custody-modes.md](custody-modes.md), [account-closure.md](account-closure.md) and the Adviser Portal page contract.
+A second person approves every adjustment on `webapi`. It is step 17 of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13 and covers roadmap item **X1**. It amends [adjustments.md](adjustments.md), [posting.md](posting.md) §1, [transaction-source.md](transaction-source.md), [custody-modes.md](custody-modes.md), [account-closure.md](account-closure.md) and the Adviser Portal page contract.
 
 One new record (the **adjustment request**, `/adjustment-requests`), one new source kind (`AdjustmentRequest`), one script (`0058_adjustment_requests.sql`). The route `POST /transactions/adjustment` goes away, and an `Adjustment` can no longer be reversed by hand. No new permission, `TransactionType`, problem code, job or event. No simulator change.
 

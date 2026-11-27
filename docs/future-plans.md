@@ -28,9 +28,9 @@ related:
   - features/tenant-custody-modes.md
   - features/external-caller-numbers.md
   - features/custody-mode-grouping.md
-  - custodial-roadmap.md
+  - roadmaps/custodial-roadmap.md
   - features/dividends.md
-  - valuation-roadmap.md
+  - roadmaps/valuation-roadmap.md
 ---
 
 # Future plans
@@ -62,7 +62,7 @@ Order. Each step depends only on earlier steps:
 | --- | --- | --- | --- |
 | 1 | Transaction fee leg ([features/trade-fees.md](features/trade-fees.md), `accepted`) | Changes the posting leg shape. Income events add similar deduction legs, so the shape is settled first. Closes the fee work deferred in buy-sell, fx-conversions, internal-transfers and leg-accounts. | posting, buy-sell |
 | 2 | Income events | Dividend and interest, with imputation credit, RWT and foreign withholding tax. Every tax report needs them. Foreign-currency dividends need an answer from §5 or automatic FX. The `Tax` cash leg with its tax detail and the Customer tax profile exist since [features/interest-run.md](features/interest-run.md) (accepted 2026-11-22), which posts interest on Custodial accounts; dividends reuse them. Withholding on a hand-entered `Interest` of an External account stays here | Step 1 Dividends on Custodial accounts: [features/dividends.md](features/dividends.md) (accepted 2026-11-24). |
-| 3 | Historical valuation | Prices and FX rates as of a date, and holding snapshots. Every period report needs them. Closes the open daily snapshots in [function-plan.md](function-plan.md) §5.4. Several features, not one: planned in [valuation-roadmap.md](valuation-roadmap.md) (`note`, 2026-11-25). Its items V1 to V3 are this step, and all three have landed (V3: [features/valuation-run.md](features/valuation-run.md), 2026-11-26), so step 4 can open. | instrument-prices, fx-rates |
+| 3 | Historical valuation | Prices and FX rates as of a date, and holding snapshots. Every period report needs them. Closes the open daily snapshots in [function-plan.md](function-plan.md) §5.4. Several features, not one: planned in [valuation-roadmap.md](roadmaps/valuation-roadmap.md) (`note`, 2026-11-25). Its items V1 to V3 are this step, and all three have landed (V3: [features/valuation-run.md](features/valuation-run.md), 2026-11-26), so step 4 can open. | instrument-prices, fx-rates |
 | 4 | Advisory fee | Tiered or blended rates, daily accrual, pro rata for part periods, billing in advance or in arrears, and what happens when cash is short. | Step 3 |
 | 5 | Performance report | Time-weighted return (TWR) and money-weighted return (MWR), gross and net of fees. | Steps 3, 4 |
 | 6 | FIF tax report | Main goal. FDR and CV methods, the de minimis test, the quick sale adjustment, exempt ASX-listed shares, and the NZ tax year (1 April to 31 March). FIF reports published by NZ investment platforms can serve as test oracles. | Steps 2, 3 |
@@ -221,7 +221,7 @@ Slices. All five have a spec. Slices 3 to 5 do not depend on each other:
 | 4 | External accounts take the caller's numbers: executed price and fee on `Buy` / `Sell`, both amounts on an `FxConversion`. Server pricing, trade fee schedules and the reference rate then apply to Custodial accounts only. [features/external-caller-numbers.md](features/external-caller-numbers.md) (accepted, landed 2026-11-18) | Medium |
 | 5 | Read side: net worth, the two reports and the portal pages show the two modes as two groups; the Custodial group is the funds under management, and the Customer is told that External figures are not checked by the platform. [features/custody-mode-grouping.md](features/custody-mode-grouping.md) (accepted 2026-11-18, landed 2026-11-19) | Read only |
 
-After slice 2, some writes on a Custodial account are still entered by hand or are missing. Each later item replaces one of them. The plan for these items, their order, the decisions they need and the simulator is [custodial-roadmap.md](custodial-roadmap.md) (`note`, 2026-11-19):
+After slice 2, some writes on a Custodial account are still entered by hand or are missing. Each later item replaces one of them. The plan for these items, their order, the decisions they need and the simulator is [custodial-roadmap.md](roadmaps/custodial-roadmap.md) (`note`, 2026-11-19):
 
 - Deposits and withdrawals matched to a bank statement, replacing hand-entered `TransferIn` / `TransferOut`.
 - An interest job and income events (§1 step 2), replacing hand-entered `Interest`. The interest job is [features/interest-run.md](features/interest-run.md) (accepted 2026-11-22). Dividends on Custodial accounts, with RWT, NRWT, foreign withholding tax and the imputation credit, are [features/dividends.md](features/dividends.md) (accepted 2026-11-24); dividends on External accounts are still to come.
@@ -232,7 +232,7 @@ After slice 2, some writes on a Custodial account are still entered by hand or a
 - A simulator of the outside parties (a bank first, then a broker) to drive these flows without real connections.
 - Rebuilding an account's position by replaying its transactions in order. Deferred until after the items above are under way.
 
-Status on 2026-11-25: every flow in the list has landed. The roadmap has two steps left (an end-to-end run with the scenario library, and the review of an adjustment by a second person). Replay and period close are moved out of it: they open when §1 needs them, at the latest with step 6. After those two steps, work returns to §1 at what is left of step 2, then step 3 ([custodial-roadmap.md](custodial-roadmap.md) §13.1).
+Status on 2026-11-25: every flow in the list has landed. The roadmap has two steps left (an end-to-end run with the scenario library, and the review of an adjustment by a second person). Replay and period close are moved out of it: they open when §1 needs them, at the latest with step 6. After those two steps, work returns to §1 at what is left of step 2, then step 3 ([custodial-roadmap.md](roadmaps/custodial-roadmap.md) §13.1).
 
 Related: the advisory fee (§1 step 4) and platform billing (§8) can then use Custodial accounts as their base.
 

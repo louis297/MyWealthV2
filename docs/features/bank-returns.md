@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-20
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
   - withdrawals.md
   - deposit-matching.md
@@ -27,7 +27,7 @@ related:
 
 # Receipt returns, recalls and other debit lines
 
-Step 6b of [custodial-roadmap.md](../custodial-roadmap.md) §13. It finishes the bank statement work that [deposit-matching.md](deposit-matching.md) left for B6 and that [withdrawals.md](withdrawals.md) (step 6) did not take: a receipt marked for return is actually sent back to its payer (deposit-matching R28), a receipt the payer's bank recalls or dishonours is taken off the Custodial account, and every other debit line on the trust account lands in suspense instead of waiting as `Received` (deposit-matching R14). It reuses the outgoing payment, the `IBankPayments` port and the send step of [withdrawals.md](withdrawals.md) and follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20. It amends [deposit-matching.md](deposit-matching.md), [withdrawals.md](withdrawals.md), [simulator.md](simulator.md) and the Adviser Portal contract.
+Step 6b of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13. It finishes the bank statement work that [deposit-matching.md](deposit-matching.md) left for B6 and that [withdrawals.md](withdrawals.md) (step 6) did not take: a receipt marked for return is actually sent back to its payer (deposit-matching R28), a receipt the payer's bank recalls or dishonours is taken off the Custodial account, and every other debit line on the trust account lands in suspense instead of waiting as `Received` (deposit-matching R14). It reuses the outgoing payment, the `IBankPayments` port and the send step of [withdrawals.md](withdrawals.md) and follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20. It amends [deposit-matching.md](deposit-matching.md), [withdrawals.md](withdrawals.md), [simulator.md](simulator.md) and the Adviser Portal contract.
 
 New: outgoing payment kind `ReceiptReturn`; statement line statuses `ReturnSent` and `Returned`, four unmatched reasons, match method `Recall`; ignore and reopen on a debit line; `returnPayment` on the statement line item; the simulator's return payment and recall. Scripts `0044_bank_returns.sql`; simulator script `database/simulator/0005_bank_returns.sql`. No new route, permission, `TransactionType`, source kind, problem code or domain event.
 

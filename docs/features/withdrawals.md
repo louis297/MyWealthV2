@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-20
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
   - ../adr/0015-idempotency-keys.md
   - bank-returns.md
@@ -43,7 +43,7 @@ related:
 
 # Nominated bank accounts and withdrawals
 
-Step 6 of [custodial-roadmap.md](../custodial-roadmap.md) §13. It covers roadmap items **B5** (nominated bank account) and **B6** (withdrawals, available cash), with the payments side of the simulator bank (**S1 payments**). It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20, including the outgoing-call rules 12–14 that no slice has used yet, and does not re-decide them. It amends [deposit-matching.md](deposit-matching.md), [posting.md](posting.md), [custody-modes.md](custody-modes.md), [transaction-source.md](transaction-source.md), [internal-transfers.md](internal-transfers.md), [portfolios.md](portfolios.md), [adjustments.md](adjustments.md), [accounts.md](accounts.md), [simulator.md](simulator.md) and the Adviser Portal and Customer Portal contracts.
+Step 6 of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13. It covers roadmap items **B5** (nominated bank account) and **B6** (withdrawals, available cash), with the payments side of the simulator bank (**S1 payments**). It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20, including the outgoing-call rules 12–14 that no slice has used yet, and does not re-decide them. It amends [deposit-matching.md](deposit-matching.md), [posting.md](posting.md), [custody-modes.md](custody-modes.md), [transaction-source.md](transaction-source.md), [internal-transfers.md](internal-transfers.md), [portfolios.md](portfolios.md), [adjustments.md](adjustments.md), [accounts.md](accounts.md), [simulator.md](simulator.md) and the Adviser Portal and Customer Portal contracts.
 
 An Adviser records a Customer's own bank account as a **nominated bank account**, and a TenantAdmin other than the person who added it verifies it. An Adviser then requests a **withdrawal** from a Custodial account to a verified nominated bank account. The amount is **reserved** at once, so it cannot be spent twice. A TenantAdmin other than the requester approves it. The `worker` sends an **outgoing payment** to the bank through a new port, and the withdrawal's **payout** (a `TransferOut` with source `Payment`) is posted only when the bank statement shows the money leaving. From this slice on, a person can no longer enter a `TransferOut` on a Custodial account.
 

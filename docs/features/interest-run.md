@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-22
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../future-plans.md
   - ../adr/0021-outside-parties-behind-ports.md
   - customers.md
@@ -40,7 +40,7 @@ related:
 
 # Interest run
 
-Step 9 of [custodial-roadmap.md](../custodial-roadmap.md) §13. It covers roadmap items **I1** (minimal Customer tax profile), **I2** (interest run) and the **S1 trust interest** part of the simulator bank. It answers roadmap D12 (the interest margin) and the "Open" of B7 (how the bank reconciliation shows interest). The interest run calls no outside party. The bank's interest on the trust account arrives through the existing bank feed and follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 7–10. It amends [customers.md](customers.md), [posting.md](posting.md), [trade-fees.md](trade-fees.md), [custody-modes.md](custody-modes.md), [transaction-source.md](transaction-source.md), [accounts.md](accounts.md), [account-closure.md](account-closure.md), [deposit-matching.md](deposit-matching.md), [bank-reconciliation.md](bank-reconciliation.md), [reports.md](reports.md), [simulator.md](simulator.md) and the Adviser Portal, Customer Portal and Back Office contracts.
+Step 9 of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13. It covers roadmap items **I1** (minimal Customer tax profile), **I2** (interest run) and the **S1 trust interest** part of the simulator bank. It answers roadmap D12 (the interest margin) and the "Open" of B7 (how the bank reconciliation shows interest). The interest run calls no outside party. The bank's interest on the trust account arrives through the existing bank feed and follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 7–10. It amends [customers.md](customers.md), [posting.md](posting.md), [trade-fees.md](trade-fees.md), [custody-modes.md](custody-modes.md), [transaction-source.md](transaction-source.md), [accounts.md](accounts.md), [account-closure.md](account-closure.md), [deposit-matching.md](deposit-matching.md), [bank-reconciliation.md](bank-reconciliation.md), [reports.md](reports.md), [simulator.md](simulator.md) and the Adviser Portal, Customer Portal and Back Office contracts.
 
 A TenantAdmin sets, per currency, an **interest rate schedule**: marginal bands of annual rates, effective from a date. Every day the platform works out, for each Custodial account, the interest its closing cash balance earned that day (a **daily accrual**) and stores it. After each calendar month the platform posts the accruals of the account as one `Interest` Transaction: the gross interest as the principal cash leg, and the **withholding tax** as a second cash leg with role `Tax`. The tax kind and rate come from the Customer's **tax profile** at that moment. An Adviser or TenantAdmin keeps the tax profile: tax residency, whether the firm holds the Customer's IRD number, and the RWT rate the Customer chose. One execution of this work for one Tenant is an **interest run**; it is stored and is the source of the Transactions it posts.
 

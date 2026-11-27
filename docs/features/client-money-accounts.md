@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-19
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
   - tenants.md
   - tenant-custody-modes.md
@@ -27,7 +27,7 @@ related:
 
 # Client money accounts and deposit references
 
-New Tenant configuration and an amendment to account open on `webapi`. It is step 4 of [custodial-roadmap.md](../custodial-roadmap.md) §13 and covers roadmap items **B1** (client money bank accounts) and **B2** (deposit reference on a Custodial account). It amends [tenants.md](tenants.md), [accounts.md](accounts.md), the Back Office, Adviser Portal and Customer Portal contracts.
+New Tenant configuration and an amendment to account open on `webapi`. It is step 4 of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13 and covers roadmap items **B1** (client money bank accounts) and **B2** (deposit reference on a Custodial account). It amends [tenants.md](tenants.md), [accounts.md](accounts.md), the Back Office, Adviser Portal and Customer Portal contracts.
 
 SystemAdmin records, per Tenant and currency, the **client money account**: the trust bank account the firm holds Customers' cash in. A Custodial account can be opened only in a currency that has an active client money account. Every Custodial account gets a **deposit reference** when it is opened. Together they are the account's **deposit instructions**, which the Adviser and the Customer can read.
 

@@ -425,7 +425,7 @@ Still open:
 
 - What happens to `Other`, `Property` and `Credit`
 - `Dividend` on an External account (income events)
-- A conversion on a Custodial account through an outside FX party ([custodial-roadmap.md](../custodial-roadmap.md) O5)
+- A conversion on a Custodial account through an outside FX party ([custodial-roadmap.md](../roadmaps/custodial-roadmap.md) O5)
 
 ---
 

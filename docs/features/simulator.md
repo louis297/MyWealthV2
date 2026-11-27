@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-19
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
   - ../adr/0013-roles-authorization-single-user-table.md
   - ../adr/0014-openiddict-authorization-code-pkce.md
@@ -32,7 +32,7 @@ related:
 
 # Simulator
 
-New host `simulator` (`src/Simulator`) that plays the outside parties of [custodial-roadmap.md](../custodial-roadmap.md): bank, broker, custodian, issuer. This spec is roadmap step 2, item **S0**: the skeleton with no party in it yet. Each party is added later with the flow that needs it (S1 bank with B3–B7, and so on), as an amendment to this file. The decision behind it is [ADR 0021](../adr/0021-outside-parties-behind-ports.md) (accepted 2026-11-19).
+New host `simulator` (`src/Simulator`) that plays the outside parties of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md): bank, broker, custodian, issuer. This spec is roadmap step 2, item **S0**: the skeleton with no party in it yet. Each party is added later with the flow that needs it (S1 bank with B3–B7, and so on), as an amendment to this file. The decision behind it is [ADR 0021](../adr/0021-outside-parties-behind-ports.md) (accepted 2026-11-19).
 
 The skeleton has a control surface for a person (sign-in, Scalar, clock, reset, a party outage switch, a log) and a party surface for the platform (one status route behind a machine credential). On the platform side it adds a fifth role, `SimulatorOperator`, a fourth OIDC client `simulator` on `identity`, and the deploy entries. Scripts: platform `0036_users_role_simulator_operator.sql`; simulator `database/simulator/0001`, `0002`. No new `webapi` route or policy. No platform port: the first one lands with roadmap B3.
 

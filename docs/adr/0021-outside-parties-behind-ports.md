@@ -5,7 +5,7 @@ language: en
 date: 2026-11-19
 updated: 2026-11-20
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../architecture.md
   - ../features/simulator.md
   - ../features/deposit-matching.md
@@ -24,7 +24,7 @@ related:
 
 Status: accepted (2026-11-19)
 
-Roadmap item F2 of [custodial-roadmap.md](../custodial-roadmap.md) (step 2). It writes principles P1–P4, P9 and P10 and decisions D1, D2, D8–D10, D16, D17 and D19 of that note as one decision. The first port arrives with roadmap B3. The simulator host's first cut is [features/simulator.md](../features/simulator.md) (S0).
+Roadmap item F2 of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) (step 2). It writes principles P1–P4, P9 and P10 and decisions D1, D2, D8–D10, D16, D17 and D19 of that note as one decision. The first port arrives with roadmap B3. The simulator host's first cut is [features/simulator.md](../features/simulator.md) (S0).
 
 ## Context
 
@@ -117,7 +117,7 @@ The platform talks to every outside party through a port. A `worker` job pulls i
 
 ## Links
 
-- Plan: [custodial-roadmap.md](../custodial-roadmap.md) §3, §4 F2, §11, §12
+- Plan: [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §3, §4 F2, §11, §12
 - Feature specs: [features/simulator.md](../features/simulator.md) (S0); [features/deposit-matching.md](../features/deposit-matching.md) (B3, B4: the first port, `IBankFeed`, and the feed cursor table)
 - Related ADRs: [0008](0008-schema-sql-as-source-of-truth.md), [0013](0013-roles-authorization-single-user-table.md) (amended by rule 25), [0014](0014-openiddict-authorization-code-pkce.md), [0017](0017-background-worker.md), [0018](0018-transactional-outbox.md), [0019](0019-fx-rate-source-and-refresh.md)
 

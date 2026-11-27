@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-22
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
   - simulated-instruments.md
   - split.md
@@ -39,7 +39,7 @@ related:
 
 # Corporate actions
 
-Step 10b of [custodial-roadmap.md](../custodial-roadmap.md) §13. It covers roadmap item **C1** (corporate action events: split, consolidation, non-taxable bonus) and the issuer half of **S4** (the simulator announces, amends and cancels them). It builds on [simulated-instruments.md](simulated-instruments.md) (step 10a): the market data connection, the simulator market and its prices. It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20 and does not re-decide them. It amends [split.md](split.md), [holdings.md](holdings.md), [posting.md](posting.md), [custody-modes.md](custody-modes.md), [transaction-source.md](transaction-source.md), [portfolios.md](portfolios.md), [simulated-instruments.md](simulated-instruments.md), [simulator.md](simulator.md) and the Adviser Portal, Customer Portal and Back Office contracts.
+Step 10b of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13. It covers roadmap item **C1** (corporate action events: split, consolidation, non-taxable bonus) and the issuer half of **S4** (the simulator announces, amends and cancels them). It builds on [simulated-instruments.md](simulated-instruments.md) (step 10a): the market data connection, the simulator market and its prices. It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20 and does not re-decide them. It amends [split.md](split.md), [holdings.md](holdings.md), [posting.md](posting.md), [custody-modes.md](custody-modes.md), [transaction-source.md](transaction-source.md), [portfolios.md](portfolios.md), [simulated-instruments.md](simulated-instruments.md), [simulator.md](simulator.md) and the Adviser Portal, Customer Portal and Back Office contracts.
 
 A **corporate action** is an event of one Instrument: a split, a consolidation or a bonus issue, with a ratio and its dates. It reaches the platform in one of two ways. The `worker` reads **corporate action announcements** through a new port, the **corporate action feed**, on a market data connection, and turns each into a corporate action on every Tenant's instrument with that symbol. Or a TenantAdmin enters the announcement by hand, for an instrument no connection serves. Entering the event is not entering a result: nobody types a quantity. When the corporate action becomes **effective**, the platform gives every Custodial account that holds the instrument an **entitlement** and posts it as one `Split` or `Bonus` Transaction with source `CorporateAction`: the quantity changes by the ratio and the total cost stays.
 

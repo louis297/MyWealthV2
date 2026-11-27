@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-24
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../future-plans.md
   - ../adr/0021-outside-parties-behind-ports.md
   - corporate-actions.md
@@ -46,7 +46,7 @@ related:
 
 # Dividends and dividend reinvestment
 
-Step 15 of [custodial-roadmap.md](../custodial-roadmap.md) §13, the last planned step. It covers roadmap items **C2** (cash dividends) and **C3** (dividend reinvestment), and the rest of **S4** (the simulator issuer announces dividends and reinvestment plans). It also changes the simulator custodian (S3), which pays the dividend, and uses the simulator bank (S1) as it is. It is where the custodial roadmap meets step 2 of [future-plans.md](../future-plans.md) §1 (income events). It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20 and does not re-decide them. It builds on the corporate action, the announcement and the entitlement of [corporate-actions.md](corporate-actions.md), the `Tax` cash leg, the tax detail and the Customer tax profile of [interest-run.md](interest-run.md), the safekeeping account and the custody movement of [in-kind-transfers.md](in-kind-transfers.md), and the statement line of [deposit-matching.md](deposit-matching.md).
+Step 15 of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13, the last planned step. It covers roadmap items **C2** (cash dividends) and **C3** (dividend reinvestment), and the rest of **S4** (the simulator issuer announces dividends and reinvestment plans). It also changes the simulator custodian (S3), which pays the dividend, and uses the simulator bank (S1) as it is. It is where the custodial roadmap meets step 2 of [future-plans.md](../future-plans.md) §1 (income events). It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20 and does not re-decide them. It builds on the corporate action, the announcement and the entitlement of [corporate-actions.md](corporate-actions.md), the `Tax` cash leg, the tax detail and the Customer tax profile of [interest-run.md](interest-run.md), the safekeeping account and the custody movement of [in-kind-transfers.md](in-kind-transfers.md), and the statement line of [deposit-matching.md](deposit-matching.md).
 
 Today a Custodial account that holds a share gets nothing when the company pays a dividend: `Dividend` is a reserved `TransactionType` that nothing writes. After this slice a **dividend** is a fourth kind of corporate action. It is announced on the corporate action feed, or entered by a TenantAdmin for an instrument no connection serves, with an amount per share, its **tax source**, an imputation credit or a foreign withholding tax rate, and its dates. When the dividend goes ex, the platform fixes which Custodial accounts are entitled and for how many shares. Nothing is posted yet. On the payment date the custodian pays the dividend for the firm's whole position into the client money account, and that receipt is what lets the platform pay: each entitled account gets one `Dividend` Transaction with the gross dividend as the principal cash leg and the tax as `Tax` cash legs. An Account may carry a standing **reinvestment election**. For a dividend with a **reinvestment plan**, the platform tells the custodian how many of the firm's shares take part, the custodian delivers new shares in place of cash for them, and the platform shares them out to the electing accounts in the same `Dividend` Transaction, at a cost equal to the amount reinvested.
 

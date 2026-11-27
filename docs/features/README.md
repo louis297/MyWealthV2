@@ -159,7 +159,7 @@ Roadmap in [future-plans.md](../future-plans.md) §1. Each step amends the ledge
 
 ## Business domain — historical valuation (opened 2026-11-25)
 
-Step 3 of the roadmap in [future-plans.md](../future-plans.md) §1. Its own plan is [valuation-roadmap.md](../valuation-roadmap.md) (`note`): four items, V1 to V4.
+Step 3 of the roadmap in [future-plans.md](../future-plans.md) §1. Its own plan is [valuation-roadmap.md](../roadmaps/valuation-roadmap.md) (`note`): four items, V1 to V4.
 
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |
@@ -186,7 +186,7 @@ Decision in [ADR 0020](../adr/0020-account-custody-mode.md) (accepted 2026-11-17
 
 ## Ledger — custodial roadmap (opened 2026-11-19)
 
-Plan and order in [custodial-roadmap.md](../custodial-roadmap.md) (`note`) §13. Each step gets its own spec; this table grows one row per step.
+Plan and order in [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) (`note`) §13. Each step gets its own spec; this table grows one row per step.
 
 | Spec | Status | Who | Ships | Why it stays its own slice |
 | --- | --- | --- | --- | --- |

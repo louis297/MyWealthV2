@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-25
 last_updated: 2026-11-26
 related:
-  - ../valuation-roadmap.md
+  - ../roadmaps/valuation-roadmap.md
   - ../future-plans.md
   - instrument-prices.md
   - fx-rates.md
@@ -27,7 +27,7 @@ related:
 
 # Market data history
 
-Step 1 of [valuation-roadmap.md](../valuation-roadmap.md) §8. It covers roadmap item **V1** and writes the decisions **Q2** (the unadjusted close), **Q3** (one floor date) and **Q9** (one spec for prices and rates) as rules. It amends [instrument-prices.md](instrument-prices.md), [fx-rates.md](fx-rates.md) and [ADR 0019](../adr/0019-fx-rate-source-and-refresh.md).
+Step 1 of [valuation-roadmap.md](../roadmaps/valuation-roadmap.md) §8. It covers roadmap item **V1** and writes the decisions **Q2** (the unadjusted close), **Q3** (one floor date) and **Q9** (one spec for prices and rates) as rules. It amends [instrument-prices.md](instrument-prices.md), [fx-rates.md](fx-rates.md) and [ADR 0019](../adr/0019-fx-rate-source-and-refresh.md).
 
 `InstrumentPrices` and `FxRates` get a row for every source date from a configured **history floor date** on, not only from the day a job first ran. A row that is two or more days old becomes **final**: it is never changed again. Both tables get a read route.
 

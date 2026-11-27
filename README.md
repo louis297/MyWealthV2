@@ -29,8 +29,8 @@ Next: an end-to-end run across all outside parties, then the advisory fee, perfo
 | For | See |
 |-----|-----|
 | Feature Specs and their status | [`docs/features/README.md`](docs/features/README.md) |
-| Custodial account work | [`docs/custodial-roadmap.md`](docs/custodial-roadmap.md) |
-| Historical valuation | [`docs/valuation-roadmap.md`](docs/valuation-roadmap.md) |
+| Custodial account work | [`docs/roadmaps/custodial-roadmap.md`](docs/roadmaps/custodial-roadmap.md) |
+| Historical valuation | [`docs/roadmaps/valuation-roadmap.md`](docs/roadmaps/valuation-roadmap.md) |
 | What comes later | [`docs/future-plans.md`](docs/future-plans.md) |
 | Accepted gaps | [`docs/known-issues/`](docs/known-issues/README.md) |
 

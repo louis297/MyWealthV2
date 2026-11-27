@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-21
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
   - deposit-matching.md
   - withdrawals.md
@@ -34,7 +34,7 @@ related:
 
 # Bank reconciliation
 
-Step 7 of [custodial-roadmap.md](../custodial-roadmap.md) §13. It covers roadmap item **B7** (bank reconciliation) with the balances of the simulator bank (**S1 balances**). It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20 and does not re-decide them. It builds on the statement lines of [deposit-matching.md](deposit-matching.md), the outgoing payments and available cash of [withdrawals.md](withdrawals.md) and the debit lines of [bank-returns.md](bank-returns.md). It amends [deposit-matching.md](deposit-matching.md), [reports.md](reports.md), [simulator.md](simulator.md) and the Adviser Portal contract.
+Step 7 of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13. It covers roadmap item **B7** (bank reconciliation) with the balances of the simulator bank (**S1 balances**). It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20 and does not re-decide them. It builds on the statement lines of [deposit-matching.md](deposit-matching.md), the outgoing payments and available cash of [withdrawals.md](withdrawals.md) and the debit lines of [bank-returns.md](bank-returns.md). It amends [deposit-matching.md](deposit-matching.md), [reports.md](reports.md), [simulator.md](simulator.md) and the Adviser Portal contract.
 
 The bank sends its **statement balance** with every page of the bank feed: the balance of the trust account after the last line of that page. The platform stores it with the lines it covers. A **bank reconciliation** compares that balance with the cash of every Custodial account of the Tenant in the client money account's currency, and lists every **reconciliation item** that explains the difference: lines in suspense, lines not processed yet, ignored lines, cash on the platform that never passed through the trust account, and any difference the platform cannot explain. Each item is a **break** (someone must act), a **timing** difference (it clears by itself) or a **known difference** (explained and accepted). A run is computed from local tables only, stored, and never edited. It runs once a day for every active client money account, and a TenantAdmin can run it at any time. A new Tenant-scoped report renders a run as a PDF.
 

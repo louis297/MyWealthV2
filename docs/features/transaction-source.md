@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-19
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - posting.md
   - portfolios.md
   - custody-modes.md
@@ -32,7 +32,7 @@ related:
 
 # Transaction source
 
-Amendment to the ledger on `webapi`: [posting.md](posting.md), [portfolios.md](portfolios.md) and [custody-modes.md](custody-modes.md). It is step 1 of [custodial-roadmap.md](../custodial-roadmap.md) §13 and covers two roadmap items: **F1** (every Transaction records which process wrote it) and **F4** (on a Custodial account a person reverses only what a person entered, principle P6).
+Amendment to the ledger on `webapi`: [posting.md](posting.md), [portfolios.md](portfolios.md) and [custody-modes.md](custody-modes.md). It is step 1 of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13 and covers two roadmap items: **F1** (every Transaction records which process wrote it) and **F4** (on a Custodial account a person reverses only what a person entered, principle P6).
 
 No new route, no new policy, no new `TransactionType`, no problem code. Script `0035_transaction_source.sql` adds two columns to `Transactions` and back-fills them.
 

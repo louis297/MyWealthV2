@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-26
 last_updated: 2026-11-26
 related:
-  - ../valuation-roadmap.md
+  - ../roadmaps/valuation-roadmap.md
   - ../future-plans.md
   - market-data-history.md
   - instrument-prices.md
@@ -31,7 +31,7 @@ related:
 
 # Account valuation
 
-Step 2 of [valuation-roadmap.md](../valuation-roadmap.md) §8. It covers roadmap item **V2** and writes the decisions **Q1** (a day is a UTC date), **Q4** (the age limit of a price or a rate), **Q8** (income not posted does not count) and **Q10** (a spec of its own) as rules. It reads the prices and rates that [market-data-history.md](market-data-history.md) stores.
+Step 2 of [valuation-roadmap.md](../roadmaps/valuation-roadmap.md) §8. It covers roadmap item **V2** and writes the decisions **Q1** (a day is a UTC date), **Q4** (the age limit of a price or a rate), **Q8** (income not posted does not count) and **Q10** (a spec of its own) as rules. It reads the prices and rates that [market-data-history.md](market-data-history.md) stores.
 
 A **valuation** is a read that values one Account for one day: the cash and the quantity of each holding at the end of that UTC day (the **position of the day**), the price and the FX rate as of that day, and each value in the instrument's quote currency and in the Account's currency. A holding that cannot be valued is listed with the reason, and the valuation says it is **incomplete**. Nothing is stored and no job runs.
 
@@ -478,4 +478,4 @@ Still open, not this slice:
 
 Made when this spec was accepted (2026-11-26):
 
-[interest-run.md](interest-run.md) (R16: the day balance is the cash of the position of a day, R2 and R3 here; no rule changes), [holdings.md](holdings.md) (§2 Out "snapshots" and a note under R14: the quantity of a past day is read from the security legs), [posting.md](posting.md) (a note that the cash of a past day is read by `bookedAt`), [corporate-actions.md](corporate-actions.md) (R23: the ex-date in a valuation, R18 here), [fx-rates.md](fx-rates.md) (R7: a valuation catches a missing pair and marks the line), [known-issues/eodhd-nz-jp-coverage.md](../known-issues/eodhd-nz-jp-coverage.md) (its effect on a valuation: `NoPrice`, incomplete), [api-design.md](../api-design.md) (the resource row and the change log), [domain-model.md](../domain-model.md) (the valuation of a day), [architecture.md](../architecture.md) (the two services), [glossary.md](../glossary.md) (the review terms become accepted; "Day balance" covers every Account), [features/README.md](README.md) row status, and [valuation-roadmap.md](../valuation-roadmap.md) (H5 reworded by point 1, §5 V2, §8).
+[interest-run.md](interest-run.md) (R16: the day balance is the cash of the position of a day, R2 and R3 here; no rule changes), [holdings.md](holdings.md) (§2 Out "snapshots" and a note under R14: the quantity of a past day is read from the security legs), [posting.md](posting.md) (a note that the cash of a past day is read by `bookedAt`), [corporate-actions.md](corporate-actions.md) (R23: the ex-date in a valuation, R18 here), [fx-rates.md](fx-rates.md) (R7: a valuation catches a missing pair and marks the line), [known-issues/eodhd-nz-jp-coverage.md](../known-issues/eodhd-nz-jp-coverage.md) (its effect on a valuation: `NoPrice`, incomplete), [api-design.md](../api-design.md) (the resource row and the change log), [domain-model.md](../domain-model.md) (the valuation of a day), [architecture.md](../architecture.md) (the two services), [glossary.md](../glossary.md) (the review terms become accepted; "Day balance" covers every Account), [features/README.md](README.md) row status, and [valuation-roadmap.md](../roadmaps/valuation-roadmap.md) (H5 reworded by point 1, §5 V2, §8).
