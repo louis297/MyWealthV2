@@ -387,6 +387,7 @@ Beyond PK / unique constraints already listed:
 0057_dividends.sql                          -- dividend terms, receipt, payment and election on CorporateActions and the terms on CorporateActionAnnouncements (ratio nullable, kind 3); dividend fields on CorporateActionEntitlements; TransactionDividendDetails; cash leg role 3, tax kind 2; Accounts.ReinvestDividends; BankStatementLines.CorporateActionId, match method 7, unmatched reason 14; reconciliation item kinds 20–21
 0058_adjustment_requests.sql                -- AdjustmentRequests; source kind 11 (AdjustmentRequest)
 0059_stored_valuations.sql                  -- ValuationRuns, StoredValuations, StoredValuationLines; Accounts.ValuedThrough
+0060_external_income.sql                    -- TransactionDividendDetails.AmountPerShare and ExDate nullable; CK_TransactionDividendDetails_AmountPerShare allows NULL
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -496,7 +497,7 @@ Detail tables. Each row is part of an immutable Transaction: no `PublicId`, no `
 | `TransactionExecutionDetails` | `0051` | `FillPublicId uniqueidentifier`, `Price decimal(18,8)` (CHECK `> 0`), `TradeDate date`, `SettlementDate date` (CHECK `≥ TradeDate`), `BrokerReference nvarchar(50) NULL`. No `Buy` or `Sell` posted before `0051` has a row. [features/orders.md](features/orders.md) §6.1 |
 | `TransactionMigrationDetails` | `0054` | `AsOfDate date`, `PreviousProvider nvarchar(100)`. [features/migration-batches.md](features/migration-batches.md) §6 |
 | `TransactionInKindTransferDetails` | `0055` | `TransferPublicId`, `CounterpartyName nvarchar(100)`, `CounterpartyAccountMasked nvarchar(34)`, `ChangesBeneficialOwner bit`, `AcquiredOn date NULL`, `SettlementDate date`, `CustodianReference nvarchar(100)`. No audit columns. [features/in-kind-transfers.md](features/in-kind-transfers.md) §6.1 |
-| `TransactionDividendDetails` | `0057` | `InstrumentId` (tenant composite FK), `Quantity decimal(18,8)` and `AmountPerShare decimal(18,8)` (CHECK `> 0` each), `Currency char(3)` (FK), `TaxSource int`, `ImputationCredit decimal(18,4)`, `ReinvestedQuantity` and `ReinvestmentPrice decimal(18,8) NULL`, `ExDate date`, `RecordDate date NULL`, `PaymentDate date NULL`. [features/dividends.md](features/dividends.md) §6.1 |
+| `TransactionDividendDetails` | `0057` | `InstrumentId` (tenant composite FK), `Quantity decimal(18,8)` (CHECK `> 0`), `AmountPerShare decimal(18,8) NULL` (CHECK `NULL` or `> 0`, nullable from `0060`), `Currency char(3)` (FK), `TaxSource int`, `ImputationCredit decimal(18,4)`, `ReinvestedQuantity` and `ReinvestmentPrice decimal(18,8) NULL`, `ExDate date NULL` (nullable from `0060`), `RecordDate date NULL`, `PaymentDate date NULL`. A corporate action's dividend has both the amount per share and the ex-date; a hand-entered one may have neither ([features/dividends.md](features/dividends.md) §6.1, [features/external-income.md](features/external-income.md) §6) |
 
 ### 11.5 Holdings (accepted, landed)
 
@@ -767,6 +768,7 @@ One row per change. §9 lists what each script did. The text of each change is i
 | 2026-11-25 | `0058` | Adjustment requests |
 | 2026-11-26 | — | The amendments were folded into §6.5, §11 and §14. No table changed |
 | 2026-11-26 | `0059` | Stored valuations and valuation runs (§11.22); `Accounts.ValuedThrough` (§11.3) |
+| 2026-11-27 | `0060` | Income on External accounts: `TransactionDividendDetails.AmountPerShare` and `ExDate` nullable |
 
 ---
 

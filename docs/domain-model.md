@@ -375,7 +375,7 @@ Details. Each is immutable, a child of the `Transaction` unless the row says oth
 | `TransactionExecutionDetail` | Required with source `OrderFill`, refused with any other | The fill's PublicId, price, trade date, settlement date, broker reference ([features/orders.md](features/orders.md)) |
 | `TransactionMigrationDetail` | Exactly one on a migrated `Opening` or `OpeningHoldings` | As-of date, previous provider ([features/migration-batches.md](features/migration-batches.md)) |
 | `TransactionInKindTransferDetail` | Exactly one on the `StockIn` / `StockOut` of an in-kind transfer | Transfer PublicId, counterparty name, masked counterparty account, `changesBeneficialOwner`, `acquiredOn`, settlement date, custodian reference ([features/in-kind-transfers.md](features/in-kind-transfers.md) R38) |
-| `TransactionDividendDetail` | Exactly one on a `Dividend` | Instrument, entitled quantity, amount per share and currency, tax source, imputation credit, the dates, the reinvested quantity and price ([features/dividends.md](features/dividends.md)) |
+| `TransactionDividendDetail` | Exactly one on a `Dividend` | Instrument, entitled quantity, amount per share and currency, tax source, imputation credit, the dates, the reinvested quantity and price ([features/dividends.md](features/dividends.md)). The amount per share and the ex-date are optional on a hand-entered dividend ([features/external-income.md](features/external-income.md)) |
 
 Invariants:
 
@@ -395,6 +395,7 @@ What each type builds:
 - `Buy` security cost is `quantity × price` in the quote currency. Cash is that cost times FX, negative, in the account currency. With a trade fee, cost is `quantity × price + fee`, and a separate negative `Fee` leg carries the fee times FX ([features/trade-fees.md](features/trade-fees.md) R14–R16).
 - `Sell` and `StockOut` store the released average cost on the security leg (`Round(oldCost × qty / oldQty, 4, AwayFromZero)`; the full quantity releases the whole cost). `Sell` cash is `quantity × price × FX`, positive; a trade fee is a separate negative `Fee` leg and does not change the release. `StockOut` has no cash leg.
 - `PostBuy` / `PostSell` take an optional entered fee (quote currency, `≥ 0`) in place of a schedule, never both; its fee detail has no schedule. They take an optional `AppliedFxRate`, stored as the trade's FX detail; its base is the price currency, its quote the Account currency and its rate the one the cash legs used. `PostFxConversionWithAmounts` builds an `FxConversion` from both amounts: legs equal to them, rate `Round(buy ÷ sell, 8, AwayFromZero)`, FX detail source `Caller` ([features/external-caller-numbers.md](features/external-caller-numbers.md)).
+- `PostEnteredDividend` builds a hand-entered `Dividend` on an External account from the caller's numbers in the Instrument's quote currency: each amount converted with the caller's `fxRate` as `Round(amount × fxRate, dp, AwayFromZero)` when the quote currency differs from the Account's (an FX detail with source `Caller`); one `Principal` leg of the gross; one `Tax` leg per `EnteredTax` with its tax detail (basis the gross, plus the imputation credit for `Rwt`); a tax that converts to 0 books no leg; a dividend detail with an optional amount per share and ex-date; no security leg. `PostEnteredInterest` builds an `Interest` with one `Principal` leg of the gross (`> 0`) and one `Tax` leg per `EnteredTax`. Both take only source `Manual`, refuse taxes above the gross, and refuse `Rwt` with `Nrwt` and a kind twice (`EnteredTaxes`) ([features/external-income.md](features/external-income.md))
 - `StockIn` stores the client cost and has no cash leg.
 - `Split`, `Bonus`, and `Scrip` store the signed quantity delta and cost `0`. Holding total cost is unchanged. They do not call average-cost release and they do not create a holding.
 - `PostInternalTransfer` builds exactly two cash legs, `−amount` on the from Account and `+amount` on the to Account: different Accounts, same currency, positive amount, sum zero, from balance not negative ([features/internal-transfers.md](features/internal-transfers.md)).
@@ -405,7 +406,7 @@ Sources. A person's entry has source `Manual`. Every other kind is written by th
 
 | `TransactionSourceKind` | Id | Factory | Builds |
 | --- | --- | --- | --- |
-| `Manual` (0) | none | The factory of the type | What a person enters |
+| `Manual` (0) | none | The factory of the type; `PostEnteredDividend`, `PostEnteredInterest` | What a person enters; a hand-entered `Dividend` or `Interest` with tax on an External account ([features/external-income.md](features/external-income.md)) |
 | `Seed` (1) | none | The factory of the type | The test seed's history |
 | `Rebalance` (2) | The rebalance handle | None. Kept for reading rows written before rebalances went through orders ([features/rebalances.md](features/rebalances.md) R26) | — |
 | `BankFeed` (3) | The statement line | `PostBankDeposit` | A deposit: one `Principal` `TransferIn` cash leg, `amount > 0`, a bank receipt detail. Undone by an undo match ([features/deposit-matching.md](features/deposit-matching.md)) |
@@ -419,7 +420,7 @@ Sources. A person's entry has source `Manual`. Every other kind is written by th
 | `InKindTransfer` (10) | The in-kind transfer | `PostTransferIn` / `PostTransferOut` | A `StockIn` with one security leg of `+quantity` and the transfer's cost; a `StockOut` with one leg of `−quantity` at the holding's average cost. An in-kind transfer detail ([features/in-kind-transfers.md](features/in-kind-transfers.md) R37, R41) |
 | `AdjustmentRequest` (11) | The adjustment request | `PostAdjustment` | An `Adjustment`, only from the approval of a request ([features/adjustment-review.md](features/adjustment-review.md)) |
 
-Every factory other than `PostInterest`, `PostDividend` and `Reverse` refuses a `Tax` leg.
+Every factory other than `PostInterest`, `PostDividend`, `PostEnteredInterest`, `PostEnteredDividend` and `Reverse` refuses a `Tax` leg.
 
 Field rules: [features/posting.md](features/posting.md), [features/holdings.md](features/holdings.md), [features/buy-sell.md](features/buy-sell.md), [features/split.md](features/split.md), [features/leg-accounts.md](features/leg-accounts.md), and the specs named above.
 
@@ -732,6 +733,7 @@ One row per change. The text of each change is in git (`git log -p -- docs/domai
 | 2026-11-26 | Account valuation: `LedgerDay`, `AccountPosition`, `ValuationRules`, `ValuationLineStatus`, `BasisChange`, `AccountValuation` (§8.22). No entity or event. [features/account-valuation.md](features/account-valuation.md) |
 | 2026-11-26 | Valuation run: `StoredValuation`, `StoredValuationLine`, `ValuationRun`, `ValuationRunTrigger`, `ValuationRules.LastFinalDay` (§8.23); `Account.ValuedThrough` and `MarkValued` (§8.5). No event. [features/valuation-run.md](features/valuation-run.md) |
 | 2026-11-26 | Valuation history: `FxFold`, `FoldLine`, `FoldedTotal`, `FoldLineStatus` (§8.22). No entity or event. [features/valuation-history.md](features/valuation-history.md) |
+| 2026-11-27 | Income on External accounts: `EnteredTax`, `EnteredTaxes`, `Transaction.PostEnteredDividend` and `PostEnteredInterest`; the dividend detail's amount per share and ex-date optional; `CustodyRules` allows `Dividend` on an External account. No event. [features/external-income.md](features/external-income.md) |
 
 ---
 

@@ -147,7 +147,7 @@ Three invariants hold:
 | `StockIn` / `StockOut` | allowed | **refused** | An in-kind transfer: `Transaction.PostTransferIn` / `PostTransferOut`, source `InKindTransfer` (in-kind-transfers R48) |
 | `Split` / `Bonus` | allowed | **refused** | Corporate actions: `Transaction.PostCorporateAction`, source `CorporateAction` (corporate-actions R33) |
 | `Scrip` | allowed | **refused** | Nothing. A reinvested dividend is a `Dividend` ([dividends.md](dividends.md)) |
-| `Dividend` | not accepted | **refused** | Corporate actions: `Transaction.PostDividend`, source `CorporateAction` (dividends R43) |
+| `Dividend` | allowed, on `POST /transactions/dividend` ([external-income.md](external-income.md) R21) | **refused** | Corporate actions: `Transaction.PostDividend`, source `CorporateAction` (dividends R43) |
 | `Adjustment` | **refused** | allowed through an adjustment request that a second person approves, with `transactions.adjust` (adjustment-review R16) | The approval of the request |
 | `Reversal` (reverse) | allowed | allowed only for source `Manual`, and never for an `Adjustment` (transaction-source R13, rebalances R28, adjustment-review R15) | Each flow undoes its own writes |
 
@@ -155,7 +155,6 @@ What follows from the matrix:
 
 - On a Custodial account `POST /transactions` refuses every type it accepts. A person writes on a Custodial account only through `POST /transactions/transfer`, `POST /transactions/fx`, `POST /transactions/{id}/reverse` and `POST /adjustment-requests`.
 - A Transaction that a person typed on a Custodial account before its cell was refused keeps source `Manual` and can still be reversed by hand, within the reverse rules of its type (withdrawals R45, account-closure R23, orders R48).
-- `Dividend` on an External account stays not accepted until income events add it.
 
 Why `CloseOut` exists: a `Buy` / `Sell` cash leg is rounded to 4 decimals (buy-sell R12), so a balance can hold a part smaller than the currency's minor unit. `TransferOut` cannot carry that part (posting R8). On an External account a hand `CloseOut` brings such a balance to zero so that the Account can close ([ledger-write-guards](../fixes/ledger-write-guards.md) Decision 5). On a Custodial account the account closure writes the remainder off (account-closure R18).
 
@@ -173,7 +172,7 @@ All are ordinary validation, under `errors.Type` on `POST /transactions` unless 
 | Custodial | `Opening`, `OpeningHoldings` | `Opening balances on a Custodial account come from a migration batch.` |
 | Custodial | `StockIn`, `StockOut` | `Securities move in or out of a Custodial account by an in-kind transfer. Request a transfer.` |
 | Custodial | `Split`, `Bonus`, `Scrip` | `Corporate actions cannot be entered by hand on a Custodial account.` |
-| Custodial | `Dividend` | `Dividends are paid by the platform from the company's announcement.` |
+| Custodial | `Dividend` | `errors.AccountId` on `POST /transactions/dividend` ([external-income.md](external-income.md) R2): `Dividends are paid by the platform from the company's announcement.` `POST /transactions` refuses the type `Dividend` in its validator on both modes |
 | Custodial | `InternalTransfer` to another Customer's account | `errors.ToAccountId` on `POST /transactions/transfer`: `Cash can be transferred between Custodial accounts of the same customer only.` |
 | Custodial | Reverse of a source other than `Manual` | On `POST /transactions/{id}/reverse`: `This transaction was written by the platform and cannot be reversed by hand.` |
 | Both | Reverse of an `Adjustment` | On `POST /transactions/{id}/reverse`: `An adjustment cannot be reversed. Request a new adjustment that corrects it.` |
@@ -424,7 +423,6 @@ Decisions confirmed when this spec was accepted, with the option that was not ta
 Still open:
 
 - What happens to `Other`, `Property` and `Credit`
-- `Dividend` on an External account (income events)
 - A conversion on a Custodial account through an outside FX party ([custodial-roadmap.md](../roadmaps/custodial-roadmap.md) O5)
 
 ---
@@ -453,3 +451,4 @@ What changed in this file after it landed. The text of each change is in git (`g
 | 2026-11-25 | [adjustment-review.md](adjustment-review.md) | R5: an adjustment goes through a request; an `Adjustment` is never reversed |
 | 2026-11-26 | — | The amendments above were folded into §1–§11. No rule changed |
 | 2026-11-26 | [valuation-run.md](valuation-run.md) | §9.1: the demo Custodial account gains a Sell and a TransferIn and is opened on the day of its funding |
+| 2026-11-27 | [external-income.md](external-income.md) | R5: `Dividend` allowed by hand on an External account on its own route. §4.2.1: the Custodial `Dividend` message on that route |

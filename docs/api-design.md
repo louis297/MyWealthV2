@@ -563,6 +563,7 @@ Field rules: [features/posting.md](features/posting.md) for the aggregate, the c
 | POST | `/transactions/transfer` | `transactions.create` | 201 `{ id }` |
 | POST | `/transactions/fx` | `transactions.create` | 201 `{ id }` |
 | POST | `/transactions/fx/quote` | `transactions.create` | 200 quote |
+| POST | `/transactions/dividend` | `transactions.create` | 201 `{ id }` |
 | POST | `/transactions/{id}/reverse` | `transactions.create` | 201 `{ id }` |
 
 `POST /transactions/adjustment` was removed on 2026-11-25: an `Adjustment` is posted only by the approval of an adjustment request (§7.15).
@@ -576,7 +577,8 @@ Field rules: [features/posting.md](features/posting.md) for the aggregate, the c
 
 | | External account | Custodial account |
 | --- | --- | --- |
-| `POST /transactions` | Every type the route accepts | Every type is refused (400 `errors.Type`): the platform writes them from its flows. The matrix and the messages are [features/custody-modes.md](features/custody-modes.md) §4.2 |
+| `POST /transactions` | Every type the route accepts; `Interest` may carry `taxes` ([features/external-income.md](features/external-income.md)) | Every type is refused (400 `errors.Type`): the platform writes them from its flows. The matrix and the messages are [features/custody-modes.md](features/custody-modes.md) §4.2 |
+| `POST /transactions/dividend` | A dividend an outside party paid: the gross, each tax withheld and the imputation credit as the caller states them, and `fxRate` when the quote currency differs from the Account currency; no tax profile, rate or holding is read ([features/external-income.md](features/external-income.md)) | Refused (400 `errors.AccountId`): dividends are paid by the platform from the corporate action |
 | `bookedAt` | Required | Set by the server; a body that sends it to `POST /transactions`, `/transactions/transfer`, `/transactions/fx` or `/transactions/fx/quote` → 400 `errors.BookedAt` |
 | Transfer, conversion, quote | Only with another External account, else 400 `errors.ToAccountId` | Only with another Custodial account; a transfer only between accounts of one Customer (400 `errors.ToAccountId`) |
 | `Buy` / `Sell` numbers | Require `security[0].price` (the executed price), accept an optional `fee`, and require `fxRate` when the instrument's quote currency differs from the Account currency; no price, rate or schedule is read ([features/external-caller-numbers.md](features/external-caller-numbers.md)) | Not entered by hand: the caller places an order (§7.12) |
@@ -599,6 +601,7 @@ On both custody modes: reverse of an `Adjustment` → 400 for every caller ([fea
 | `InterestRun` | An interest posting | The interest run | `interest: { periodFrom, periodTo, days, accruedAmount, grossAmount }` |
 | `CorporateAction` | An entitlement posting (`Split` or `Bonus`: one security leg of the quantity difference with cost 0) | The corporate action | `corporateAction: { id, kind, ratioNew, ratioHeld, exDate, recordDate, paymentDate, quantityBefore, quantityAfter }` |
 | `CorporateAction` | A `Dividend` | The corporate action | `dividend` ([features/dividends.md](features/dividends.md) §8) |
+| `Manual` | A hand-entered `Dividend` on an External account | `null` | `dividend` with `corporateActionId` `null` ([features/external-income.md](features/external-income.md) R26) |
 | `OrderFill` | The `Buy` or `Sell` of a fill | The order | `execution: { orderId, fillId, price, tradeDate, settlementDate, brokerReference, settledAt, brokenAt }` |
 | `Migration` | An `Opening` or `OpeningHoldings` of a migration batch | The migration batch | `migration: { asOfDate, previousProvider }` |
 | `InKindTransfer` | The `StockIn` or `StockOut` of an in-kind transfer | The in-kind transfer | `inKindTransfer: { transferId, direction, counterpartyName, counterpartyAccount, changesBeneficialOwner, acquiredOn, settlementDate, custodianReference }` |
@@ -606,7 +609,7 @@ On both custody modes: reverse of an `Adjustment` → 400 for every caller ([fea
 
 **Type-specific create routes.** When a type's create body differs from the common shape (one top-level `accountId`), that type gets its own `POST /transactions/{action}`. Each type has exactly one create route: a type with its own route is rejected by `POST /transactions` (400). Read (`GET /transactions`, `GET /transactions/{id}`) and reverse (`POST /transactions/{id}/reverse`) stay shared by every type. Every new type gets its own `POST /transactions/{action}` route, whatever its body shape (decided 2026-11-10). Existing types keep `POST /transactions` until each is moved in its own spec change ([future-plans.md](future-plans.md) §4).
 
-Type-specific routes: `POST /transactions/transfer` for `InternalTransfer` ([features/internal-transfers.md](features/internal-transfers.md)); `POST /transactions/fx` for `FxConversion` and the read-only `POST /transactions/fx/quote` ([features/fx-conversions.md](features/fx-conversions.md)). `Adjustment` has no create route under `/transactions`: it is requested and approved under `/adjustment-requests` ([features/adjustment-review.md](features/adjustment-review.md)). The quote is a `POST` because it takes the create body and the same validation; it writes nothing, takes no `Idempotency-Key` and holds no rate. Create confirms the quoted rate with `expectedRate`; a different stored rate → 409 with `expectedRate` in `errors`.
+Type-specific routes: `POST /transactions/transfer` for `InternalTransfer` ([features/internal-transfers.md](features/internal-transfers.md)); `POST /transactions/fx` for `FxConversion` and the read-only `POST /transactions/fx/quote` ([features/fx-conversions.md](features/fx-conversions.md)); `POST /transactions/dividend` for a hand-entered `Dividend` on an External account ([features/external-income.md](features/external-income.md)). `Adjustment` has no create route under `/transactions`: it is requested and approved under `/adjustment-requests` ([features/adjustment-review.md](features/adjustment-review.md)). The quote is a `POST` because it takes the create body and the same validation; it writes nothing, takes no `Idempotency-Key` and holds no rate. Create confirms the quoted rate with `expectedRate`; a different stored rate → 409 with `expectedRate` in `errors`.
 
 ---
 
@@ -896,3 +899,4 @@ One row per change. The text of each change is in git (`git log -p -- docs/api-d
 | 2026-11-26 | Valuation run (§3.1, §6, §7.6, §7.18): `valuation-runs.read` and `valuation-runs.start`; `/valuation-runs`; `GET /accounts/{id}/valuations[/{date}]`; `valuedThrough` on the account item. No problem code |
 | 2026-11-26 | Valuation history (§6, §7.18): `GET /net-worth/funds-under-management`; `folded` on the net-worth reads; `date` of the Adviser Balances Report. No permission or problem code |
 | 2026-11-27 | Docs caught up with the code: §1 diagram shows the BFF between the browser and `webapi`; §2 CORS is none on `webapi`; §4 login failures are uniform (`Invalid login.`), no longer open; §7.8 the Customer's `reports.customer.create` and the Tenant pair; §4.2 `concurrent_modification` marked retired; §5 end session returns to `{bffOrigin}/` |
+| 2026-11-27 | Income on External accounts (§7.7): `POST /transactions/dividend`; `taxes` on a hand `Interest`; `POST /transactions` refuses `Dividend`; a hand-entered dividend on the item. No permission or problem code |

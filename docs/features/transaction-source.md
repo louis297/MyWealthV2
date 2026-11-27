@@ -107,7 +107,7 @@ The rule that distinguishes this slice: the source is set once, when the Transac
 | R1 | Unchanged access rules: posting R1–R4a, R15, leg-accounts R6–R8. 401 / 403 / 404, PublicId only, `tenantId` rules, Customer read scope. |
 | R2 | **Every Transaction has a source.** A source kind and an optional source id. Both are set when the Transaction is built and never change (posting R10). The kinds are in the table below. A spec that adds a kind adds the next value and widens the check in its own script. |
 | R3 | **Source id.** `Manual` and `Seed` have no source id. Every other kind has one: the PublicId of the instruction, event or run that wrote the Transaction (the table below). The id has no foreign key. |
-| R4 | **Hand-written Transactions are `Manual`.** `POST /transactions`, `POST /transactions/transfer`, `POST /transactions/fx` and `POST /transactions/{id}/reverse` write `Manual` for every caller, SystemAdmin included. The person is in the audit columns (`CreatedBy`), not in the source. An adjustment is not a hand write: it is posted by the approval of an adjustment request, with kind `AdjustmentRequest`. Adjustments posted before 2026-11-25 keep `Manual`. |
+| R4 | **Hand-written Transactions are `Manual`.** `POST /transactions`, `POST /transactions/transfer`, `POST /transactions/fx`, `POST /transactions/dividend` ([external-income.md](external-income.md)) and `POST /transactions/{id}/reverse` write `Manual` for every caller, SystemAdmin included. The person is in the audit columns (`CreatedBy`), not in the source. An adjustment is not a hand write: it is posted by the approval of an adjustment request, with kind `AdjustmentRequest`. Adjustments posted before 2026-11-25 keep `Manual`. |
 | R5 | **Rebalance.** No Transaction gets source `Rebalance` any more: a rebalance trade is the fill of a rebalance order, with source `OrderFill` and the order's PublicId (rebalances R26). The kind stays for the rows that have it — the `Buy` / `Sell` that `AccountRebalancer` posted before 2026-11-23, with the rebalance handle as source id, all trades of one run sharing it — and `TransactionSource.Rebalance(handle)` is kept for reading them. |
 | R6 | **Seeded Transactions are `Seed`.** Every Transaction that `TestSeed` and `DevelopmentSmokeSeeder` build has kind `Seed`. Both run in Development and in the TestAppHost only. The demo tenant seed writes no Transaction ([demo-tenant-seed.md](demo-tenant-seed.md) R9). |
 | R7 | **A Reversal has its own source.** The source of a Reversal is the process that reversed, not a copy of the original's source. A hand reverse writes `Manual` with no id, whatever the original's source. A later flow that undoes its own write passes its own source. So an undo match writes `BankFeed`, a returned payout `Payment`, and the Reversal of a broken trade `OrderFill`, each with its flow's id. |
@@ -118,7 +118,7 @@ The source kinds. Each has a factory on `TransactionSource`; a factory that take
 
 | Kind | Source id | Marks | Undone by |
 | --- | --- | --- | --- |
-| `Manual` (0) | none | What a person wrote through a create or reverse route | A hand reverse |
+| `Manual` (0) | none | What a person wrote through a create or reverse route, a hand-entered `Dividend` on an External account included | A hand reverse |
 | `Seed` (1) | none | Seed data (R6) | — |
 | `Rebalance` (2) | The rebalance handle | A rebalance trade posted before 2026-11-23 (R5). Nothing writes it now | An adjustment |
 | `BankFeed` (3) | The bank statement line. A deposit and the Reversal of its undo share it; a line matched again after an undo gives a second deposit with the same id | A deposit | An undo match (deposit-matching R30, R33) |
@@ -364,3 +364,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-24 | [migration-batches.md](migration-batches.md), [in-kind-transfers.md](in-kind-transfers.md), [dividends.md](dividends.md) | Kinds `Migration` (9) and `InKindTransfer` (10); `CorporateAction` also marks a `Dividend` |
 | 2026-11-25 | [adjustment-review.md](adjustment-review.md) | Kind `AdjustmentRequest` (11). R4, R13: an adjustment |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
+| 2026-11-27 | [external-income.md](external-income.md) | R4, §4.1: kind `Manual` also marks a hand-entered `Dividend` |

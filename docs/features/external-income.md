@@ -1,6 +1,6 @@
 ---
 title: Income on External accounts
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -41,7 +41,7 @@ After this slice an Adviser or TenantAdmin records a dividend on an External acc
 
 New: route `POST /transactions/dividend`; the field `taxes` on `POST /transactions` for `Interest`; Domain value `EnteredTax` and factories `Transaction.PostEnteredDividend` and `Transaction.PostEnteredInterest`; a dividend detail may have no amount per share and no ex-date. Script `0060_external_income.sql`. No new permission, `TransactionType`, tax kind, cash leg role, source kind, job, port, problem code or domain event. The simulator and the BFFs do not change.
 
-**Status is `review` (2026-11-27).** It is not a build contract. The points of §11 are open until they are confirmed. The changes to accepted docs listed in §12 are a plan; they are made when this spec is accepted.
+**Status is `accepted` (2026-11-27).** The twelve points of §11 were confirmed on 2026-11-27, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract.
 
 Tax figures in the worked examples come from dividends R33 and interest-run R4, which name their Inland Revenue sources. This slice adds no rate: on an External account the caller states what the payer withheld (R4).
 
@@ -80,7 +80,7 @@ Worked examples, used by the tests. NZD and USD have 2 decimal places.
 - Application: command `CreateDividend`; `CreateTransaction` takes `taxes` on an `Interest` and no longer lets `Dividend` through; the transaction reads map the two optional fields
 - Script: `database/schema/0060_external_income.sql`
 - HTTP (`webapi`): `POST /transactions/dividend`; `taxes` on `POST /transactions`
-- Adviser Portal: the dividend form, tax rows on the interest form, the hand-entered dividend on the ledger pages
+- Adviser Portal: the dividend form, the interest form with its tax rows, the hand-entered dividend and interest on the ledger pages
 - Customer Portal: the row of a hand-entered dividend and of a hand-entered interest with tax
 - Tests listed in §10
 
@@ -213,7 +213,7 @@ Invariants:
 
 Domain events: none new. Each posting raises `TransactionPosted` as every Transaction does.
 
-Update [domain-model.md](../domain-model.md) when this spec is accepted.
+[domain-model.md](../domain-model.md) carries these factories and invariants.
 
 ---
 
@@ -229,7 +229,7 @@ Script `database/schema/0060_external_income.sql`:
 
 Nothing else changes. `CK_Transactions_Type` allows 6, `CK_TransactionTaxDetails_Kind` allows 0–2 on any Transaction, and the rate, basis and amount CHECKs of `TransactionTaxDetails` hold for an entered tax (R5). The schema does not tie the two columns to the source: that a corporate action's dividend has both is held by `PostDividend`. No back-fill.
 
-Update [database-design.md](../database-design.md) when this spec is accepted.
+[database-design.md](../database-design.md) carries the two nullable columns.
 
 ---
 
@@ -364,14 +364,14 @@ Cross-tenant or wrong-collection id → **404**, not 403. Keep the resource cata
 
 ## 9. UI
 
-Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D111–D113) and [customer-portal.md](../customer-portal/customer-portal.md) (C48, C49), amended when this spec is accepted. Neither BFF gains a prefix: `/transactions` is already allowed.
+Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md) (D111–D113) and [customer-portal.md](../customer-portal/customer-portal.md) (C48, C49). Neither BFF gains a prefix: `/transactions` is already allowed.
 
 **Adviser Portal**
 
 | ID | Behaviour |
 | --- | --- |
 | D111 | On an External account the type selector of `/accounts/:id/transactions/new` (D18) offers "Dividend". The form has: an instrument picker; "Shares"; "Gross amount (<quote currency>)"; an optional "Amount per share (<quote currency>)"; "Company" ("New Zealand" / "Foreign", nothing preselected); "Imputation credit (<quote currency>)", shown only with New Zealand; a "Tax withheld" list where "Add tax" adds a row of Kind, Rate % and Amount (<quote currency>), up to three rows; only when the quote currency differs from the Account currency, a required "FX rate" labelled "1 <quote currency> = ? <Account currency>" (as D22); "Booked at"; optional Ex-date, Record date and Payment date; Memo and Reference. The Kind options follow the Company: New Zealand offers "RWT" and "NRWT", Foreign offers "Foreign tax" and "RWT". Under the list the form shows "Net <amount> <quote currency>" as display text; it does no other arithmetic and fills in no rate or amount. Submit posts `POST /transactions/dividend` with one `Idempotency-Key` per form open. A 400 is shown at its input; `errors.Taxes` under the list. The portal's copy of the matrix (D18) allows `Dividend` on an External account. A Custodial account never offers it. |
-| D112 | On an External account the `Interest` form has the "Tax withheld" list of D111, with amounts in the Account currency and Kind "RWT", "NRWT" or "Foreign tax". With at least one row the amount input is labelled "Gross interest" and must be above 0, and "Net <amount>" is shown under the list. The POST carries `taxes` only when the list has a row. |
+| D112 | On an External account the type selector of D18 offers "Interest", whose form has an "Amount (<Account currency>)" input (posting R20: either sign without tax), "Booked at", Memo, Reference and the "Tax withheld" list of D111, with amounts in the Account currency and Kind "RWT", "NRWT" or "Foreign tax". With at least one row the amount input is labelled "Gross interest" and must be above 0, and "Net <amount>" is shown under the list. The POST carries `taxes` only when the list has a row. |
 | D113 | `/transactions/:id` of a hand-entered dividend shows what D100 shows for a Custodial one, with these differences: the Source line (D26) reads "Entered by hand"; there is no link to a corporate action; the shares line reads "<quantity> shares × <amountPerShare>" or, with no amount per share, "<quantity> shares"; a date that was not entered is not shown; Reverse is offered by D27. A hand-entered `Interest` with tax shows Gross, each tax as "<kind label> <rate> %" with its amount, and Net. The transactions list and account activity show "Dividend <symbol>" or "Interest" with the net and "incl. tax <amount>" under it, as D61. |
 
 **Customer Portal**
@@ -415,9 +415,9 @@ No new ADR. ADR 0020 and custody-modes §1 apply as written: on an External acco
 | Script | `0060_external_income.sql` |
 | Permissions, types, tax kinds, source kinds, jobs, problem codes, events | None added |
 
-### Points to confirm
+### Points confirmed
 
-Each point states the recommendation, which the rules above already follow, and the alternative.
+Each point states the recommendation, written into the rules above, and the alternative. All twelve were confirmed as recommended on 2026-11-27.
 
 1. **One spec for the dividend and the tax on interest.** Recommended: both are the same idea (income an outside party paid, recorded with its tax), they share §4.2 and the portal's tax list, and together they close step 2 of the business roadmap. Alternative: two specs, the dividend first; the interest part is then R9, §4.4, D112 and C49.
 2. **A route of its own for the dividend; `taxes` on `POST /transactions` for interest** (R10, R22). Recommended: a dividend's body shares almost nothing with the common body, and [api-design.md](../api-design.md) §7.7 gives a type that is new to hand entry its own route; `Interest` already lives on `POST /transactions`, and moving it is [future-plans.md](../future-plans.md) §4. Alternative: `POST /transactions/interest` now, with a decision on how long both routes take `Interest`.
@@ -446,7 +446,7 @@ Still open, not this slice:
 
 ## 12. Changes to other docs
 
-A plan while this spec is in review. Each doc is changed in place when this spec is accepted.
+Each doc was changed in place when this spec was accepted (2026-11-27).
 
 | Doc | Change |
 | --- | --- |
