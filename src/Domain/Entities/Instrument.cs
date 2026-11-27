@@ -1,7 +1,11 @@
+using MyWealthV2.Domain.Instruments;
+
 namespace MyWealthV2.Domain.Entities;
 
 public class Instrument : BaseAuditableEntity
 {
+    private readonly List<InstrumentFifTreatment> _fifTreatments = [];
+
     private Instrument()
     {
     }
@@ -19,6 +23,12 @@ public class Instrument : BaseAuditableEntity
     public bool IsActive { get; private set; }
 
     public byte[] RowVersion { get; private set; } = null!;
+
+    /// <summary>Instrument-tax-attributes R4: the country the issuer is tax resident in, or none.</summary>
+    public string? IssuerCountry { get; private set; }
+
+    /// <summary>Instrument-tax-attributes R9: the FIF treatment rows, at most one per tax year.</summary>
+    public IReadOnlyList<InstrumentFifTreatment> FifTreatments => _fifTreatments;
 
     public static Instrument Create(
         int tenantId,
@@ -76,6 +86,20 @@ public class Instrument : BaseAuditableEntity
         IsActive = true;
         AddDomainEvent(new InstrumentEnabled(this));
     }
+
+    /// <summary>
+    /// Instrument-tax-attributes R5, R9, R12, R16: replaces the issuer country and every FIF treatment row with what
+    /// the caller states. Raises no event (R20).
+    /// </summary>
+    public void SetTaxAttributes(string? issuerCountry, IReadOnlyList<FifTreatmentInput> rows, int latestTaxYear)
+    {
+    }
+
+    /// <summary>R5, R9, R12: every reason the tax attributes cannot be stored, keyed by field; empty when they can.</summary>
+    public static IReadOnlyList<TaxAttributeRefusal> TaxAttributeRefusals(
+        string? issuerCountry,
+        IReadOnlyList<FifTreatmentInput> rows,
+        int latestTaxYear) => [];
 
     private static string NormaliseSymbol(string symbol)
     {
