@@ -37,7 +37,17 @@ After this slice a person with `instruments.manage` states two things about an I
 
 New: route `PUT /instruments/{id}/tax-attributes`; route `GET /countries`; fields `issuerCountry` and `fifTreatments` on the instrument item; Domain enum `FifTreatment`, child entity `InstrumentFifTreatment`, constant list `Countries`, and `Instrument.SetTaxAttributes` and `Instrument.FifTreatmentFor`; script `0061_instrument_tax_attributes.sql`; a tax attributes section on the Back Office instrument page; the demo catalog classified. No new permission, problem code, domain event, job, port or setting. The simulator, the two portals and the BFFs do not change.
 
-**Status is `accepted` (2026-11-27).** The thirteen points of §11 were confirmed on 2026-11-27, every one as recommended, and are written into the rules. For point 9 a person checked the three ASX rows in Inland Revenue's tool, which gave an answer for tax year 2026 only; §1.1 and §5.1 say what the seed writes. The changes to the docs listed in §12 were made when it was accepted. It is a build contract.
+**Status is `accepted` (2026-11-27).** The thirteen points of §11 were confirmed on 2026-11-27, every one as recommended, and are written into the rules. For point 9 a person checked the three ASX rows in Inland Revenue's tool, which gave an answer for tax year 2026 only; §1.1 and §5.1 say what the seed writes. The changes to the docs listed in §12 were made when it was accepted. It is a build contract. Landed 2026-11-27.
+
+Notes from landing:
+
+- R17: `IApplicationDbContext.MarkModified` marks the Instrument as changed, so the save always writes its row and its `rowVersion` moves when only a row changed, or when nothing changed.
+- R16, §6: the EF mapping deletes a row the write leaves out through the Instrument's collection (`DeleteBehavior.Cascade` in EF only); the SQL FK stays RESTRICT, as §6 says.
+- R9, R16: the messages the spec leaves open are `Note must be at most 500 characters.`, `TaxYear is required.`, `A FIF treatment row is required.`, `IssuerCountry is required; send null for no country.` and `FifTreatments is required; send an empty list for none.` A body with a row of the wrong shape (no tax year, a treatment that is not one of the five names) gets those errors and the check of the country only, so no agreement error points at the wrong row. An unknown field, on the body or on a row, is a 400 with no `errors`.
+- R19: `PUT /instruments/{id}` refuses `issuerCountry` and `fifTreatments` with a 400 at the field, `… is set with PUT /instruments/{id}/tax-attributes.`
+- R6: `GET /countries` sorts by name with the invariant culture, so `Åland Islands` sorts with the A names.
+- R24, R25: the seeds pass the server's year plus 1 as the latest tax year, as Application does.
+- BO-I11: the Back Office page tests see the first server render only, so Save, a 400 at an input and the 409 reload are covered through the API client (`BackOfficeApiTests`) and the page's helper (`FifTreatmentChoice`), not by clicking.
 
 The tax statements in this spec were read again from Inland Revenue's guide on 2026-11-27 (§14). The Act and Inland Revenue's lookup tool refused automated reads on the day; a person then ran the tool by hand for BHP, CBA and WOW (§14 S5). Nothing here is tax advice.
 
@@ -448,6 +458,13 @@ Adviser Portal and Customer Portal: no change. Neither has an Instruments page, 
 ---
 
 ## 10. Tests
+
+| Project | Where |
+| --- | --- |
+| Domain.UnitTests | `Instruments/CountriesTests.cs`, `Entities/InstrumentTaxAttributesTests.cs`, `Entities/InstrumentFifTreatmentForTests.cs` |
+| Application.FunctionalTests | `Instruments/SetInstrumentTaxAttributesTests.cs`, `Instruments/InstrumentTaxAttributesIsolationTests.cs` (two tenants), `Countries/GetCountriesTests.cs`; the R19 cases in `Instruments/UpdateInstrumentTests.cs` and `Instruments/CreateInstrumentTests.cs` |
+| Infrastructure.IntegrationTests | `AppliedSchema/InstrumentsTaxAttributesSchemaTests.cs`; `InstrumentsSchemaTests`, `TenantCompositeKeysSchemaTests`, `DemoTenantSeedTests` and `TestSeedInstrumentsTests` |
+| Back Office | `BackOffice/BackOfficePageTests.cs`, `BackOffice/BackOfficeApiTests.cs`, `BackOffice/FifTreatmentChoiceTests.cs` |
 
 | Project | Assert |
 | --- | --- |

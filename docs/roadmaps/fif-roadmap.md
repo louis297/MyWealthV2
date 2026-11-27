@@ -187,7 +187,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 - **Also decide:** who classifies (Q6); whether the country is free text, an ISO code or a catalog; whether the treatment is one value with a year from which it applies or one row per year; whether a dividend's tax source must agree with the Instrument's country, or only a warning is shown; what happens to two Instrument rows for one company listed on two exchanges (recommended: two interests, as entered).
 - **Amends:** instruments, demo-tenant-seed, back-office-instruments.
 - **Worked example:** the demo catalog classified by hand, each Australian symbol checked in Inland Revenue's lookup tool for one year.
-- **Spec:** [instrument-tax-attributes](../features/instrument-tax-attributes.md) (`accepted`, 2026-11-27). It names the values `NotForeign`, `ExemptAsxListed`, `Attributing` and `AttributingNoFdr`, and adds `ExemptOther` for the exemptions of §7 that the platform does not check. Its points 1 to 13 answer "Also decide" and were confirmed as recommended. A person checked the three Australian symbols in the lookup tool on 2026-11-27: it answered for tax year 2026 only, so the 2027 rows of the demo catalog are assumed from 2026.
+- **Spec:** [instrument-tax-attributes](../features/instrument-tax-attributes.md) (`accepted` and landed, 2026-11-27). It names the values `NotForeign`, `ExemptAsxListed`, `Attributing` and `AttributingNoFdr`, and adds `ExemptOther` for the exemptions of §7 that the platform does not check. Its points 1 to 13 answer "Also decide" and were confirmed as recommended. A person checked the three Australian symbols in the lookup tool on 2026-11-27: it answered for tax year 2026 only, so the 2027 rows of the demo catalog are assumed from 2026.
 
 ### TR2. Tax year events in NZD
 
@@ -308,7 +308,7 @@ Each step depends only on earlier steps.
 
 | Step | Item | Closes | Spec | Status |
 | --- | --- | --- | --- | --- |
-| 1 | TR1 tax attributes of an Instrument | "No ISIN / Exchange / Kind" stays; the country and the FIF treatment are new | [instrument-tax-attributes](../features/instrument-tax-attributes.md) | spec accepted (2026-11-27) |
+| 1 | TR1 tax attributes of an Instrument | "No ISIN / Exchange / Kind" stays; the country and the FIF treatment are new | [instrument-tax-attributes](../features/instrument-tax-attributes.md) | accepted and landed (2026-11-27) |
 | 2 | TR2 tax year events in NZD | — | — | not started |
 | 3 | TR3 cost in NZD and the threshold test | "Tax lots and a cost in NZD" of custodial-roadmap §10, as far as this step needs it | — | not started |
 | 4 | TR4 FIF income: FDR, quick sale, CV | — | — | not started |
