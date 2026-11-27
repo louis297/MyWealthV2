@@ -1619,3 +1619,94 @@ describe("Customer Portal valuation history (C45–C47)", () => {
     expect(valuationUrls(fetchMock)).toEqual([]);
   });
 });
+
+describe("Customer Portal income on External accounts (external-income C48, C49)", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.stubGlobal("fetch", vi.fn());
+    vi.stubGlobal("location", {
+      origin: "http://localhost:3000",
+      pathname: "/accounts/account-1",
+      search: "",
+      href: "http://localhost:3000/accounts/account-1",
+      assign: vi.fn(),
+    });
+  });
+
+  const externalNzd = { type: "Bank", currency: "NZD" };
+  const leg = (role: string, amount: number, tax: unknown = null) =>
+    ({ accountId: "account-1", customerId: me.id, role, amount, currency: "NZD", fee: null, tax });
+  const base = {
+    tenantId: "22222222-2222-2222-2222-222222222222",
+    bookedAt: "2026-11-20T00:00:00Z",
+    memo: null,
+    reference: null,
+    originalTransactionId: null,
+    reversedByTransactionId: null,
+    rowVersion: "AAAA",
+    source: { kind: "Manual", id: null },
+    corporateAction: null,
+    security: [],
+    bankReceipt: null,
+    payment: null,
+    interest: null,
+  };
+  const enteredDividend = {
+    ...base,
+    id: "77777777-7777-7777-7777-777777777777",
+    type: "Dividend",
+    dividend: {
+      corporateActionId: null, instrument: { id: "i-1", symbol: "AIA", name: "Auckland Airport" }, quantity: 1000,
+      amountPerShare: null, currency: "NZD", taxSource: "NewZealand", imputationCredit: 200,
+      reinvestedQuantity: null, reinvestmentPrice: null, exDate: null, recordDate: null, paymentDate: null,
+    },
+    cash: [
+      leg("Principal", 2000),
+      leg("Tax", -526, { kind: "Rwt", ratePercent: 33, basisAmount: 2200, amount: 526, currency: "NZD" }),
+    ],
+  };
+  const enteredInterest = {
+    ...base,
+    id: "78888888-8888-8888-8888-888888888888",
+    type: "Interest",
+    dividend: null,
+    cash: [
+      leg("Principal", 50),
+      leg("Tax", -5, { kind: "ForeignWithholding", ratePercent: 10, basisAmount: 50, amount: 5, currency: "NZD" }),
+      leg("Tax", -1.5, { kind: "Rwt", ratePercent: 3, basisAmount: 50, amount: 1.5, currency: "NZD" }),
+    ],
+  };
+
+  it("shows a hand-entered dividend with its shares alone when there is no amount per share (C48)", async () => {
+    renderAt("/accounts/account-1", me, [enteredDividend], "External", { account: externalNzd });
+
+    const row = await screen.findByRole("row", { name: /Dividend AIA/ });
+    expect(row).toHaveTextContent("1000 shares");
+    expect(row).not.toHaveTextContent("shares ×");
+    expect(row).toHaveTextContent("Gross 2,000.00 NZD");
+    expect(row).toHaveTextContent("RWT 33 % 526.00 NZD");
+    expect(row).toHaveTextContent("Imputation credit 200.00 NZD");
+    expect(row).toHaveTextContent("1,474.00 NZD");
+  });
+
+  it("shows a hand Interest with tax: the gross, each tax with its label and rate, and the net, with no period (C49)", async () => {
+    renderAt("/accounts/account-1", me, [enteredInterest], "External", { account: externalNzd });
+
+    const row = await screen.findByRole("row", { name: /Interest/ });
+    expect(row).toHaveTextContent("Gross 50.00 NZD");
+    expect(row).toHaveTextContent("Tax withheld (Foreign tax 10 %) 5.00 NZD");
+    expect(row).toHaveTextContent("Tax withheld (RWT 3 %) 1.50 NZD");
+    expect(row).toHaveTextContent("43.50 NZD");
+    expect(row).not.toHaveTextContent(" to ");
+  });
+
+  it("keeps today's row for a hand Interest without tax (C49)", async () => {
+    renderAt("/accounts/account-1", me, [{ ...enteredInterest, cash: [leg("Principal", 12.34)] }], "External", {
+      account: externalNzd,
+    });
+
+    const row = await screen.findByRole("row", { name: /Interest/ });
+    expect(row).toHaveTextContent("12.34 NZD");
+    expect(row).not.toHaveTextContent("Gross");
+  });
+});
