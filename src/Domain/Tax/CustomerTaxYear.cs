@@ -67,7 +67,15 @@ public sealed record CustomerTaxYear(
             // R24: at the closing the comparable quantity is the quantity; R25: the peak of the opening and every event.
             start = start with { ComparableQuantity = comparable?[0] };
             end = end with { ComparableQuantity = comparable is null ? null : end.Quantity };
-            holdings.Add(new TaxHolding(instrumentId, treatment, start, end, comparable?.Max(), yearEvents, [], []));
+            holdings.Add(new TaxHolding(
+                instrumentId,
+                treatment,
+                start,
+                end,
+                comparable?.Max(),
+                yearEvents,
+                Reasons(treatment, start, end, yearEvents, comparable is not null),
+                Notices(treatment, Of(opening, instrumentId), yearEvents)));
         }
 
         var incomplete = holdings.Count(holding => !holding.Complete);
@@ -129,6 +137,88 @@ public sealed record CustomerTaxYear(
 
         return comparable;
     }
+
+    /// <summary>R27: every reason of the table that applies, in the order of the table.</summary>
+    private static List<TaxIncompleteReason> Reasons(
+        TaxTreatment treatment, TaxPoint opening, TaxPoint closing, IReadOnlyList<TaxYearEvent> events, bool hasComparable)
+    {
+        var reasons = new List<TaxIncompleteReason>();
+        if (treatment.FifTreatment == FifTreatment.NotClassified)
+        {
+            reasons.Add(TaxIncompleteReason.NotClassified);
+        }
+
+        if (opening.Status == TaxValueStatus.NotValued)
+        {
+            reasons.Add(TaxIncompleteReason.OpeningNotValued);
+        }
+
+        if (closing.Status == TaxValueStatus.NotValued)
+        {
+            reasons.Add(TaxIncompleteReason.ClosingNotValued);
+        }
+
+        if (events.Any(e => e.Status is TaxAmountStatus.NoRate or TaxAmountStatus.StaleRate or TaxAmountStatus.NoPrice or TaxAmountStatus.StalePrice))
+        {
+            reasons.Add(TaxIncompleteReason.AmountMissing);
+        }
+
+        if (opening.Quantity < 0m || events.Any(e => e.QuantityAfter < 0m))
+        {
+            reasons.Add(TaxIncompleteReason.NegativeQuantity);
+        }
+
+        if (!hasComparable)
+        {
+            reasons.Add(TaxIncompleteReason.NoComparableQuantity);
+        }
+
+        return reasons;
+    }
+
+    /// <summary>R28, R29: each notice of the table that applies, once, in the order of the table.</summary>
+    private static List<TaxNotice> Notices(TaxTreatment treatment, IReadOnlyList<TaxQuantity> opening, IReadOnlyList<TaxYearEvent> events)
+    {
+        var notices = new SortedSet<TaxNotice>();
+        if (opening.Any(q => q.CustodyMode == CustodyMode.External)
+            || events.Any(e => e.Event.CustodyMode == CustodyMode.External || e.Event.Changes.Any(c => c.CustodyMode == CustodyMode.External)))
+        {
+            notices.Add(TaxNotice.ExternalFigures);
+        }
+
+        foreach (var taxEvent in events.Select(e => e.Event))
+        {
+            switch (taxEvent.Kind)
+            {
+                case TaxEventKind.Arrival:
+                    notices.Add(TaxNotice.ArrivalAtMarketValue);
+                    break;
+                case TaxEventKind.Departure:
+                    notices.Add(TaxNotice.DepartureAtMarketValue);
+                    break;
+                case TaxEventKind.Move:
+                    notices.Add(TaxNotice.Move);
+                    break;
+                case TaxEventKind.Reorganisation when taxEvent.LedgerType == TransactionType.Scrip:
+                    notices.Add(TaxNotice.Scrip);
+                    break;
+                case TaxEventKind.Correction:
+                    notices.Add(TaxNotice.Correction);
+                    break;
+                case TaxEventKind.Dividend when Disagrees(taxEvent.Dividend!.TaxSource, treatment.IssuerCountry):
+                    notices.Add(TaxNotice.DividendTaxSourceDisagrees);
+                    break;
+            }
+        }
+
+        return notices.ToList();
+    }
+
+    /// <summary>R29: <c>NewZealand</c> from an issuer outside New Zealand, or <c>Foreign</c> from one in it. An Instrument
+    /// with no issuer country never disagrees.</summary>
+    private static bool Disagrees(DividendTaxSource source, string? issuerCountry) =>
+        issuerCountry is { } country
+        && (source == DividendTaxSource.NewZealand) != string.Equals(country.Trim(), "NZ", StringComparison.OrdinalIgnoreCase);
 
     private static List<TaxQuantity> Of(IReadOnlyList<TaxQuantity> quantities, int instrumentId) =>
         quantities.Where(quantity => quantity.InstrumentId == instrumentId).ToList();
