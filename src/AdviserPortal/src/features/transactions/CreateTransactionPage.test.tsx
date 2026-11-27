@@ -1,5 +1,5 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -135,7 +135,7 @@ function renderForm(
       }
       return json({ ...account, ...accountOverride });
     }
-    if (url.endsWith("/transactions") && method === "POST") {
+    if ((url.endsWith("/transactions") || url.endsWith("/transactions/dividend")) && method === "POST") {
       if (postStatus === 404) {
         return new Response("", { status: 404 });
       }
@@ -870,5 +870,212 @@ describe("CreateTransactionPage", () => {
       .map(([input]) => input)
       .find((input): input is Request => input instanceof Request && input.method === "POST");
     expect(JSON.parse(await post!.clone().text())).toMatchObject({ type: "TransferIn", amount: 25 });
+  });
+
+  async function postRequest(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([input]) => input instanceof Request && input.method === "POST")).toBe(true);
+    });
+    return fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.method === "POST")!;
+  }
+
+  function taxRow(index: number) {
+    return within(screen.getByRole("group", { name: `Tax ${index}` }));
+  }
+
+  async function addTax(index: number, kind: string, rate: string, amount: string, currency: string) {
+    fireEvent.click(screen.getByRole("button", { name: "Add tax" }));
+    const row = taxRow(index);
+    await chooseOption("Kind", kind, row);
+    fireEvent.change(row.getByLabelText("Rate %"), { target: { value: rate } });
+    fireEvent.change(row.getByLabelText(`Amount (${currency})`), { target: { value: amount } });
+  }
+
+  describe("a dividend on an External account (external-income D111)", () => {
+    it("posts a New Zealand company's dividend with its credit and RWT to /transactions/dividend", async () => {
+      const { fetchMock, router } = renderForm(user(), 201, "", { type: "Bank" }, "errors", "?type=Dividend");
+
+      await chooseOption("Type", "Dividend");
+      await chooseOption("Instrument", "LOCAL Local Fund");
+      fireEvent.change(screen.getByLabelText("Shares"), { target: { value: "1000" } });
+      fireEvent.change(screen.getByLabelText("Gross amount (NZD)"), { target: { value: "2000.00" } });
+      expect(screen.queryByLabelText("Imputation credit (NZD)")).not.toBeInTheDocument();
+      await chooseOption("Company", "New Zealand");
+      fireEvent.change(screen.getByLabelText("Imputation credit (NZD)"), { target: { value: "200.00" } });
+      await addTax(1, "RWT", "33", "526.00", "NZD");
+      expect(screen.getByText("Net 1474.00 NZD")).toBeInTheDocument();
+      expect(screen.queryByLabelText(/FX rate/)).not.toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText("Booked at"), { target: { value: "2026-11-20T13:00" } });
+      fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+      expect(await screen.findByText("account detail")).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe(`/accounts/${accountId}`);
+      const post = await postRequest(fetchMock);
+      expect(post.url).toBe("http://localhost:3000/api/transactions/dividend");
+      expect(post.headers.get("Idempotency-Key")).toBe(idempotencyKey);
+      expect(JSON.parse(await post.clone().text())).toEqual({
+        accountId,
+        instrumentId: localInstrumentId,
+        quantity: 1000,
+        grossAmount: 2000,
+        taxSource: "NewZealand",
+        imputationCredit: 200,
+        taxes: [{ kind: "Rwt", ratePercent: 33, amount: 526 }],
+        bookedAt: "2026-11-20T00:00:00.000Z",
+        memo: null,
+        reference: null,
+      });
+    });
+
+    it("asks for the FX rate in another currency, offers Foreign tax and RWT for a foreign company, and sends the optional fields", async () => {
+      const { fetchMock } = renderForm(user(), 201, "", {}, "errors", "?type=Dividend");
+
+      await chooseOption("Type", "Dividend");
+      await chooseOption("Instrument", "DEMO Demo Fund");
+      fireEvent.change(screen.getByLabelText("Shares"), { target: { value: "10" } });
+      fireEvent.change(screen.getByLabelText("Gross amount (USD)"), { target: { value: "2.60" } });
+      fireEvent.change(screen.getByLabelText("Amount per share (USD)"), { target: { value: "0.26" } });
+      await chooseOption("Company", "Foreign");
+      expect(screen.queryByLabelText("Imputation credit (USD)")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Add tax" }));
+      fireEvent.click(taxRow(1).getByLabelText("Kind"));
+      expect(await screen.findByRole("option", { name: "Foreign tax" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "RWT" })).toBeInTheDocument();
+      expect(screen.queryByRole("option", { name: "NRWT" })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("option", { name: "Foreign tax" }));
+      fireEvent.change(taxRow(1).getByLabelText("Rate %"), { target: { value: "15" } });
+      fireEvent.change(taxRow(1).getByLabelText("Amount (USD)"), { target: { value: "0.39" } });
+      expect(screen.getByText("Net 2.21 USD")).toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText("FX rate (1 USD = ? NZD)"), { target: { value: "1.69147" } });
+      fireEvent.change(screen.getByLabelText("Ex-date"), { target: { value: "2026-11-09" } });
+      fireEvent.change(screen.getByLabelText("Record date"), { target: { value: "2026-11-10" } });
+      fireEvent.change(screen.getByLabelText("Payment date"), { target: { value: "2026-11-13" } });
+      fireEvent.change(screen.getByLabelText("Memo"), { target: { value: "Quarterly dividend" } });
+      fireEvent.change(screen.getByLabelText("Reference"), { target: { value: "HATCH-2026-11" } });
+      fireEvent.change(screen.getByLabelText("Booked at"), { target: { value: "2026-11-20T13:00" } });
+      fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+      const post = await postRequest(fetchMock);
+      expect(JSON.parse(await post.clone().text())).toEqual({
+        accountId,
+        instrumentId,
+        quantity: 10,
+        grossAmount: 2.6,
+        amountPerShare: 0.26,
+        taxSource: "Foreign",
+        taxes: [{ kind: "ForeignWithholding", ratePercent: 15, amount: 0.39 }],
+        fxRate: 1.69147,
+        exDate: "2026-11-09",
+        recordDate: "2026-11-10",
+        paymentDate: "2026-11-13",
+        bookedAt: "2026-11-20T00:00:00.000Z",
+        memo: "Quarterly dividend",
+        reference: "HATCH-2026-11",
+      });
+    });
+
+    it("preselects no company, offers RWT and NRWT for a New Zealand company, and adds at most three taxes", async () => {
+      renderForm(user(), 201, "", {}, "errors", "?type=Dividend");
+
+      await chooseOption("Type", "Dividend");
+      await chooseOption("Instrument", "LOCAL Local Fund");
+      expect(screen.getByLabelText("Company")).toHaveTextContent(/select/i);
+      await chooseOption("Company", "New Zealand");
+      fireEvent.click(screen.getByRole("button", { name: "Add tax" }));
+      fireEvent.click(taxRow(1).getByLabelText("Kind"));
+      expect(await screen.findByRole("option", { name: "NRWT" })).toBeInTheDocument();
+      expect(screen.queryByRole("option", { name: "Foreign tax" })).not.toBeInTheDocument();
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+      fireEvent.click(screen.getByRole("button", { name: "Add tax" }));
+      fireEvent.click(screen.getByRole("button", { name: "Add tax" }));
+      expect(screen.getAllByRole("group", { name: /^Tax \d$/ })).toHaveLength(3);
+      expect(screen.queryByRole("button", { name: "Add tax" })).not.toBeInTheDocument();
+    });
+
+    it("shows a 400 at its input, the taxes' error under the list and stays on the form", async () => {
+      const { router } = renderForm(user(), 400, "", {}, "errors", "?type=Dividend", 200, false, {
+        GrossAmount: ["GrossAmount can have at most 2 decimal places."],
+        Taxes: ["Tax withheld cannot be more than the gross amount."],
+        "Taxes[0].Amount": ["Amount can have at most 2 decimal places."],
+      });
+
+      await chooseOption("Type", "Dividend");
+      await chooseOption("Instrument", "LOCAL Local Fund");
+      fireEvent.change(screen.getByLabelText("Shares"), { target: { value: "10" } });
+      fireEvent.change(screen.getByLabelText("Gross amount (NZD)"), { target: { value: "10.005" } });
+      await chooseOption("Company", "New Zealand");
+      await addTax(1, "RWT", "33", "3.301", "NZD");
+      fireEvent.change(screen.getByLabelText("Booked at"), { target: { value: "2026-11-20T13:00" } });
+      fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+      expect(await screen.findByText("GrossAmount can have at most 2 decimal places.")).toBeInTheDocument();
+      expect(screen.getByLabelText("Gross amount (NZD)")).toHaveAttribute("aria-describedby", "dividend-gross-error");
+      expect(screen.getByText("Tax withheld cannot be more than the gross amount.")).toHaveAttribute("id", "dividend-taxes-error");
+      expect(taxRow(1).getByText("Amount can have at most 2 decimal places.")).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe(`/accounts/${accountId}/transactions/new`);
+    });
+  });
+
+  describe("tax on a hand Interest (external-income D112)", () => {
+    it("offers Interest, labels the amount the gross once a tax is added, shows the net and posts the taxes", async () => {
+      const { fetchMock } = renderForm(user(), 201, "", { type: "Bank" }, "errors", "?type=Interest");
+
+      await chooseOption("Type", "Interest");
+      fireEvent.change(screen.getByLabelText("Amount (NZD)"), { target: { value: "12.34" } });
+      await addTax(1, "RWT", "33", "4.07", "NZD");
+      expect(screen.queryByLabelText("Amount (NZD)")).not.toBeInTheDocument();
+      expect(screen.getByLabelText("Gross interest (NZD)")).toHaveValue("12.34");
+      expect(screen.getByText("Net 8.27 NZD")).toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText("Reference"), { target: { value: "STMT-11" } });
+      fireEvent.change(screen.getByLabelText("Booked at"), { target: { value: "2026-11-26T13:00" } });
+      fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+      const post = await postRequest(fetchMock);
+      expect(post.url).toBe("http://localhost:3000/api/transactions");
+      expect(JSON.parse(await post.clone().text())).toEqual({
+        accountId,
+        type: "Interest",
+        amount: 12.34,
+        bookedAt: "2026-11-26T00:00:00.000Z",
+        memo: null,
+        reference: "STMT-11",
+        taxes: [{ kind: "Rwt", ratePercent: 33, amount: 4.07 }],
+      });
+    });
+
+    it("offers RWT, NRWT and Foreign tax, and posts an Interest without a tax of either sign and without taxes", async () => {
+      const { fetchMock } = renderForm(user(), 201, "", { type: "Bank" }, "errors", "?type=Interest");
+
+      await chooseOption("Type", "Interest");
+      fireEvent.click(screen.getByRole("button", { name: "Add tax" }));
+      fireEvent.click(taxRow(1).getByLabelText("Kind"));
+      expect(await screen.findByRole("option", { name: "Foreign tax" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "NRWT" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "RWT" })).toBeInTheDocument();
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+      fireEvent.click(taxRow(1).getByRole("button", { name: "Remove" }));
+      fireEvent.change(screen.getByLabelText("Amount (NZD)"), { target: { value: "-1.25" } });
+      fireEvent.change(screen.getByLabelText("Booked at"), { target: { value: "2026-11-26T13:00" } });
+      fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+      const body = JSON.parse(await (await postRequest(fetchMock)).clone().text()) as Record<string, unknown>;
+      expect(body).toMatchObject({ type: "Interest", amount: -1.25 });
+      expect(body).not.toHaveProperty("taxes");
+    });
+
+    it("refuses a gross interest that is not above 0 once a tax is added, and posts nothing", async () => {
+      const { fetchMock } = renderForm(user(), 201, "", { type: "Bank" }, "errors", "?type=Interest");
+
+      await chooseOption("Type", "Interest");
+      fireEvent.change(screen.getByLabelText("Amount (NZD)"), { target: { value: "-1" } });
+      await addTax(1, "RWT", "33", "1", "NZD");
+      fireEvent.change(screen.getByLabelText("Booked at"), { target: { value: "2026-11-26T13:00" } });
+      fireEvent.click(screen.getByRole("button", { name: "Post transaction" }));
+
+      expect(await screen.findByText("Gross interest must be above 0.")).toBeInTheDocument();
+      expect(fetchMock.mock.calls.some(([input]) => input instanceof Request && input.method === "POST")).toBe(false);
+    });
   });
 });
