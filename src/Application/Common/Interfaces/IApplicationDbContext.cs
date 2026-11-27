@@ -124,6 +124,9 @@ public interface IApplicationDbContext
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 
+    /// <summary>Marks a tracked entity as changed, so the next save writes its row and moves its rowVersion.</summary>
+    void MarkModified(object entity);
+
     Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken);
 
     /// <summary>Runs <paramref name="action"/> in one transaction at <paramref name="isolationLevel"/>, for example

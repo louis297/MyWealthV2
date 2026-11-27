@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using FluentValidation.Results;
 using MyWealthV2.Application.Common.Exceptions;
@@ -25,6 +26,12 @@ public class UpdateInstrumentCommand : IRequest
     public Guid? TenantId { get; init; }
 
     public bool? IsActive { get; init; }
+
+    /// <summary>Instrument-tax-attributes R19: the tax attributes have their own route.</summary>
+    public JsonElement? IssuerCountry { get; init; }
+
+    /// <summary>Instrument-tax-attributes R19: the tax attributes have their own route.</summary>
+    public JsonElement? FifTreatments { get; init; }
 }
 
 public class UpdateInstrumentCommandValidator : AbstractValidator<UpdateInstrumentCommand>
@@ -43,6 +50,12 @@ public class UpdateInstrumentCommandValidator : AbstractValidator<UpdateInstrume
         RuleFor(command => command.IsActive)
             .Must(isActive => isActive is null)
             .WithMessage("IsActive cannot be changed.");
+        RuleFor(command => command.IssuerCountry)
+            .Must(value => value is null)
+            .WithMessage("IssuerCountry is set with PUT /instruments/{id}/tax-attributes.");
+        RuleFor(command => command.FifTreatments)
+            .Must(value => value is null)
+            .WithMessage("FifTreatments are set with PUT /instruments/{id}/tax-attributes.");
         RuleFor(command => command.Name)
             .Must(name => name is null || (!string.IsNullOrWhiteSpace(name) && name.Trim().Length is >= 1 and <= 200))
             .WithMessage("Name must be 1 to 200 characters.");

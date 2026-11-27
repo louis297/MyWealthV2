@@ -106,22 +106,22 @@ public class SetInstrumentTaxAttributesTests : TestBase
         var id = await CreateAsync(tokens.AccessToken, "BHP", "AUD");
         (await Put(id, tokens.AccessToken, Body("AU",
         [
-            Row(2026, "ExemptAsxListed"),
-            Row(2027, "ExemptAsxListed")
+            Row(2025, "ExemptAsxListed"),
+            Row(2026, "ExemptAsxListed")
         ], await RowVersion(id, tokens.AccessToken)))).StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         var response = await Put(id, tokens.AccessToken, Body("AU",
         [
-            Row(2027, "Attributing", "Left the list."),
-            Row(Latest, "Attributing")
+            Row(2026, "Attributing", "Left the list."),
+            Row(2027, "Attributing")
         ], await RowVersion(id, tokens.AccessToken)));
 
         response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
         using var item = await ReadItem(id, tokens.AccessToken);
         Rows(item.RootElement).ShouldBe(
         [
-            (2027, "Attributing", (string?)"Left the list."),
-            (Latest, "Attributing", null)
+            (2026, "Attributing", (string?)"Left the list."),
+            (2027, "Attributing", null)
         ]);
     }
 

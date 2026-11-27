@@ -36,7 +36,12 @@ public sealed class InstrumentDto
         QuoteCurrency = instrument.QuoteCurrency,
         IsActive = instrument.IsActive,
         RowVersion = Convert.ToBase64String(instrument.RowVersion ?? []),
-        MarketDataConnection = marketDataConnection
+        MarketDataConnection = marketDataConnection,
+        IssuerCountry = instrument.IssuerCountry,
+        FifTreatments = instrument.FifTreatments
+            .OrderBy(row => row.TaxYear)
+            .Select(row => new FifTreatmentDto(row.TaxYear, row.Treatment.ToString(), row.Note))
+            .ToList()
     };
 }
 

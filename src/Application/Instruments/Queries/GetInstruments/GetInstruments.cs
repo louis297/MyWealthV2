@@ -62,7 +62,7 @@ public class GetInstrumentsQueryHandler(IApplicationDbContext db, ICurrentUser c
         }
 
         var query =
-            from instrument in db.Instruments.AsNoTracking()
+            from instrument in db.Instruments.AsNoTracking().Include(row => row.FifTreatments)
             join tenant in db.Tenants.AsNoTracking() on instrument.TenantId equals tenant.Id
             where instrument.TenantId == tenantId
             select new { instrument, tenant };

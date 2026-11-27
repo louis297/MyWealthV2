@@ -229,6 +229,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
     public Task LoadSecurityLegsAsync(Transaction transaction, CancellationToken cancellationToken) =>
         Entry(transaction).Collection(row => row.SecurityLegs).LoadAsync(cancellationToken);
 
+    public void MarkModified(object entity) => Entry(entity).State = EntityState.Modified;
+
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         try
