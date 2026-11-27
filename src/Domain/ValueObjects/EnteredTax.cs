@@ -27,14 +27,64 @@ public static class EnteredTaxes
 
     /// <summary>R5, R6: the field and message of the first rule a list breaks, or null when all hold. A row's field is
     /// <c>Taxes[i].Kind</c>, <c>Taxes[i].RatePercent</c> or <c>Taxes[i].Amount</c>; a rule of the list is <c>Taxes</c>.</summary>
-    public static (string Field, string Message)? RefusalOf(IReadOnlyList<EnteredTax> taxes) => null;
+    public static (string Field, string Message)? RefusalOf(IReadOnlyList<EnteredTax> taxes)
+    {
+        if (taxes.Count > MaxCount)
+        {
+            return ("Taxes", TooManyMessage);
+        }
+
+        for (var i = 0; i < taxes.Count; i++)
+        {
+            var tax = taxes[i];
+            if (!Enum.IsDefined(tax.Kind))
+            {
+                return ($"Taxes[{i}].Kind", KindMessage);
+            }
+
+            if (tax.RatePercent is <= 0m or > 100m || decimal.Round(tax.RatePercent, RateDecimals) != tax.RatePercent)
+            {
+                return ($"Taxes[{i}].RatePercent", RateMessage);
+            }
+
+            if (tax.Amount <= 0m)
+            {
+                return ($"Taxes[{i}].Amount", AmountMessage);
+            }
+        }
+
+        if (taxes.Select(tax => tax.Kind).Distinct().Count() != taxes.Count)
+        {
+            return ("Taxes", KindTwiceMessage);
+        }
+
+        if (taxes.Any(tax => tax.Kind == TaxKind.Rwt) && taxes.Any(tax => tax.Kind == TaxKind.Nrwt))
+        {
+            return ("Taxes", RwtWithNrwtMessage);
+        }
+
+        return null;
+    }
 
     /// <summary>R12: the field and message of the first tax whose kind does not go with the dividend's tax source, or
     /// null. <c>ForeignWithholding</c> only with <c>Foreign</c>, <c>Nrwt</c> only with <c>NewZealand</c>, <c>Rwt</c> with
     /// either.</summary>
-    public static (string Field, string Message)? RefusalOf(IReadOnlyList<EnteredTax> taxes, DividendTaxSource taxSource) =>
-        null;
+    public static (string Field, string Message)? RefusalOf(IReadOnlyList<EnteredTax> taxes, DividendTaxSource taxSource)
+    {
+        for (var i = 0; i < taxes.Count; i++)
+        {
+            switch (taxes[i].Kind)
+            {
+                case TaxKind.ForeignWithholding when taxSource != DividendTaxSource.Foreign:
+                    return ($"Taxes[{i}].Kind", ForeignOnlyMessage);
+                case TaxKind.Nrwt when taxSource != DividendTaxSource.NewZealand:
+                    return ($"Taxes[{i}].Kind", NrwtOnlyMessage);
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>R7: true when the taxes add up to more than <paramref name="gross"/>.</summary>
-    public static bool AboveGross(IEnumerable<decimal> taxAmounts, decimal gross) => false;
+    public static bool AboveGross(IEnumerable<decimal> taxAmounts, decimal gross) => taxAmounts.Sum() > gross;
 }
