@@ -274,7 +274,7 @@ public sealed record CustomerTaxYear(
                 var (status, rate) = RateOf(currency, LedgerDay.Of(taxEvent.BookedAt), rates);
                 decimal? Nzd(decimal amount) => status switch
                 {
-                    TaxAmountStatus.Stated => amount,
+                    TaxAmountStatus.Stated => Round(amount, decimalPlaces),
                     TaxAmountStatus.Converted => Round(amount * rate!.Rate, decimalPlaces),
                     _ => null
                 };

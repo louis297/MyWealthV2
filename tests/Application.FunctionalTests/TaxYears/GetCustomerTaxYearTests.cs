@@ -133,7 +133,13 @@ public class GetCustomerTaxYearTests : TestBase
             .ShouldBe([(world.T["T1"], "Converted", 8_708.70m), (world.T["T2"], "Stated", 3_647.00m)]);
         var closing = holding.GetProperty("closing");
         var opening = HoldingOf(year2026, "AAA").GetProperty("opening");
-        closing.GetRawText().ShouldBe(opening.GetRawText());
+        // R22: the same instant, day, rows and value. The comparable quantity is on the basis of each year's end (R24).
+        foreach (var field in new[] { "at", "valuationDay", "quantity", "value", "status", "lines" })
+        {
+            closing.GetProperty(field).GetRawText().ShouldBe(opening.GetProperty(field).GetRawText(), field);
+        }
+
+        (closing.GetProperty("comparableQuantity").GetDecimal(), opening.GetProperty("comparableQuantity").GetDecimal()).ShouldBe((140m, 280m));
         Strings(holding.GetProperty("notices")).ShouldBe(["ExternalFigures"]);
         var transactions = year2026.GetProperty("holdings").EnumerateArray()
             .SelectMany(h => h.GetProperty("events").EnumerateArray()).Select(e => e.GetProperty("transactionId").GetGuid()).ToList();
