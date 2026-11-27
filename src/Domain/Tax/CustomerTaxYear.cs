@@ -32,21 +32,69 @@ public sealed record CustomerTaxYear(
         var from = Tax.TaxYear.Start(taxYear);
         var to = Tax.TaxYear.End(taxYear);
         var ofYear = events.Where(e => e.BookedAt >= from && e.BookedAt < to).ToList();
-        var holdings = ofYear
-            .GroupBy(e => e.InstrumentId)
-            .OrderBy(group => group.Key)
-            .Select(group => new TaxHolding(
-                group.Key,
-                treatments.GetValueOrDefault(group.Key) ?? TaxTreatment.NotClassified(),
-                new TaxPoint(from, Tax.TaxYear.OpeningDay(taxYear), 0m, null, null, TaxValueStatus.NotRequired, []),
-                new TaxPoint(to, Tax.TaxYear.ClosingDay(taxYear), 0m, null, null, TaxValueStatus.NotRequired, []),
-                null,
-                group.Select((e, index) => Amounts(index + 1, e, rates, values, decimalPlaces)).ToList(),
-                [],
-                []))
-            .ToList();
+        var opening = TaxLedger.QuantitiesAt(events, from);
+        var closing = TaxLedger.QuantitiesAt(events, to);
+
+        // R23: a tax holding is listed when it is held at the start or has an event in the year.
+        var instruments = opening.Select(quantity => quantity.InstrumentId)
+            .Concat(ofYear.Select(e => e.InstrumentId))
+            .Distinct()
+            .Order();
+        var holdings = new List<TaxHolding>();
+        foreach (var instrumentId in instruments)
+        {
+            var treatment = treatments.GetValueOrDefault(instrumentId) ?? TaxTreatment.NotClassified();
+            var needsValue = NeedsValue(treatment.FifTreatment);
+            var start = Point(
+                from, Tax.TaxYear.OpeningDay(taxYear), Of(opening, instrumentId), Lines(values.Opening, instrumentId), needsValue);
+            var end = Point(
+                to, Tax.TaxYear.ClosingDay(taxYear), Of(closing, instrumentId), Lines(values.Closing, instrumentId), needsValue);
+
+            var quantity = start.Quantity;
+            var yearEvents = new List<TaxYearEvent>();
+            foreach (var taxEvent in ofYear.Where(e => e.InstrumentId == instrumentId))
+            {
+                quantity += taxEvent.Changes.Sum(change => change.Quantity);
+                yearEvents.Add(Amounts(yearEvents.Count + 1, taxEvent, rates, values, decimalPlaces) with { QuantityAfter = quantity });
+            }
+
+            holdings.Add(new TaxHolding(instrumentId, treatment, start, end, null, yearEvents, [], []));
+        }
+
         var incomplete = holdings.Count(holding => !holding.Complete);
         return new CustomerTaxYear(taxYear, from, to, holdings, incomplete == 0, incomplete);
+    }
+
+    private static List<TaxQuantity> Of(IReadOnlyList<TaxQuantity> quantities, int instrumentId) =>
+        quantities.Where(quantity => quantity.InstrumentId == instrumentId).ToList();
+
+    private static List<TaxValueLine> Lines(IReadOnlyList<TaxValueLine> lines, int instrumentId) =>
+        lines.Where(line => line.Line.InstrumentId == instrumentId).ToList();
+
+    /// <summary>
+    /// R22, R23: the quantity at the instant, summed over the Accounts, and its value: the sum of one line per Account
+    /// that holds a quantity, when every line is valued. A line that was not given is <c>NoPrice</c>. A quantity of 0 is
+    /// worth 0.00 with no line. A treatment that needs no value reads no line.
+    /// </summary>
+    private static TaxPoint Point(
+        DateTimeOffset at, DateOnly day, IReadOnlyList<TaxQuantity> quantities, IReadOnlyList<TaxValueLine> given, bool needsValue)
+    {
+        var quantity = quantities.Sum(q => q.Quantity);
+        if (!needsValue)
+        {
+            return new TaxPoint(at, day, quantity, null, null, TaxValueStatus.NotRequired, []);
+        }
+
+        var lines = quantities
+            .Select(q => given.FirstOrDefault(line => line.AccountId == q.AccountId)
+                         ?? new TaxValueLine(
+                             q.AccountId,
+                             q.CustodyMode,
+                             new ValuationLine(q.InstrumentId, q.Quantity, q.Quantity, ValuationLineStatus.NoPrice, null, null, null, null)))
+            .ToList();
+        return lines.All(line => line.Line.Status == ValuationLineStatus.Valued)
+            ? new TaxPoint(at, day, quantity, null, lines.Sum(line => line.Line.Value!.Value), TaxValueStatus.Valued, lines)
+            : new TaxPoint(at, day, quantity, null, null, TaxValueStatus.NotValued, lines);
     }
 
     /// <summary>R10–R14, R18, R21: the NZD figures of one event.</summary>
@@ -144,7 +192,8 @@ public sealed record CustomerTaxYear(
     }
 
     /// <summary>R23: an opening and a closing value are worked out for an attributing and a not classified holding.</summary>
-    public static bool NeedsValue(FifTreatment treatment) => false;
+    public static bool NeedsValue(FifTreatment treatment) =>
+        treatment is FifTreatment.Attributing or FifTreatment.AttributingNoFdr or FifTreatment.NotClassified;
 
     /// <summary>The currency of every figure of a tax year (R31).</summary>
     public const string Nzd = "NZD";

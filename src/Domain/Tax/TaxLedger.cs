@@ -28,7 +28,16 @@ public static class TaxLedger
     /// R22: each Account's quantity of each Instrument before <paramref name="instant"/>, from the events booked before
     /// it; a move counts from its later leg. A quantity of 0 is left out.
     /// </summary>
-    public static IReadOnlyList<TaxQuantity> QuantitiesAt(IEnumerable<TaxEvent> events, DateTimeOffset instant) => [];
+    public static IReadOnlyList<TaxQuantity> QuantitiesAt(IEnumerable<TaxEvent> events, DateTimeOffset instant) =>
+        events
+            .Where(taxEvent => taxEvent.BookedAt < instant)
+            .SelectMany(taxEvent => taxEvent.Changes.Select(change => (change, taxEvent.InstrumentId)))
+            .GroupBy(row => (row.change.AccountId, row.change.CustodyMode, row.InstrumentId))
+            .Select(group => new TaxQuantity(group.Key.AccountId, group.Key.CustodyMode, group.Key.InstrumentId, group.Sum(row => row.change.Quantity)))
+            .Where(quantity => quantity.Quantity != 0m)
+            .OrderBy(quantity => quantity.AccountId)
+            .ThenBy(quantity => quantity.InstrumentId)
+            .ToList();
 
     /// <summary>The most a departure and an arrival of one move may be apart (R15).</summary>
     public static readonly TimeSpan MoveWindow = TimeSpan.FromDays(30);
