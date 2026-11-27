@@ -520,7 +520,7 @@ Every flow of the plan has landed. Of the five conditions of §2, four held afte
 | X2 replay, X3 period close | Moved out of this plan | They are not about Custodial accounts only. Replay is what booking at an outside date (D2), backdating and tax lots need, so it opens when the business roadmap needs it ([future-plans.md](../future-plans.md) §1, at the latest step 6, the FIF report). X3 follows X2. |
 | X4 third-party payments | Unchanged | Refused (D14). No plan. |
 
-After steps 16 and 17 this plan is complete, and work returns to the business roadmap of [future-plans.md](../future-plans.md) §1: what is left of step 2 (dividends and withholding on External accounts), then step 3, historical valuation, which has its own plan: [valuation-roadmap.md](valuation-roadmap.md).
+After steps 16 and 17 this plan is complete, and work returns to the business roadmap of [future-plans.md](../future-plans.md) §1. Step 2 is complete: income on External accounts landed 2026-11-27 with [external-income.md](../features/external-income.md). Next is step 3, historical valuation, which has its own plan: [valuation-roadmap.md](valuation-roadmap.md).
 
 One row of the known issue stays open: history cannot be entered on a Custodial account. The simulator's clock does not close it, because the platform keeps the real clock (D9) and books at processing time (D2). X2 is what closes it.
 

@@ -41,7 +41,15 @@ After this slice an Adviser or TenantAdmin records a dividend on an External acc
 
 New: route `POST /transactions/dividend`; the field `taxes` on `POST /transactions` for `Interest`; Domain value `EnteredTax` and factories `Transaction.PostEnteredDividend` and `Transaction.PostEnteredInterest`; a dividend detail may have no amount per share and no ex-date. Script `0060_external_income.sql`. No new permission, `TransactionType`, tax kind, cash leg role, source kind, job, port, problem code or domain event. The simulator and the BFFs do not change.
 
-**Status is `accepted` (2026-11-27).** The twelve points of §11 were confirmed on 2026-11-27, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract.
+**Status is `accepted` (2026-11-27), landed 2026-11-27.** The twelve points of §11 were confirmed on 2026-11-27, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract.
+
+Notes from landing:
+
+- R19, §7: `ReverseTransaction` loaded the FX, adjustment and fee details of the Transaction it reverses, but not its tax and dividend details, so a hand reverse of a Transaction with `Tax` legs failed. It now loads both; `Transaction.Reverse` copies them as before and nothing is read again.
+- R3: the request-shape rules run in the validator before the Account is loaded, so a body that breaks one is a 400 even for another tenant's Account; with a valid shape another tenant's Account or Instrument is a 404, before `bookedAt`, the custody mode and every rule that needs the Account.
+- R5, R11, R14: the messages the spec leaves open are `Kind must be Rwt, Nrwt, or ForeignWithholding.`, `RatePercent must be above 0 and at most 100, with at most 2 decimal places.`, `Amount must be greater than 0.` and `At most 3 taxes can be entered.` for a row, `Quantity must be greater than 0, with at most 8 decimal places.`, `GrossAmount must be greater than 0.`, `TaxSource must be NewZealand or Foreign.` and, for a gross that converts to 0, `GrossAmount converts to 0 in the account currency.` A field the body declares and refuses (`type`, `amount`, `currency`, `cash`, `security`, `fee`) is a 400 at that field; any other unknown field is a 400 with no `errors`.
+- D112: the Adviser Portal had no form for a hand `Interest`, although D18 offers every hand type on an External account. The type selector now offers "Interest" and "Dividend" on an Open External account of any type.
+- D113: the transactions list shows every row with `Tax` legs as its net with "incl. tax <amount>" under it, as D61 says, where it showed each leg before; a Custodial interest posting and dividend read the same way.
 
 Tax figures in the worked examples come from dividends R33 and interest-run R4, which name their Inland Revenue sources. This slice adds no rate: on an External account the caller states what the payer withheld (R4).
 
@@ -239,7 +247,7 @@ Nothing else changes. `CK_Transactions_Type` allows 6, `CK_TransactionTaxDetails
 | --- | --- | --- |
 | Command | `CreateDividend` (new) | `POST /transactions/dividend`: R1–R3, R10–R21. Returns the new id through `IdempotentResult`, as `CreateInternalTransfer` |
 | Command | `CreateTransaction` (existing) | `taxes` on `Interest` (R22, R23); refused on every other type (R9); `Dividend` leaves the type check (R10) |
-| Command | `ReverseTransaction` (existing) | No change in code: source `Manual` on an External account is reversible (R19) |
+| Command | `ReverseTransaction` (existing) | Source `Manual` on an External account is reversible (R19). It loads the tax and dividend details of the Transaction it reverses, so `Transaction.Reverse` copies them |
 | Query | `GetTransactions`, `GetTransactionById` (existing) | `dividend.amountPerShare` and `dividend.exDate` may be `null` (R26) |
 | Query | The Customer Transactions Report (existing) | No change in code (R27) |
 
@@ -390,8 +398,15 @@ Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-d
 
 ## 10. Tests
 
-| Project | Assert |
+| Project | Where |
 | --- | --- |
+| Domain.UnitTests | `ValueObjects/EnteredTaxesTests.cs`, `Entities/EnteredDividendTests.cs`, `Entities/EnteredInterestTests.cs`, `Custody/CustodyRulesTests.cs` |
+| Application.FunctionalTests | `Transactions/ExternalDividendTests.cs`, `Transactions/ExternalDividendIsolationTests.cs` (two tenants), `Transactions/ExternalInterestTaxTests.cs`; `Custody/CustodialManualEntryTests.cs` for the matrix of `POST /transactions` |
+| Infrastructure.IntegrationTests | `AppliedSchema/TransactionsExternalIncomeSchemaTests.cs` |
+| Adviser Portal | `src/features/transactions/CreateTransactionPage.test.tsx` (D111, D112), `src/features/transactions/EnteredIncomePages.test.tsx` (D113) |
+| Customer Portal | `src/portal.test.tsx`, "income on External accounts" (C48, C49) |
+
+--- | --- |
 | Domain.UnitTests | `EnteredTaxes`: the shapes, a kind twice, `Rwt` with `Nrwt`, the pairs with the tax source. `PostEnteredDividend`: examples A–D leg by leg with their tax details and the dividend detail; the conversion and the FX detail of example C; a tax that converts to 0; taxes above the gross; a source other than `Manual`; no security leg. `PostEnteredInterest`: examples E and F; gross not above 0; no tax. `Reverse` of both copies the legs, the tax details and the dividend detail. `CustodyRules`: `Dividend` allowed on External, refused on Custodial |
 | Application.FunctionalTests (`Transactions/`) | `POST /transactions/dividend`: no Bearer → 401 not 302; Customer → 403; examples A–D through the item; every 400 of §8.2; a Custodial account → 400 `errors.AccountId`; a Bank account and a disabled Instrument are accepted; no holding is created or changed; replay and 409 of the `Idempotency-Key`; reverse, and reverse refused when the cash was spent; SystemAdmin with and without `tenantId`. `POST /transactions`: `Interest` with `taxes` (examples E, F); `taxes` on `TransferIn` → 400; `Dividend` → 400 `errors.Type` on both custody modes; an `Interest` without `taxes` is unchanged. The Customer reads both through `GET /transactions`. The Customer Transactions Report shows the net and the Tax column for both. Two-tenant fixture: another tenant's Account → 404, another tenant's Instrument → 404, an Adviser's unassigned Customer → 404 |
 | Infrastructure.IntegrationTests (`AppliedSchema/TransactionsExternalIncomeSchemaTests.cs`) | A dividend detail with no amount per share and no ex-date is stored; `AmountPerShare` of 0 is refused; existing rows keep their values |
@@ -462,23 +477,4 @@ Each doc was changed in place when this spec was accepted (2026-11-27).
 | [domain-model.md](../domain-model.md), [database-design.md](../database-design.md) | The factories and `EnteredTax`; the two nullable columns and script `0060` |
 | [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-dashboard.md), [customer-portal.md](../customer-portal/customer-portal.md) | D111–D113; C48, C49; C30 and C42 point to them |
 | [glossary.md](../glossary.md) | Entered dividend and Entered tax become accepted; Dividend, Dividend detail, Tax detail and Withholding tax gain the hand-entered case |
-| [function-plan.md](../function-plan.md), [features/README.md](README.md), [future-plans.md](../future-plans.md) §1 step 2 and §9, [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13.1 | Status: step 2 of the business roadmap is complete |
-
----
-
-## 13. Suggested commits
-
-The repository should build after each commit. Agents split each line into red then green.
-
-1. Script `0060_external_income.sql`, the nullable `AmountPerShare` and `ExDate` on `TransactionDividendDetail` and its mapping, and the schema tests.
-2. `EnteredTax` and `EnteredTaxes`: the shapes, the kinds and the pairs with the tax source (R5, R6, R12).
-3. `Transaction.PostEnteredDividend`: the legs, the tax details, the dividend detail, the conversion and the FX detail (R7, R8, R14, R16, R17).
-4. `Transaction.PostEnteredInterest` and `ForeignWithholding` on an `Interest` (R9, R22, R23).
-5. `CustodyRules`: `Dividend` allowed on an External account (R21).
-6. `POST /transactions/dividend`: access, the body, the Custodial refusal, the Instrument, decimal places, `fxRate`, idempotency and the item (R1–R3, R10–R15, R20, R26). `POST /transactions` refuses `Dividend`.
-7. Reverse of a hand-entered dividend, and the Customer Transactions Report row (R19, R27).
-8. `taxes` on a hand `Interest`: the body, the refusal on other types, reverse and the item (R9, R22–R24).
-9. Adviser Portal: the dividend form and the matrix copy (D111).
-10. Adviser Portal: tax rows on the interest form, and both on the ledger pages (D112, D113).
-11. Customer Portal: the two rows (C48, C49).
-12. The landing commit: this spec marked landed and the root README.
+| [features/README.md](README.md), [future-plans.md](../future-plans.md) §1 step 2 and §9, [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13.1 | Status: step 2 of the business roadmap is complete |
