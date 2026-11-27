@@ -36,7 +36,7 @@ public class InstrumentsSchemaTests
 
         columns.Select(column => column.Name).ShouldBe([
             "Id", "PublicId", "TenantId", "Symbol", "Name", "QuoteCurrency", "IsActive",
-            "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion"
+            "Created", "CreatedBy", "LastModified", "LastModifiedBy", "RowVersion", "IssuerCountry"
         ]);
 
         Column(columns, "Id").ShouldSatisfyAllConditions(
@@ -72,6 +72,10 @@ public class InstrumentsSchemaTests
         Column(columns, "LastModifiedBy").Nullable.ShouldBe("YES");
         Column(columns, "RowVersion").Type.ShouldBe("timestamp");
         Column(columns, "RowVersion").Nullable.ShouldBe("NO");
+        Column(columns, "IssuerCountry").ShouldSatisfyAllConditions(
+            column => column.Type.ShouldBe("char"),
+            column => column.Length.ShouldBe(2),
+            column => column.Nullable.ShouldBe("YES"));
     }
 
     [Test]

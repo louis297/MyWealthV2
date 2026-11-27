@@ -804,7 +804,11 @@ public class TenantCompositeKeysSchemaTests
             ValuationRunRow("{p}") + StoredValuationRow(tenant: "@{p}_tenant", account: "@{p}_brokerage", run: "@{p}_vrun")
             + StoredValuationLineRow()),
         ("FK_StoredValuationLines_Instruments_TenantId_InstrumentId", "Instruments",
-            ValuationRunRow("a") + StoredValuationRow() + StoredValuationLineRow(instrument: "@{p}_instrument"))
+            ValuationRunRow("a") + StoredValuationRow() + StoredValuationLineRow(instrument: "@{p}_instrument")),
+        ("FK_InstrumentFifTreatments_Instruments_TenantId_InstrumentId", "Instruments", """
+            INSERT INTO [InstrumentFifTreatments] ([TenantId], [InstrumentId], [TaxYear], [Treatment], [Note], [Created], [CreatedBy])
+            VALUES (@a_tenant, @{p}_instrument, 2027, 4, NULL, SYSDATETIMEOFFSET(), N'test');
+            """)
     ];
 
     /// <summary>A Scheduled valuation run of tenant <paramref name="prefix"/> in <c>@{prefix}_vrun</c> (script 0059).</summary>
