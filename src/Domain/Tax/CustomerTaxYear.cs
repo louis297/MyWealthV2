@@ -27,8 +27,126 @@ public sealed record CustomerTaxYear(
         IReadOnlyDictionary<int, TaxTreatment> treatments,
         IReadOnlyDictionary<(string Currency, DateOnly Date), StoredRate> rates,
         TaxYearValues values,
-        int decimalPlaces) =>
-        new(taxYear, default, default, [], false, 0);
+        int decimalPlaces)
+    {
+        var from = Tax.TaxYear.Start(taxYear);
+        var to = Tax.TaxYear.End(taxYear);
+        var ofYear = events.Where(e => e.BookedAt >= from && e.BookedAt < to).ToList();
+        var holdings = ofYear
+            .GroupBy(e => e.InstrumentId)
+            .OrderBy(group => group.Key)
+            .Select(group => new TaxHolding(
+                group.Key,
+                treatments.GetValueOrDefault(group.Key) ?? TaxTreatment.NotClassified(),
+                new TaxPoint(from, Tax.TaxYear.OpeningDay(taxYear), 0m, null, null, TaxValueStatus.NotRequired, []),
+                new TaxPoint(to, Tax.TaxYear.ClosingDay(taxYear), 0m, null, null, TaxValueStatus.NotRequired, []),
+                null,
+                group.Select((e, index) => Amounts(index + 1, e, rates, values, decimalPlaces)).ToList(),
+                [],
+                []))
+            .ToList();
+        var incomplete = holdings.Count(holding => !holding.Complete);
+        return new CustomerTaxYear(taxYear, from, to, holdings, incomplete == 0, incomplete);
+    }
+
+    /// <summary>R10–R14, R18, R21: the NZD figures of one event.</summary>
+    private static TaxYearEvent Amounts(
+        int sequence,
+        TaxEvent taxEvent,
+        IReadOnlyDictionary<(string Currency, DateOnly Date), StoredRate> rates,
+        TaxYearValues values,
+        int decimalPlaces)
+    {
+        var none = new TaxYearEvent(sequence, taxEvent, 0m, null, null, TaxAmountStatus.None, null, null, null, null, null);
+        switch (taxEvent.Kind)
+        {
+            case TaxEventKind.Arrival:
+            case TaxEventKind.Departure:
+                return MarketValue(none, values.Events.GetValueOrDefault(taxEvent.Ordinal));
+
+            case TaxEventKind.Acquisition:
+            case TaxEventKind.Disposal:
+            case TaxEventKind.Dividend:
+                var currency = taxEvent.Trade?.Currency ?? taxEvent.Dividend!.Currency;
+                var (status, rate) = RateOf(currency, LedgerDay.Of(taxEvent.BookedAt), rates);
+                decimal? Nzd(decimal amount) => status switch
+                {
+                    TaxAmountStatus.Stated => amount,
+                    TaxAmountStatus.Converted => Round(amount * rate!.Rate, decimalPlaces),
+                    _ => null
+                };
+
+                if (taxEvent.Dividend is { } dividend)
+                {
+                    var gross = Nzd(dividend.Gross);
+                    return none with
+                    {
+                        Status = status,
+                        Fx = rate,
+                        Amount = gross,
+                        Dividend = new TaxDividendAmounts(
+                            dividend.Shares,
+                            dividend.TaxSource,
+                            gross,
+                            Nzd(dividend.ForeignTax),
+                            Nzd(dividend.Rwt),
+                            Nzd(dividend.Nrwt),
+                            Nzd(dividend.ImputationCredit))
+                    };
+                }
+
+                var trade = taxEvent.Trade!;
+                var principal = Nzd(trade.Principal);
+                var fee = Nzd(trade.Fee);
+                // R10: an acquisition costs the principal and the fee; a disposal brings the principal less the fee.
+                var amount = taxEvent.Kind == TaxEventKind.Disposal ? principal - fee : principal + fee;
+                return none with { Status = status, Fx = rate, Principal = principal, Fee = fee, Amount = amount };
+
+            default:
+                return none;
+        }
+    }
+
+    /// <summary>R14: the value of the line of an arrival or a departure, or the status of a line that has none.</summary>
+    private static TaxYearEvent MarketValue(TaxYearEvent none, ValuationLine? line)
+    {
+        if (line is null)
+        {
+            return none with { Status = TaxAmountStatus.NoPrice };
+        }
+
+        var status = line.Status switch
+        {
+            ValuationLineStatus.Valued => TaxAmountStatus.MarketValue,
+            ValuationLineStatus.StalePrice => TaxAmountStatus.StalePrice,
+            ValuationLineStatus.NoRate => TaxAmountStatus.NoRate,
+            ValuationLineStatus.StaleRate => TaxAmountStatus.StaleRate,
+            _ => TaxAmountStatus.NoPrice
+        };
+        return none with { Status = status, Amount = line.Value, Price = line.Price, Fx = line.Fx };
+    }
+
+    /// <summary>R18, R21: an NZD leg is used as booked; any other needs a row of the pair no older than the age limit.</summary>
+    private static (TaxAmountStatus Status, StoredRate? Rate) RateOf(
+        string currency, DateOnly date, IReadOnlyDictionary<(string Currency, DateOnly Date), StoredRate> rates)
+    {
+        if (currency == Nzd)
+        {
+            return (TaxAmountStatus.Stated, null);
+        }
+
+        if (!rates.TryGetValue((currency, date), out var rate))
+        {
+            return (TaxAmountStatus.NoRate, null);
+        }
+
+        return ValuationRules.IsFresh(rate.AsOfDate, date) ? (TaxAmountStatus.Converted, rate) : (TaxAmountStatus.StaleRate, rate);
+    }
+
+    /// <summary>The currency of every figure of a tax year (R31).</summary>
+    public const string Nzd = "NZD";
+
+    private static decimal Round(decimal amount, int places) => decimal.Round(amount, places, MidpointRounding.AwayFromZero);
 }
 
 /// <summary>R26: the treatment of an Instrument for the year, with what a report has to keep.</summary>
