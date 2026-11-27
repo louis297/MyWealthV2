@@ -2,6 +2,8 @@ using MyWealthV2.Application.Common.Models;
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.NetWorth;
 using MyWealthV2.Application.NetWorth.Queries.GetCustomerNetWorth;
+using MyWealthV2.Application.TaxYears;
+using MyWealthV2.Application.TaxYears.Queries.GetCustomerTaxYear;
 using MyWealthV2.Application.Users;
 using MyWealthV2.Application.Users.Commands.CreateCustomer;
 using MyWealthV2.Application.Users.Commands.DisableCustomer;
@@ -30,6 +32,7 @@ public class Customers : IEndpointGroup
         groupBuilder.MapGet(GetCustomers).RequireAuthorization(ManageOrOwn);
         groupBuilder.MapGet(GetCustomer, "{id}").RequireAuthorization(ManageOrOwn);
         groupBuilder.MapGet(GetCustomerNetWorth, "{id}/net-worth").RequireAuthorization(Policies.AccountsRead);
+        groupBuilder.MapGet(GetCustomerTaxYear, "{id}/tax-years/{taxYear}").RequireAuthorization(Policies.AccountsRead);
         groupBuilder.MapPost(CreateCustomer).RequireAuthorization(ManageOrOwn);
         groupBuilder.MapPut(UpdateCustomer, "{id}").RequireAuthorization(ManageOrOwn);
         groupBuilder.MapPost(DisableCustomer, "{id}/disable").RequireAuthorization(ManageOrOwn);
@@ -63,6 +66,14 @@ public class Customers : IEndpointGroup
     public static async Task<Ok<NetWorthDto>> GetCustomerNetWorth(ISender sender, Guid id)
     {
         var item = await sender.Send(new GetCustomerNetWorthQuery(id));
+        return TypedResults.Ok(item);
+    }
+
+    [EndpointSummary("Get a customer’s tax year")]
+    [EndpointDescription("Returns, per Instrument, the opening and closing quantity and NZD value of one ended tax year and the tax events between them.")]
+    public static async Task<Ok<CustomerTaxYearDto>> GetCustomerTaxYear(ISender sender, Guid id, string taxYear)
+    {
+        var item = await sender.Send(new GetCustomerTaxYearQuery(id, taxYear));
         return TypedResults.Ok(item);
     }
 

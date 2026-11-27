@@ -124,6 +124,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<MyWealthV2.Application.Interest.Runs.IRunInterest, MyWealthV2.Application.Interest.Runs.RunInterest>();
         builder.Services.AddScoped<MyWealthV2.Application.Valuations.IAccountPositions, MyWealthV2.Application.Valuations.AccountPositions>();
         builder.Services.AddScoped<MyWealthV2.Application.Valuations.IValueAccount, MyWealthV2.Application.Valuations.ValueAccount>();
+        builder.Services.AddScoped<MyWealthV2.Application.TaxYears.ICustomerTaxLedger, MyWealthV2.Application.TaxYears.CustomerTaxLedger>();
         builder.Services.AddScoped<MyWealthV2.Application.Valuations.Runs.IStoreAccountValuations, MyWealthV2.Application.Valuations.Runs.StoreAccountValuations>();
         builder.Services.AddScoped<MyWealthV2.Application.Valuations.Runs.IRunValuations, MyWealthV2.Application.Valuations.Runs.RunValuations>();
         builder.Services.Configure<MyWealthV2.Application.Interest.Runs.InterestOptions>(
