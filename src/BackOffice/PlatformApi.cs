@@ -427,7 +427,7 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
             cancellationToken);
 
     public Task<IReadOnlyList<CountryItem>> ListCountriesAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<CountryItem>>([]);
+        ReadAsync<IReadOnlyList<CountryItem>>(HttpMethod.Get, "/countries", json: null, cancellationToken);
 
     public Task SetInstrumentTaxAttributesAsync(
         Guid id,
@@ -435,7 +435,11 @@ public sealed class PlatformApi(HttpClient api, IAccessTokens access, BackOffice
         IReadOnlyList<FifTreatmentItem> fifTreatments,
         string rowVersion,
         CancellationToken cancellationToken = default) =>
-        Task.CompletedTask;
+        SendExpectingSuccessAsync(
+            HttpMethod.Put,
+            $"/instruments/{id}/tax-attributes",
+            JsonSerializer.Serialize(new { issuerCountry, fifTreatments, rowVersion }, Json),
+            cancellationToken);
 
     private static string RowVersion(string rowVersion) =>
         JsonSerializer.Serialize(new { rowVersion }, Json);
