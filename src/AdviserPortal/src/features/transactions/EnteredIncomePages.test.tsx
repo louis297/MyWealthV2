@@ -60,7 +60,7 @@ const enteredInterest = {
   ],
 };
 
-function detail(posting: typeof enteredDividend) {
+function detail(posting: { id: string; [field: string]: unknown }) {
   renderFees(feeUser({ role: "adviser" }), [{ path: "/transactions/:id", element: <TransactionDetailPage /> }],
     `/transactions/${posting.id}`,
     (request) => (new URL(request.url).pathname === `/api/transactions/${posting.id}` ? json(posting) : undefined));
@@ -87,13 +87,13 @@ describe("Income entered on an External account (external-income D113)", () => {
   });
 
   it("shows the amount per share when it was entered", async () => {
-    detail({ ...enteredDividend, dividend: { ...enteredDividend.dividend, amountPerShare: 2 } } as typeof enteredDividend);
+    detail({ ...enteredDividend, dividend: { ...enteredDividend.dividend, amountPerShare: 2 } });
 
     expect(await screen.findByText("1000 shares × 2.00")).toBeInTheDocument();
   });
 
   it("shows a hand Interest with its gross, each tax with its rate, and the net", async () => {
-    detail(enteredInterest as typeof enteredDividend);
+    detail(enteredInterest);
 
     const block = within((await screen.findByRole("heading", { name: "Interest" })).closest("section")!);
     expect(block.getByText("12.34 NZD")).toBeInTheDocument();

@@ -135,19 +135,21 @@ export type TransactionExecution = {
 };
 
 /**
- * dividends R39: the dividend a Dividend pays. Amounts are in `currency`, the dividend's currency.
+ * dividends R39: the dividend a Dividend pays. Amounts are in `currency`, the dividend's currency. A dividend entered
+ * by hand on an External account has no corporate action, and may have no amount per share and no ex-date
+ * (external-income R26).
  */
 export type TransactionDividend = {
-  corporateActionId: string;
+  corporateActionId: string | null;
   instrument: { id: string; symbol: string; name: string };
   quantity: number;
-  amountPerShare: number;
+  amountPerShare: number | null;
   currency: string;
   taxSource: string;
   imputationCredit: number;
   reinvestedQuantity: number | null;
   reinvestmentPrice: number | null;
-  exDate: string;
+  exDate: string | null;
   recordDate: string | null;
   paymentDate: string | null;
 };

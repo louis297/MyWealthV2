@@ -14,6 +14,8 @@ import {
   type TransactionSecurity,
 } from "@/features/transactions/transactionsApi";
 import { shortDay } from "@/features/orders/orderLabels";
+import { useGetCurrenciesQuery } from "@/features/currencies/currenciesApi";
+import { formatMoney, sumAmounts } from "@/shared/format/money";
 import { Pager } from "@/shared/components/Pager";
 import { formatInstant } from "@/shared/time/instant";
 
@@ -26,6 +28,21 @@ function cashText(cash: TransactionCash[]) {
   return cash
     .map((leg) => `${leg.role === "Fee" ? "fee " : leg.role === "Tax" ? "tax " : ""}${leg.amount} ${leg.currency}`)
     .join(", ");
+}
+
+/**
+ * interest-run D61, external-income D113: a row with `Tax` legs shows its net, and the tax withheld under it, as a fee
+ * is shown on the account page.
+ */
+function TaxedCash({ cash, places }: { cash: TransactionCash[]; places: (code: string) => number | undefined }) {
+  const currency = cash[0]?.currency ?? "";
+  const tax = Math.abs(sumAmounts(cash.filter((leg) => leg.role === "Tax").map((leg) => leg.amount)));
+  return (
+    <>
+      {formatMoney(sumAmounts(cash.map((leg) => leg.amount)), currency, places(currency))}
+      <p className="text-muted-foreground text-xs">{`incl. tax ${formatMoney(tax, currency, places(currency))}`}</p>
+    </>
+  );
 }
 
 function securityText(security: TransactionSecurity[]) {
@@ -52,6 +69,8 @@ export function TransactionsListPage() {
     customerId: customerId || undefined,
   });
   const notFound = isNotFound(error);
+  const currencies = useGetCurrenciesQuery();
+  const places = (code: string) => currencies.data?.find((item) => item.code === code)?.decimalPlaces;
 
   function updateParam(key: string, value: string | null) {
     const updated = new URLSearchParams(params);
@@ -108,7 +127,7 @@ export function TransactionsListPage() {
                     <TableRow key={item.id}>
                       <TableCell>
                         <Link to={`/transactions/${item.id}`} className={recordLinkClass}>
-                          {item.corporateAction ? transactionTypeLabel(item) : item.type}
+                          {item.corporateAction || item.dividend ? transactionTypeLabel(item) : item.type}
                         </Link>
                       </TableCell>
                       <TableCell>{formatInstant(item.bookedAt)}</TableCell>
@@ -131,7 +150,9 @@ export function TransactionsListPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {cashText(item.cash)}
+                        {item.cash.some((leg) => leg.role === "Tax")
+                          ? <TaxedCash cash={item.cash} places={places} />
+                          : cashText(item.cash)}
                         {/* D74: a fill that has not settled. */}
                         {item.execution && !item.execution.settledAt ? (
                           <p className="text-muted-foreground text-xs">{`Settles ${shortDay(item.execution.settlementDate)}`}</p>
