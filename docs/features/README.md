@@ -157,6 +157,16 @@ Roadmap in [future-plans.md](../future-plans.md) §1. Each step amends the ledge
 
 ---
 
+## Business domain — income events (opened 2026-11-27)
+
+Step 2 of the roadmap in [future-plans.md](../future-plans.md) §1. Income on Custodial accounts landed with the custodial roadmap: [interest-run](interest-run.md) and [dividends](dividends.md), in the table further down. This section holds what is left: income on External accounts.
+
+| Spec | Status | Who | Ships | Why it stays its own slice |
+| --- | --- | --- | --- | --- |
+| [external-income](external-income.md) | review (2026-11-27) | Adviser (assigned Customers), TenantAdmin and SystemAdmin (`transactions.create`); the Customer reads | A dividend entered by hand on an External account, `POST /transactions/dividend`: the Instrument, the shares, the gross, each tax withheld (`Rwt`, `Nrwt`, `ForeignWithholding`) as a `Tax` leg with its tax detail, the imputation credit in the dividend detail, and the caller's `fxRate` when the dividend is in another currency than the Account's. No security leg and no holding check. A hand `Interest` on an External account takes `taxes`; its amount is then the gross. Every number is the caller's: the tax profile is not read and no rate is applied. The amount per share and the ex-date of a dividend detail become optional. Script `0060`. No permission, type, tax kind, job, simulator or BFF change | The Custodial flows work the tax out and take the dividend from a corporate action; hand entry records what an outside payer did. It closes step 2 of the business roadmap and gives the later tax reports one shape for both custody modes |
+
+---
+
 ## Business domain — historical valuation (opened 2026-11-25)
 
 Step 3 of the roadmap in [future-plans.md](../future-plans.md) §1. Its own plan is [valuation-roadmap.md](../roadmaps/valuation-roadmap.md) (`note`): four items, V1 to V4.
