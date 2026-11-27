@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-22
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../future-plans.md
   - ../adr/0021-outside-parties-behind-ports.md
   - customers.md
@@ -40,7 +40,7 @@ related:
 
 # Interest run
 
-Step 9 of [custodial-roadmap.md](../custodial-roadmap.md) §13. It covers roadmap items **I1** (minimal Customer tax profile), **I2** (interest run) and the **S1 trust interest** part of the simulator bank. It answers roadmap D12 (the interest margin) and the "Open" of B7 (how the bank reconciliation shows interest). The interest run calls no outside party. The bank's interest on the trust account arrives through the existing bank feed and follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 7–10. It amends [customers.md](customers.md), [posting.md](posting.md), [trade-fees.md](trade-fees.md), [custody-modes.md](custody-modes.md), [transaction-source.md](transaction-source.md), [accounts.md](accounts.md), [account-closure.md](account-closure.md), [deposit-matching.md](deposit-matching.md), [bank-reconciliation.md](bank-reconciliation.md), [reports.md](reports.md), [simulator.md](simulator.md) and the Adviser Portal, Customer Portal and Back Office contracts.
+Step 9 of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13. It covers roadmap items **I1** (minimal Customer tax profile), **I2** (interest run) and the **S1 trust interest** part of the simulator bank. It answers roadmap D12 (the interest margin) and the "Open" of B7 (how the bank reconciliation shows interest). The interest run calls no outside party. The bank's interest on the trust account arrives through the existing bank feed and follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 7–10. It amends [customers.md](customers.md), [posting.md](posting.md), [trade-fees.md](trade-fees.md), [custody-modes.md](custody-modes.md), [transaction-source.md](transaction-source.md), [accounts.md](accounts.md), [account-closure.md](account-closure.md), [deposit-matching.md](deposit-matching.md), [bank-reconciliation.md](bank-reconciliation.md), [reports.md](reports.md), [simulator.md](simulator.md) and the Adviser Portal, Customer Portal and Back Office contracts.
 
 A TenantAdmin sets, per currency, an **interest rate schedule**: marginal bands of annual rates, effective from a date. Every day the platform works out, for each Custodial account, the interest its closing cash balance earned that day (a **daily accrual**) and stores it. After each calendar month the platform posts the accruals of the account as one `Interest` Transaction: the gross interest as the principal cash leg, and the **withholding tax** as a second cash leg with role `Tax`. The tax kind and rate come from the Customer's **tax profile** at that moment. An Adviser or TenantAdmin keeps the tax profile: tax residency, whether the firm holds the Customer's IRD number, and the RWT rate the Customer chose. One execution of this work for one Tenant is an **interest run**; it is stored and is the source of the Transactions it posts.
 
@@ -125,8 +125,8 @@ The rule that distinguishes this slice: interest is earned per day and paid per 
 - Holders that are not individuals: companies (28 % default), trustees, Māori authorities, joint holders. RWT-exempt status. They need the legal structure of the holder, which the roadmap leaves out (§10 there)
 - A reduced NRWT rate under a double tax agreement, and the approved issuer levy. An overseas Customer is withheld at 15 % (R4)
 - Paying the withheld tax to Inland Revenue, the investment income report to Inland Revenue, and a tax certificate or year-end tax statement for the Customer
-- Recording withholding tax on a hand-entered `Interest` of an External account (income events, future-plans §1 step 2)
-- Dividends on External accounts. Dividends on Custodial accounts are [dividends.md](dividends.md), which reuses the `Tax` leg and the tax detail of R25
+- Recording withholding tax on a hand-entered `Interest` of an External account: [external-income.md](external-income.md)
+- Dividends. Dividends on Custodial accounts are [dividends.md](dividends.md) and on External accounts [external-income.md](external-income.md); both reuse the `Tax` leg and the tax detail of R25
 - Passing the bank's trust interest through to Customers, a fee on interest, and a computed margin figure (§11 point 6)
 - Interest on negative balances (a Custodial balance is never negative), and negative rates
 - Per-Customer, per-Account or per-portfolio rates. A platform default schedule
@@ -134,7 +134,7 @@ The rule that distinguishes this slice: interest is earned per day and paid per 
 - A flow that reverses an interest posting. A wrong posting is corrected with an adjustment (R27)
 - Running the manual trigger on the `worker` queue (§11 point 12)
 - Named scenarios and the scenario library in the simulator
-- Any change to External accounts: they keep hand `Interest` as it is
+- Any change to External accounts: they keep hand `Interest`, whose tax is [external-income.md](external-income.md)
 
 ---
 
@@ -218,11 +218,11 @@ Amendment to [posting.md](posting.md), [trade-fees.md](trade-fees.md) (cash leg 
 | R22 | **Posting.** `accrued` = the sum of those rows. `gross = Round(accrued, dp, AwayFromZero)`, `dp` the currency's `DecimalPlaces`. When `gross` is `0`, nothing is posted and the rows stay unposted, so they count in the next posting. Otherwise the platform posts one `Interest` Transaction (R23) and stamps every row with it, in the same database transaction as R19. The part of `accrued` that rounding takes or adds is not carried forward. |
 | R23 | **The Transaction.** Type `Interest`, with one `Principal` cash leg on the Account of `+gross`; when the tax of R24 is above 0, a second cash leg with role `Tax` of `−tax` and its tax detail (R25); an interest detail (R26); source `InterestRun` (6) with the run's PublicId as source id; `bookedAt` = platform time when it is posted (ADR 0021 rule 10); memo `Interest`; `reference` `null`. Built by `Transaction.PostInterest` without the manual entry matrix (custody-modes R7). `CreatedBy` is the worker's system name for the daily job, the person for a manual run or an account closure (R33). |
 | R24 | **Withholding at posting.** The tax kind and rate are R4 for the Customer's tax profile when the Transaction is built. `tax = Round(gross × ratePercent / 100, dp, AwayFromZero)`, in the Account's currency. When `tax` is `0`, the Transaction has no `Tax` leg and no tax detail. Inland Revenue's pages state no rounding rule for the amount; the half-up rounding of the platform is used (§11 point 10). |
-| R25 | **`Tax` cash leg and tax detail.** `CashLegRole` gains `Tax = 2`: an amount withheld from the Transaction's income and owed to a tax authority, always negative on the Account. Every `Tax` leg has exactly one tax detail, and no other leg has one: tax kind (`Rwt`, `Nrwt`), rate percent, basis amount (the gross the tax was computed on), tax amount and currency. At most one tax detail per `(Transaction, kind)`. In this slice a `Tax` leg appears only on an `Interest` posted by an interest run; the Domain refuses it on every other type. Dividends (roadmap C2) reuse the role and the detail and add their kinds. `TaxKind` also has `ForeignWithholding` (2). A `Tax` leg is allowed on `Interest` (kinds `Rwt`, `Nrwt`) and on `Dividend` (all three kinds) and on no other type (dividends R38). `WithholdingRates` also holds the dividend rates: RWT 33 % for every New Zealand Customer, NRWT 30 % for an overseas Customer on a New Zealand company's dividend; the rates of interest are as above (dividends R33). |
+| R25 | **`Tax` cash leg and tax detail.** `CashLegRole` gains `Tax = 2`: an amount withheld from the Transaction's income and owed to a tax authority, always negative on the Account. Every `Tax` leg has exactly one tax detail, and no other leg has one: tax kind (`Rwt`, `Nrwt`), rate percent, basis amount (the gross the tax was computed on), tax amount and currency. At most one tax detail per `(Transaction, kind)`. In this slice a `Tax` leg appears only on an `Interest` posted by an interest run; the Domain refuses it on every other type. Dividends (roadmap C2) reuse the role and the detail and add their kinds. `TaxKind` also has `ForeignWithholding` (2). A `Tax` leg is allowed on `Interest` and on `Dividend`, of all three kinds on both, and on no other type (dividends R38, [external-income.md](external-income.md) R9). A `ForeignWithholding` leg on an `Interest` comes only from hand entry on an External account; an interest run withholds `Rwt` or `Nrwt` (R24). `WithholdingRates` also holds the dividend rates: RWT 33 % for every New Zealand Customer, NRWT 30 % for an overseas Customer on a New Zealand company's dividend; the rates of interest are as above (dividends R33). |
 | R26 | **Interest detail.** Every interest posting has exactly one interest detail: `periodFrom` and `periodTo` (the earliest and latest day of the rows it paid), `days` (the number of rows), `accruedAmount` (8 decimals) and `grossAmount`. The rows themselves say which schedule and rate each day used (R36). |
 | R27 | **No reversal by hand, none by the flow.** `InterestRun` is not a hand-reversible source (transaction-source R12): `POST /transactions/{id}/reverse` of an interest posting → 400 by transaction-source R13. No flow of this slice reverses one; a wrong posting is corrected with an adjustment ([adjustments.md](adjustments.md)). `Transaction.Reverse` copies a `Tax` leg with its role and tax detail and copies the interest detail, as it copies a fee detail (trade-fees R19), so a later flow can undo its own posting. |
 | R28 | **Cash rules.** The net of an interest posting is never negative (the highest rate is 45 %), so available cash only rises (withdrawals R36). The portfolio trade lock does not apply and no rebalance is enqueued, as for a deposit (deposit-matching R19). |
-| R29 | **Matrix.** The manual entry matrix cell `Interest` / Custodial stays **refused** (custody-modes R5); its "written by" is now the interest run. External accounts are unchanged: a hand `Interest` there has one `Principal` leg and no `Tax` leg. |
+| R29 | **Matrix.** The manual entry matrix cell `Interest` / Custodial stays **refused** (custody-modes R5); its "written by" is now the interest run. On an External account a hand `Interest` has one `Principal` leg and may have `Tax` legs, one per tax the caller entered ([external-income.md](external-income.md) R22, R23). |
 
 ### 4.6 An interest run (I2)
 
@@ -610,7 +610,7 @@ Page contracts: [adviser-portal-dashboard.md](../adviser-portal/adviser-portal-d
 | --- | --- | --- | --- |
 | C28 | A Customer | Profile page | A "Tax details" section from `GET /users/me/tax-profile`: Tax residency, IRD number ("On file" / "Not on file"), RWT rate, and "Tax taken from your interest: <rate> %". Under it: "To change these details, contact your adviser." No form. |
 | C29 | A Customer with a Custodial account whose `accruedInterest` is above 0 | Account page | "Interest earned so far this period: <amount>" (the currency's minor unit, rounded down) under the balance, with "Paid after the end of the month." |
-| C30 | A Customer with an interest posting | Account page activity | The row is labelled "Interest" with its period, and shows Gross, "Tax withheld (<kind label> <rate> %)" and the net amount. A hand-entered `Interest` on an External account keeps today's row. |
+| C30 | A Customer with an interest posting | Account page activity | The row is labelled "Interest" with its period, and shows Gross, "Tax withheld (<kind label> <rate> %)" and the net amount. A hand-entered `Interest` on an External account has no period; with tax it shows the row of customer-portal C49. |
 
 **Back Office**
 
@@ -714,3 +714,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-24 | [dividends.md](dividends.md) | R25, R41: tax legs on a `Dividend`; the dividend withholding rates |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
 | 2026-11-26 | [account-valuation.md](account-valuation.md) | R16: the day balance is the cash of the position of a day; the end of a day comes from `LedgerDay`. No rule changed |
+| 2026-11-27 | [external-income.md](external-income.md) | R25: a `Tax` leg on `Interest` may be of all three kinds. R29: a hand `Interest` on an External account may have `Tax` legs. §2 Out. C30 |

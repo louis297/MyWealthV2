@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-22
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
   - withdrawals.md
   - bank-returns.md
@@ -40,7 +40,7 @@ related:
 
 # Account closure
 
-Step 8 of [custodial-roadmap.md](../custodial-roadmap.md) §13. It covers roadmap item **B8** (account closure flow). It needs no outside party of its own: the money leaves through the withdrawal of [withdrawals.md](withdrawals.md), and the flow follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 12–14 through it. It amends [accounts.md](accounts.md), [posting.md](posting.md), [custody-modes.md](custody-modes.md), [transaction-source.md](transaction-source.md), [withdrawals.md](withdrawals.md), [deposit-matching.md](deposit-matching.md), [portfolios.md](portfolios.md), [adjustments.md](adjustments.md), [internal-transfers.md](internal-transfers.md), [fx-conversions.md](fx-conversions.md) and the Adviser Portal and Customer Portal contracts.
+Step 8 of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13. It covers roadmap item **B8** (account closure flow). It needs no outside party of its own: the money leaves through the withdrawal of [withdrawals.md](withdrawals.md), and the flow follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 12–14 through it. It amends [accounts.md](accounts.md), [posting.md](posting.md), [custody-modes.md](custody-modes.md), [transaction-source.md](transaction-source.md), [withdrawals.md](withdrawals.md), [deposit-matching.md](deposit-matching.md), [portfolios.md](portfolios.md), [adjustments.md](adjustments.md), [internal-transfers.md](internal-transfers.md), [fx-conversions.md](fx-conversions.md) and the Adviser Portal and Customer Portal contracts.
 
 An Adviser or TenantAdmin requests an **account closure** for a Custodial account that holds nothing and has nothing in progress. The platform splits the cash balance into the **payout**, the part that is a whole number of the currency's minor unit, and the **remainder** below it. When there is a payout, the closure creates an ordinary withdrawal of it to a verified nominated bank account of the Customer, and the account is **closing**: it accepts no new activity until the closure ends. When the bank statement shows the payment, the platform posts the payout, writes off the remainder, and closes the account, in one database transaction. When there is no payout, the platform writes off the remainder and closes the account at once. From this slice on, no person enters a `CloseOut` on a Custodial account, and `POST /accounts/{id}/close` no longer closes one.
 

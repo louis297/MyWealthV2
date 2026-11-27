@@ -10,7 +10,7 @@ This is a learning and showcase project. The design lives in [`docs/`](docs/): e
 
 - **Firms and people.** A SystemAdmin runs the platform and its tenants (advice firms). Each tenant has TenantAdmins, Advisers and Customers.
 - **Ledger.** Accounts with a journal of cash and security legs: transfers, interest, dividends, buys and sells, corporate actions, reversals, internal transfers and FX conversions.
-- **Custody modes.** An account is `External` (held elsewhere, recorded by the adviser) or `Custodial` (held by the firm, which runs the money and the trades).
+- **Custody modes.** An account is `External` (held elsewhere, recorded by the adviser, who enters the outside party's numbers: prices, fees, FX rates, and dividends and interest with the tax withheld) or `Custodial` (held by the firm, which runs the money and the trades).
 - **Custodial operations.** Client money accounts, deposit matching, withdrawals approved by a second person, bank and custodian reconciliation, orders and settlement through a broker, in-kind transfers, interest runs, corporate actions and dividends.
 - **Holdings, net worth and valuation.** Average-cost holdings, net worth per currency, a daily valuation of every Custodial account, and funds under management over time in the firm's reporting currency.
 - **Model portfolios and fees.** Target weights rebalanced through orders, and trade fee schedules per tenant.
@@ -22,15 +22,15 @@ The full feature map is in [`docs/function-plan.md`](docs/function-plan.md), and
 
 ## Status
 
-The platform foundation, the ledger, reports, the Customer Portal, custody modes, most of the Custodial roadmap, trade fees and historical valuation have landed. The showcase is deployed on one VPS with Docker Compose behind Caddy, by GitHub Actions.
+The platform foundation, the ledger, reports, the Customer Portal, custody modes, most of the Custodial roadmap, trade fees, historical valuation and income events (dividends and interest with their tax, on both custody modes) have landed. The showcase is deployed on one VPS with Docker Compose behind Caddy, by GitHub Actions.
 
 Next: an end-to-end run across all outside parties, then the advisory fee, performance reports (TWR / MWR) and the FIF tax report.
 
 | For | See |
 |-----|-----|
 | Feature Specs and their status | [`docs/features/README.md`](docs/features/README.md) |
-| Custodial account work | [`docs/custodial-roadmap.md`](docs/custodial-roadmap.md) |
-| Historical valuation | [`docs/valuation-roadmap.md`](docs/valuation-roadmap.md) |
+| Custodial account work | [`docs/roadmaps/custodial-roadmap.md`](docs/roadmaps/custodial-roadmap.md) |
+| Historical valuation | [`docs/roadmaps/valuation-roadmap.md`](docs/roadmaps/valuation-roadmap.md) |
 | What comes later | [`docs/future-plans.md`](docs/future-plans.md) |
 | Accepted gaps | [`docs/known-issues/`](docs/known-issues/README.md) |
 

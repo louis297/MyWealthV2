@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-24
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
   - posting.md
   - holdings.md
@@ -37,7 +37,7 @@ related:
 
 # Migration batches
 
-Step 13 of [custodial-roadmap.md](../custodial-roadmap.md) §13. It covers roadmap item **T2** (migration batch). It needs no outside party of its own and makes no change to the simulator: the cash of a batch arrives through the bank feed of [deposit-matching.md](deposit-matching.md), as an ordinary receipt on the trust account. It builds on the `Opening` and `OpeningHoldings` types of [posting.md](posting.md) and [holdings.md](holdings.md), the source of [transaction-source.md](transaction-source.md) and the run of [bank-reconciliation.md](bank-reconciliation.md).
+Step 13 of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13. It covers roadmap item **T2** (migration batch). It needs no outside party of its own and makes no change to the simulator: the cash of a batch arrives through the bank feed of [deposit-matching.md](deposit-matching.md), as an ordinary receipt on the trust account. It builds on the `Opening` and `OpeningHoldings` types of [posting.md](posting.md) and [holdings.md](holdings.md), the source of [transaction-source.md](transaction-source.md) and the run of [bank-reconciliation.md](bank-reconciliation.md).
 
 Today a Custodial account starts empty and stays empty until a Customer pays in and an order is filled. A firm that moves its existing Customers onto the platform has no way to bring their cash and holdings with them. After this slice a TenantAdmin prepares a **migration batch**: one entry per empty Custodial account with its opening cash and holdings, and the **control totals** typed from the previous provider's closing statement. The bulk transfer the previous provider pays into the trust account is matched to the batch as its **funding**. A second TenantAdmin posts the batch. The platform then writes one `Opening` and one `OpeningHoldings` Transaction per account, all of them or none.
 

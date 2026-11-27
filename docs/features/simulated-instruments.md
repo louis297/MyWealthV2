@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-22
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
   - corporate-actions.md
   - simulator.md
@@ -28,7 +28,7 @@ related:
 
 # Simulated instruments
 
-Step 10a of [custodial-roadmap.md](../custodial-roadmap.md) §13. It covers roadmap decision **D11** (where the simulator gets prices) and the data vendor half of **S4** (issuer and data vendor). It is the first of the two specs of step 10; the second is [corporate-actions.md](corporate-actions.md) (C1 and the issuer half of S4), which builds on this one. It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–4, 11, 15–19 and 21–23. It amends [instrument-prices.md](instrument-prices.md), [instruments.md](instruments.md), [simulator.md](simulator.md) and the Back Office contract.
+Step 10a of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13. It covers roadmap decision **D11** (where the simulator gets prices) and the data vendor half of **S4** (issuer and data vendor). It is the first of the two specs of step 10; the second is [corporate-actions.md](corporate-actions.md) (C1 and the issuer half of S4), which builds on this one. It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–4, 11, 15–19 and 21–23. It amends [instrument-prices.md](instrument-prices.md), [instruments.md](instruments.md), [simulator.md](simulator.md) and the Back Office contract.
 
 The simulator gets its second outside party, the **simulator market**. It holds **simulated instruments**: made-up symbols that end in `.SIM`, each with a price that moves once per simulator day by a seeded random step. The platform reads those prices through a new port, **market prices**, on a named **market data connection**. A connection has a symbol suffix; an instrument of any Tenant whose symbol ends with that suffix is served by the connection, and its prices come from there and not from EODHD. Nothing else about such an instrument is special: it is an ordinary catalog row, it can be bought, sold, held and rebalanced, and `IMarketData` reads its price from `InstrumentPrices` as for every other instrument.
 

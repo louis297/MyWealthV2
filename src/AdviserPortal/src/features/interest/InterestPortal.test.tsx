@@ -413,7 +413,8 @@ describe("Interest (interest-run D58–D63)", () => {
       renderFees(feeUser(), [{ path: "/transactions", element: <TransactionsListPage /> }], "/transactions", (request) =>
         path(request) === "/api/transactions" ? json({ items: [posting], page: 1, pageSize: 20, totalCount: 1 }) : undefined);
 
-      expect(await screen.findByText(/tax -2\.16 USD/)).toBeInTheDocument();
+      // D61, external-income D113: the net, with the tax withheld under it.
+      expect(await screen.findByText("incl. tax 2.16 USD")).toBeInTheDocument();
     });
   });
 

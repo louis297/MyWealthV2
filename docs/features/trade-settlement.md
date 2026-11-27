@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-23
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
   - orders.md
   - bank-reconciliation.md
@@ -37,7 +37,7 @@ related:
 
 # Trade settlement cash and broken trades
 
-Step 11b of [custodial-roadmap.md](../custodial-roadmap.md) §13. It finishes the two parts that [orders.md](orders.md) (step 11) left out: §11 point 1, paying and receiving the cash of settled trades through the client money account and reconciling it, and §11 point 12, a trade the broker breaks after it was filled. It reuses the broker feed and the fills of [orders.md](orders.md), the outgoing payment, the `IBankPayments` port and the send step of [withdrawals.md](withdrawals.md), the statement lines of [deposit-matching.md](deposit-matching.md) and the run of [bank-reconciliation.md](bank-reconciliation.md). It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20 and does not re-decide them.
+Step 11b of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13. It finishes the two parts that [orders.md](orders.md) (step 11) left out: §11 point 1, paying and receiving the cash of settled trades through the client money account and reconciling it, and §11 point 12, a trade the broker breaks after it was filled. It reuses the broker feed and the fills of [orders.md](orders.md), the outgoing payment, the `IBankPayments` port and the send step of [withdrawals.md](withdrawals.md), the statement lines of [deposit-matching.md](deposit-matching.md) and the run of [bank-reconciliation.md](bank-reconciliation.md). It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20 and does not re-decide them.
 
 When the broker settles the fills of a day, it nets them per trust account and currency into one **broker settlement** and reports it on the broker feed. The platform works out the same net from its own fills and stores a **trade settlement**. When the firm owes the broker, the `worker` pays the net from the client money account; when the broker owes the firm, the platform waits for the broker's receipt on the bank statement. Either way the statement line is matched to the trade settlement, with no Transaction: the fills were posted when they were reported. The bank reconciliation then explains the cash of order fills by their settlement instead of listing it as the known difference `Trades`.
 

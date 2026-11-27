@@ -449,7 +449,7 @@ Field rules: [dividends](../features/dividends.md). Calls: the existing `/corpor
 | D97 | "Apply now" on a Manual dividend reads "Fix the entitlements now". A dividend that waits for shares offers "Pay in cash" to a TenantAdmin, with a required note. |
 | D98 | The Suspense page offers "Match to a dividend" on a credit line; a `DividendMismatch` line is labelled "Names a dividend but does not fit it"; a line matched to a dividend links to it and offers no action. |
 | D99 | The page of a Custodial account shows "Reinvest dividends" with a switch for a caller with `accounts.manage`, "Not used while the account follows a portfolio." on an assigned account, and "<n> dividend(s) to be paid". |
-| D100 | `/transactions/:id` of a `Dividend` shows the dividend, each tax leg, the imputation credit, the reinvestment and the net, with a link to the corporate action; the Source line shows "Corporate action"; Reverse is not offered. |
+| D100 | `/transactions/:id` of a `Dividend` shows the dividend, each tax leg, the imputation credit, the reinvestment and the net, with a link to the corporate action; the Source line shows "Corporate action"; Reverse is not offered. A hand-entered dividend on an External account: D113. |
 | D101 | The bank reconciliation page labels `DividendsNotPosted` and `DividendDifference`. |
 
 The full wording is [dividends.md](../features/dividends.md) §9.
@@ -479,6 +479,16 @@ Field rules: [valuation-history](../features/valuation-history.md). Calls: `GET 
 | D109 | `/accounts/:id` of a Custodial account: a chart "Value over the last 90 days" from `GET /accounts/{id}/valuations?from=&to=&pageSize=100` (`to` the account's `valuedThrough`, `from` 89 days before it), in the account's currency, oldest day first, with the hollow marker for `complete` `false` ("Some holdings were not valued on this day."). With `valuedThrough` `null`: "Not valued yet. The first value appears two days after the account was opened." An External account shows no chart. |
 
 ---
+
+### Income on External accounts
+
+Field rules: [external-income](../features/external-income.md). Calls: `POST /transactions/dividend` and `POST /transactions` with `taxes`, under the existing `/transactions` prefix, and the existing instrument and transaction reads; the BFF does not change.
+
+| ID | Behaviour |
+| --- | --- |
+| D111 | On an External account the type selector of `/accounts/:id/transactions/new` (D18) offers "Dividend". The form has: an instrument picker; "Shares"; "Gross amount (<quote currency>)"; an optional "Amount per share (<quote currency>)"; "Company" ("New Zealand" / "Foreign", nothing preselected); "Imputation credit (<quote currency>)", shown only with New Zealand; a "Tax withheld" list where "Add tax" adds a row of Kind, Rate % and Amount (<quote currency>), up to three rows; only when the quote currency differs from the Account currency, a required "FX rate" labelled "1 <quote currency> = ? <Account currency>" (as D22); "Booked at"; optional Ex-date, Record date and Payment date; Memo and Reference. The Kind options follow the Company: New Zealand offers "RWT" and "NRWT", Foreign offers "Foreign tax" and "RWT". Under the list the form shows "Net <amount> <quote currency>" as display text; it does no other arithmetic and fills in no rate or amount. Submit posts `POST /transactions/dividend` with one `Idempotency-Key` per form open. A 400 is shown at its input; `errors.Taxes` under the list. The portal's copy of the matrix (D18) allows `Dividend` on an External account. A Custodial account never offers it. |
+| D112 | On an External account the type selector of D18 offers "Interest", whose form has an "Amount (<Account currency>)" input (posting R20: either sign without tax), "Booked at", Memo, Reference and the "Tax withheld" list of D111, with amounts in the Account currency and Kind "RWT", "NRWT" or "Foreign tax". With at least one row the amount input is labelled "Gross interest" and must be above 0, and "Net <amount>" is shown under the list. The POST carries `taxes` only when the list has a row. |
+| D113 | `/transactions/:id` of a hand-entered dividend shows what D100 shows for a Custodial one, with these differences: the Source line (D26) reads "Entered by hand"; there is no link to a corporate action; the shares line reads "<quantity> shares × <amountPerShare>" or, with no amount per share, "<quantity> shares"; a date that was not entered is not shown; Reverse is offered by D27. A hand-entered `Interest` with tax shows Gross, each tax as "<kind label> <rate> %" with its amount, and Net. The transactions list and account activity show "Dividend <symbol>" or "Interest" with the net and "incl. tax <amount>" under it, as D61. |
 
 ## Tests
 
@@ -527,3 +537,4 @@ What changed in this file after it was accepted. Each row is a subsection of "Ac
 | 2026-11-25 | [adjustment-review](../features/adjustment-review.md) | Adjustment review |
 | 2026-11-26 | [valuation-history](../features/valuation-history.md) | Valuation history |
 | 2026-11-26 | — | The amendments became the subsections above, and the rows they changed (D10, D15, D18, D26, D27, D29, D31, D39, D44, D53, D69) now state the current behaviour. No behaviour changed |
+| 2026-11-27 | [external-income](../features/external-income.md) | Income on External accounts |

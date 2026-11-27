@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-23
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
   - buy-sell.md
   - trade-fees.md
@@ -53,7 +53,7 @@ related:
 
 # Orders and settlement
 
-Step 11 of [custodial-roadmap.md](../custodial-roadmap.md) §13. It covers roadmap items **O1** (orders) and **O2** (settlement), with the simulator broker (**S2**). It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20 and does not re-decide them. It amends [buy-sell.md](buy-sell.md), [trade-fees.md](trade-fees.md), [holdings.md](holdings.md), [posting.md](posting.md), [custody-modes.md](custody-modes.md), [transaction-source.md](transaction-source.md), [withdrawals.md](withdrawals.md), [internal-transfers.md](internal-transfers.md), [fx-conversions.md](fx-conversions.md), [account-closure.md](account-closure.md), [portfolios.md](portfolios.md), [corporate-actions.md](corporate-actions.md), [adjustments.md](adjustments.md), [tenants.md](tenants.md), [accounts.md](accounts.md), [simulator.md](simulator.md) and the Adviser Portal, Customer Portal and Back Office contracts.
+Step 11 of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13. It covers roadmap items **O1** (orders) and **O2** (settlement), with the simulator broker (**S2**). It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20 and does not re-decide them. It amends [buy-sell.md](buy-sell.md), [trade-fees.md](trade-fees.md), [holdings.md](holdings.md), [posting.md](posting.md), [custody-modes.md](custody-modes.md), [transaction-source.md](transaction-source.md), [withdrawals.md](withdrawals.md), [internal-transfers.md](internal-transfers.md), [fx-conversions.md](fx-conversions.md), [account-closure.md](account-closure.md), [portfolios.md](portfolios.md), [corporate-actions.md](corporate-actions.md), [adjustments.md](adjustments.md), [tenants.md](tenants.md), [accounts.md](accounts.md), [simulator.md](simulator.md) and the Adviser Portal, Customer Portal and Back Office contracts.
 
 An Adviser no longer types a `Buy` or a `Sell` on a Custodial account. The Adviser places an **order**: buy or sell a quantity of one Instrument. The platform **reserves** the most the order can cost (a buy) or the quantity (a sell), and the `worker` sends the order to the firm's broker through a new port. The broker answers on a feed of **execution reports**: a fill, a cancellation, an expiry, a settlement. Each fill is posted as one `Buy` or `Sell` Transaction with source `OrderFill`, at the broker's price, with an **execution detail** (price, trade date, settlement date, contract note). A fill **settles** when the broker says so. Until then the cash of a sale is in the balance and can buy, but it cannot leave the account.
 

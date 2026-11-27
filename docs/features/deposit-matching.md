@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-20
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
   - simulator.md
   - client-money-accounts.md
@@ -39,7 +39,7 @@ related:
 
 # Bank feed and deposit matching
 
-The first platform-side flow driven by an outside party. It is step 5 of [custodial-roadmap.md](../custodial-roadmap.md) §13 and covers roadmap items **B3** (bank feed port and statement lines) and **B4** (deposit matching and suspense), with the receipts side of the simulator bank (**S1 receipts**). It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20 and does not re-decide them. It amends [client-money-accounts.md](client-money-accounts.md), [transaction-source.md](transaction-source.md), [custody-modes.md](custody-modes.md), [posting.md](posting.md), [accounts.md](accounts.md), [simulator.md](simulator.md) and the Back Office, Adviser Portal and Customer Portal contracts.
+The first platform-side flow driven by an outside party. It is step 5 of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13 and covers roadmap items **B3** (bank feed port and statement lines) and **B4** (deposit matching and suspense), with the receipts side of the simulator bank (**S1 receipts**). It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20 and does not re-decide them. It amends [client-money-accounts.md](client-money-accounts.md), [transaction-source.md](transaction-source.md), [custody-modes.md](custody-modes.md), [posting.md](posting.md), [accounts.md](accounts.md), [simulator.md](simulator.md) and the Back Office, Adviser Portal and Customer Portal contracts.
 
 The `worker` reads the bank statement of every active client money account through a new port, the **bank feed**, and stores each **bank statement line** once. A receipt that quotes the deposit reference of a Custodial account in the same Tenant and currency is posted as a **deposit**: a `TransferIn` with source `BankFeed` and a bank receipt detail. Any other receipt waits **unmatched** in suspense, where a TenantAdmin matches it to an account by hand, ignores it, or marks it for return. From this slice on, a person can no longer enter a `TransferIn` on a Custodial account.
 

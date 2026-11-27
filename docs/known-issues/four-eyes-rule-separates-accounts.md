@@ -10,7 +10,7 @@ related:
   - ../features/account-closure.md
   - ../features/advisers.md
   - ../features/identity-auth.md
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../adr/0013-roles-authorization-single-user-table.md
 ---
 
@@ -38,7 +38,7 @@ Not affected: adjustment requests and migration batches. Both sides of those nee
 ## Why it is accepted now
 
 - The platform is a showcase. Its tenants are demo firms and money moves through the simulator bank.
-- [custodial-roadmap.md](../custodial-roadmap.md) D5 maps the approval permissions to TenantAdmin first; a separate operations role comes only when it is needed.
+- [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) D5 maps the approval permissions to TenantAdmin first; a separate operations role comes only when it is needed.
 - Real platforms usually leave a firm's own user administration to the firm (complementary user entity controls in a SOC 1 / ISAE 3402 report), and add controls outside the application: a payment released at the bank with the bank's own credentials, and a notice to the Customer when a bank account is added. This platform has neither yet.
 
 ## What still holds
@@ -81,7 +81,7 @@ When the fix lands, set this issue to `resolved` and keep the file.
 
 ## What we are not doing now
 
-- A separate operations role that releases payments ([custodial-roadmap.md](../custodial-roadmap.md) D5).
+- A separate operations role that releases payments ([custodial-roadmap.md](../roadmaps/custodial-roadmap.md) D5).
 - A release step for payments at the bank.
 - A notice to the Customer when a nominated bank account is added. The platform sends no email yet.
 - A waiting period before a new nominated bank account can be paid.

@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-24
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
   - buy-sell.md
   - holdings.md
@@ -52,7 +52,7 @@ related:
 
 # In-kind transfers and custodian reconciliation
 
-Step 14 of [custodial-roadmap.md](../custodial-roadmap.md) §13. It covers roadmap items **T1** (in-kind transfer) and **T3** (custodian reconciliation), with the simulator custodian (**S3**). It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20 and does not re-decide them. It builds on the `StockIn` and `StockOut` types of [buy-sell.md](buy-sell.md), the source of [transaction-source.md](transaction-source.md), the orders and fills of [orders.md](orders.md), the instruction shape of [withdrawals.md](withdrawals.md) and the run of [bank-reconciliation.md](bank-reconciliation.md).
+Step 14 of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13. It covers roadmap items **T1** (in-kind transfer) and **T3** (custodian reconciliation), with the simulator custodian (**S3**). It follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) rules 1–20 and does not re-decide them. It builds on the `StockIn` and `StockOut` types of [buy-sell.md](buy-sell.md), the source of [transaction-source.md](transaction-source.md), the orders and fills of [orders.md](orders.md), the instruction shape of [withdrawals.md](withdrawals.md) and the run of [bank-reconciliation.md](bank-reconciliation.md).
 
 Today the securities on a Custodial account exist only in the platform's ledger. No outside record says the firm really holds them, and a Customer's existing shares can neither come in nor leave: `StockIn` and `StockOut` are refused, and no flow writes them. After this slice a firm has a **safekeeping account** at a custodian for each currency its securities are quoted in, where the securities of all its Custodial accounts in that currency are held together. The `worker` reads the custodian's **custody movements** and its **positions** through a new port. An Adviser requests an **in-kind transfer** of a Customer's shares in or out; a TenantAdmin approves it; the `worker` instructs the custodian; and the platform posts a `StockIn` or `StockOut` only when the custodian's movement shows the shares arrived or left. The broker delivers the shares of every order fill through the same safekeeping account. Once a day a **custodian reconciliation** compares the custodian's position in each instrument with the sum of the Custodial holdings and lists every difference.
 

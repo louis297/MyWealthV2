@@ -17,7 +17,7 @@ related:
   - ../features/interest-run.md
   - ../features/migration-batches.md
   - ../features/in-kind-transfers.md
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
 ---
 
 # Known issue: Custodial accounts still rely on hand entry, and some writes are missing
@@ -32,7 +32,7 @@ A Custodial account is meant to be the platform's own record: the server produce
 
 | Gap | Effect on a Custodial account | Closed by |
 | --- | --- | --- |
-| History cannot be entered | The server sets `bookedAt`. A deposit entered today cannot be dated yesterday, and no past activity can be built through the API | Replay with booking at an outside date ([custodial-roadmap.md](../custodial-roadmap.md) X2, D2); the test seed until then. The simulator's clock does not close it: the platform keeps the real clock and books at processing time (roadmap D9). A migration batch brings balances across, not history |
+| History cannot be entered | The server sets `bookedAt`. A deposit entered today cannot be dated yesterday, and no past activity can be built through the API | Replay with booking at an outside date ([custodial-roadmap.md](../roadmaps/custodial-roadmap.md) X2, D2); the test seed until then. The simulator's clock does not close it: the platform keeps the real clock and books at processing time (roadmap D9). A migration batch brings balances across, not history |
 
 External accounts have none of these gaps: they keep every hand-entered type.
 
@@ -46,4 +46,4 @@ External accounts have none of these gaps: they keep every hand-entered type.
 
 - Each flow in the last column is specified. Its spec changes one cell of the manual entry matrix and removes its row here. Every flow of the roadmap has landed (2026-11-25); the one row left waits for replay.
 
-The order of the flows is in [custodial-roadmap.md](../custodial-roadmap.md) §13.
+The order of the flows is in [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13.

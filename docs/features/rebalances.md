@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-23
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - ../adr/0021-outside-parties-behind-ports.md
   - portfolios.md
   - orders.md
@@ -36,7 +36,7 @@ related:
 
 # Rebalance through orders
 
-Step 12 of [custodial-roadmap.md](../custodial-roadmap.md) §13. It covers roadmap item **O3** and answers its open question (the Customer's consent). It builds on the orders, fills and reservations of [orders.md](orders.md) and the settlement of [trade-settlement.md](trade-settlement.md), keeps the portfolio, the assignment and the targets of [portfolios.md](portfolios.md), and follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) without re-deciding it. The simulator broker (**S2**) does not change.
+Step 12 of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13. It covers roadmap item **O3** and answers its open question (the Customer's consent). It builds on the orders, fills and reservations of [orders.md](orders.md) and the settlement of [trade-settlement.md](trade-settlement.md), keeps the portfolio, the assignment and the targets of [portfolios.md](portfolios.md), and follows [ADR 0021](../adr/0021-outside-parties-behind-ports.md) without re-deciding it. The simulator broker (**S2**) does not change.
 
 Today a rebalance posts `Buy` and `Sell` Transactions at once, at the platform's stored price, with source `Rebalance`. It is the last trade on a Custodial account that no broker executed. After this slice a rebalance is a **rebalance**: a stored run with a **proposal** (the trades the plan would make) that an Adviser or TenantAdmin confirms. The platform then places ordinary orders in **waves**: the sells first, and, when they are filled, the buys, sized from the cash that is really there. Each fill is posted as any order fill. Nothing is traded before a person confirms.
 

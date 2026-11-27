@@ -58,6 +58,7 @@ Implementation notes (2026-11-18), where the rules left a message open:
 | `FxConversion` amounts | **Caller**: both `sellAmount` and `buyAmount`; the rate is derived from them and stored | Caller names one amount; the server computes the other from the reference rate (unchanged) |
 | `expectedRate` | Refused | Required (unchanged) |
 | `POST /transactions/fx/quote` | Refused | Unchanged |
+| Dividend and interest: gross, each tax withheld, imputation credit, FX rate | **Caller**: `POST /transactions/dividend`, and `taxes` on a hand `Interest` ([external-income.md](external-income.md)). No tax profile or rate is read | Server: the corporate action and the tax profile ([dividends.md](dividends.md), [interest-run.md](interest-run.md)) |
 | `bookedAt` | Caller, required (unchanged) | Server (unchanged) |
 
 With this slice the third invariant of [custody-modes.md](custody-modes.md) §1 holds in both directions: on a Custodial account the server decides the price, the cost, the FX rate and the fee; on an External account the caller does.
@@ -119,7 +120,7 @@ A side effect: recording a trade or a conversion on an External account no longe
 
 | ID | Rule |
 | --- | --- |
-| R4 | **Body.** `security` still holds exactly one leg with `instrumentId` and `quantity` `> 0`. `cost`, `amount`, `currency` and `cash` → 400, as today (buy-sell R9). Three fields depend on the custody mode: `security[0].price`, `fee` and `fxRate`. On every other `TransactionType` of `POST /transactions`, `fee` and `fxRate` → 400 in the validator, and the `price` refusals of `OpeningHoldings`, `StockIn` / `StockOut` and `Split` / `Bonus` / `Scrip` stay, with today's messages. |
+| R4 | **Body.** `security` still holds exactly one leg with `instrumentId` and `quantity` `> 0`. `cost`, `amount`, `currency` and `cash` → 400, as today (buy-sell R9). Three fields depend on the custody mode: `security[0].price`, `fee` and `fxRate`. On every other `TransactionType` of `POST /transactions`, `fee` and `fxRate` → 400 in the validator, and so is a `taxes` that is not empty on every type but `Interest` ([external-income.md](external-income.md) R9), and the `price` refusals of `OpeningHoldings`, `StockIn` / `StockOut` and `Split` / `Bonus` / `Scrip` stay, with today's messages. |
 | R5 | **Executed price.** `security[0].price` is required: the price per unit at which the trade was filled, in the instrument's quote currency. Shape: `> 0` (`Price must be greater than 0.`), at most 8 decimal places (`Price can have at most 8 decimal places.`; the precision of `InstrumentPrices.Price`). Missing → 400 with `errors["Security[0].Price"]` and the message `Price is required on an External account. Enter the executed price.` The server does not call `IMarketData`: a missing or different stored price does not matter. |
 | R6 | **Fee.** `fee` is optional: the brokerage the outside broker charged, in the instrument's quote currency. Shape: `≥ 0` (`Fee cannot be negative.`). It must have no more decimal places than the quote currency's `DecimalPlaces` (else 400 with `errors.Fee` and the message `Fee can have at most {n} decimal places.`, checked after the instrument is loaded). Omitted, `null` or `0` → the trade has no `Fee` leg. The server does not read the tenant's trade fee schedules for an External account. |
 | R7 | **FX rate.** When the instrument's quote currency differs from the Account currency, `fxRate` is required: the number of units of Account currency per 1 unit of quote currency that the outside broker used (for a USD instrument in an NZD account, NZD per 1 USD). Shape: `> 0` (`FxRate must be greater than 0.`), at most 8 decimal places (`FxRate can have at most 8 decimal places.`; the precision of `TransactionFxDetails.Rate`). Missing → 400 with `errors.FxRate` and the message `FxRate is required when the instrument currency differs from the account currency.` When the two currencies are the same, `fxRate` → 400 with `errors.FxRate` and the message `FxRate cannot be set when the instrument currency is the account currency.` The server does not call `IFxRate`. |
@@ -415,3 +416,13 @@ Still open, not this slice:
 - A rate line on `Buy` / `Sell` in the Customer Portal
 - The rest of [cross-currency-trades.md](cross-currency-trades.md) for Custodial accounts
 - Fees in the Account currency, or several fee kinds, on an External trade
+
+---
+
+## 12. History
+
+What changed in this file after it landed. The text of each change is in git (`git log -p -- docs/features/external-caller-numbers.md`).
+
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-27 | [external-income.md](external-income.md) | §1: a row for dividends and interest. R4: `taxes` is refused on every type but `Interest` |

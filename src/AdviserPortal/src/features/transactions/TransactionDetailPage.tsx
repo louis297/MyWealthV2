@@ -16,6 +16,7 @@ import {
 } from "@/features/transactions/ReverseTransactionButton";
 import { CorporateActionPostingBlock } from "@/features/corporateActions/CorporateActionPostingBlock";
 import { DividendPostingBlock } from "@/features/corporateActions/DividendPostingBlock";
+import { EnteredInterestBlock } from "@/features/interest/EnteredInterestBlock";
 import { InterestPostingBlock } from "@/features/interest/InterestPostingBlock";
 import { useGetTransactionQuery } from "@/features/transactions/transactionsApi";
 import { formatAmount, formatMoney } from "@/shared/format/money";
@@ -133,6 +134,10 @@ export function TransactionDetailPage() {
               </Section>
             ) : null}
             {data.interest ? <InterestPostingBlock transaction={data} /> : null}
+            {/* external-income D113: a hand Interest with tax has no interest detail. */}
+            {!data.interest && data.type === "Interest" && data.cash.some((leg) => leg.role === "Tax")
+              ? <EnteredInterestBlock transaction={data} />
+              : null}
             {data.corporateAction ? <CorporateActionPostingBlock detail={data.corporateAction} /> : null}
             {data.dividend ? <DividendPostingBlock transaction={data} /> : null}
             {data.adjustment ? (

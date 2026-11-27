@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-19
 last_updated: 2026-11-26
 related:
-  - ../custodial-roadmap.md
+  - ../roadmaps/custodial-roadmap.md
   - transaction-source.md
   - posting.md
   - holdings.md
@@ -33,7 +33,7 @@ related:
 
 # Adjustments
 
-New ledger write on `webapi`. It is step 3 of [custodial-roadmap.md](../custodial-roadmap.md) §13 and covers roadmap item **F3** (controlled adjustment, first version, no review). It amends [posting.md](posting.md), [holdings.md](holdings.md), [custody-modes.md](custody-modes.md), [portfolios.md](portfolios.md), [reports.md](reports.md) and the two portal contracts.
+New ledger write on `webapi`. It is step 3 of [custodial-roadmap.md](../roadmaps/custodial-roadmap.md) §13 and covers roadmap item **F3** (controlled adjustment, first version, no review). It amends [posting.md](posting.md), [holdings.md](holdings.md), [custody-modes.md](custody-modes.md), [portfolios.md](portfolios.md), [reports.md](reports.md) and the two portal contracts.
 
 This spec owns what an adjustment is: the `TransactionType` `Adjustment`, its shape, its reason, its checks, the permission `transactions.adjust` (TenantAdmin only) and the item field `adjustment`. How one is entered is [adjustment-review.md](adjustment-review.md): a TenantAdmin requests it and another TenantAdmin approves it, and the approval posts the Transaction. Script `0037_adjustments.sql` widens the type check and adds `TransactionAdjustmentDetails`. No problem code.
 

@@ -58,6 +58,12 @@ public class CreateTransactionCommand : IRequest<IdempotentResult>
     /// </summary>
     public decimal? FxRate { get; init; }
 
+    /// <summary>
+    /// The taxes an outside payer withheld from a hand <c>Interest</c> on an External account (external-income R22);
+    /// <see cref="Amount"/> is then the gross. Refused on every other type (R9).
+    /// </summary>
+    public List<EnteredTaxBody>? Taxes { get; init; }
+
     public sealed class OpeningHoldingSecurity
     {
         public Guid InstrumentId { get; init; }
@@ -104,9 +110,9 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
                 .Null()
                 .WithMessage("FxRate can only be set on a buy or sell.");
         });
-        // Dividends R43: a Dividend passes on to the manual entry matrix, which refuses it with its own message.
+        // External income R10: a hand Dividend has its own route, POST /transactions/dividend.
         RuleFor(command => command.Type)
-            .Must(type => type is not null && (AllowedTypes.Contains(type) || type == nameof(TransactionType.Dividend)))
+            .Must(type => type is not null && AllowedTypes.Contains(type))
             .WithMessage("Type must be TransferIn, TransferOut, Interest, CloseOut, Opening, OpeningHoldings, Buy, Sell, StockIn, StockOut, Split, Bonus, or Scrip.");
         RuleFor(command => command.BookedAt).NotInTheFuture(time);
         RuleFor(command => command.Memo)
@@ -220,6 +226,27 @@ public class CreateTransactionCommandValidator : AbstractValidator<CreateTransac
             });
         });
 
+        // External income R9, R22: taxes on a hand Interest only; with a tax the amount is the gross, above 0.
+        When(command => command.Type == nameof(TransactionType.Interest), () =>
+        {
+            EnteredTaxRules.Add(this, command => command.Taxes);
+            RuleFor(command => command.Amount)
+                .Must(amount => amount is > 0m)
+                .When(command => command.Taxes is { Count: > 0 } && command.Amount is not null)
+                .WithMessage(Domain.Entities.Transaction.InterestWithTaxNeedsGrossMessage);
+            RuleFor(command => command.Taxes)
+                .Must((command, rows) => EnteredTaxBody.Parse(rows) is not { } taxes
+                                         || EnteredTaxes.RefusalOf(taxes) is not null
+                                         || !EnteredTaxes.AboveGross(taxes.Select(tax => tax.Amount), command.Amount!.Value))
+                .When(command => command.Taxes is { Count: > 0 } && command.Amount is > 0m)
+                .WithMessage(EnteredTaxes.AboveGrossMessage);
+        }).Otherwise(() =>
+        {
+            RuleFor(command => command.Taxes)
+                .Must(rows => rows is null || rows.Count == 0)
+                .WithMessage("Taxes can be set on Interest only.");
+        });
+
         When(command => CashTypes.Contains(command.Type ?? ""), () =>
         {
             RuleFor(command => command.Amount).NotNull();
@@ -270,6 +297,8 @@ public class CreateTransactionCommandHandler(
                 ratio = request.Ratio,
                 fee = request.Fee,
                 fxRate = request.FxRate,
+                // External income R24.
+                taxes = request.Taxes?.Select(tax => new { kind = tax.Kind, ratePercent = tax.RatePercent, amount = tax.Amount }),
                 security = request.Security?.Select(leg => new
                 {
                     instrumentId = leg.InstrumentId,
@@ -383,6 +412,17 @@ public class CreateTransactionCommandHandler(
             CashAmountPlaces.EnsureFits(catalog, Money.Create(0m, currency).Currency, request.Amount!.Value);
         }
 
+        // External income R22: each tax amount fits the Account currency's decimal places.
+        var enteredTaxes = type == TransactionType.Interest ? EnteredTaxBody.Parse(request.Taxes)! : [];
+        if (enteredTaxes.Count > 0)
+        {
+            var places = catalog.TryGet(Money.Create(0m, currency).Currency)?.DecimalPlaces ?? 2;
+            if (EnteredTaxRules.DecimalPlaceFailures(enteredTaxes, places) is { Count: > 0 } failures)
+            {
+                throw new ValidationException(failures);
+            }
+        }
+
         var currentSum = await TransactionCash.SumAsync(db, loaded.Account.Id, cancellationToken);
 
         // Withdrawals R46: on a Custodial account a CloseOut writes off only the remainder a trade leaves.
@@ -461,6 +501,19 @@ public class CreateTransactionCommandHandler(
             else if (type is TransactionType.Split or TransactionType.Bonus or TransactionType.Scrip)
             {
                 transaction = await PostSplitAsync(request, bookedAt, tenant, loaded, type, cancellationToken);
+            }
+            else if (enteredTaxes.Count > 0)
+            {
+                transaction = Domain.Entities.Transaction.PostEnteredInterest(
+                    tenant.Id,
+                    loaded.Account.Id,
+                    currency,
+                    request.Amount!.Value,
+                    enteredTaxes,
+                    bookedAt,
+                    request.Memo,
+                    request.Reference,
+                    TransactionSource.Manual);
             }
             else
             {

@@ -68,18 +68,19 @@ public sealed class TransactionDto
 }
 
 /// <summary>Dividends R50: the corporate action, the instrument, the entitled quantity and the terms of a dividend,
-/// with its reinvestment when there was one.</summary>
+/// with its reinvestment when there was one. A hand-entered dividend has no corporate action, and may have no amount
+/// per share and no ex-date (external-income R26).</summary>
 public sealed record TransactionDividendDto(
-    Guid CorporateActionId,
+    Guid? CorporateActionId,
     TransactionDividendInstrumentDto Instrument,
     decimal Quantity,
-    decimal AmountPerShare,
+    decimal? AmountPerShare,
     string Currency,
     string TaxSource,
     decimal ImputationCredit,
     decimal? ReinvestedQuantity,
     decimal? ReinvestmentPrice,
-    string ExDate,
+    string? ExDate,
     string? RecordDate,
     string? PaymentDate);
 

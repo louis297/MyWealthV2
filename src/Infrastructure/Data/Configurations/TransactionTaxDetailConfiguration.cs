@@ -69,7 +69,8 @@ public class TransactionCorporateActionDetailConfiguration : IEntityTypeConfigur
     }
 }
 
-/// <summary>Dividends §6.1: 0..1 dividend detail per Transaction (script 0057).</summary>
+/// <summary>Dividends §6.1: 0..1 dividend detail per Transaction (script 0057); the amount per share and the ex-date
+/// are nullable (external-income §6, script 0060).</summary>
 public class TransactionDividendDetailConfiguration : IEntityTypeConfiguration<TransactionDividendDetail>
 {
     public void Configure(EntityTypeBuilder<TransactionDividendDetail> builder)
@@ -78,12 +79,12 @@ public class TransactionDividendDetailConfiguration : IEntityTypeConfiguration<T
         builder.HasKey(detail => detail.TransactionId);
         builder.Property(detail => detail.TransactionId).ValueGeneratedNever();
         builder.Property(detail => detail.Quantity).HasColumnType("decimal(18,8)").IsRequired();
-        builder.Property(detail => detail.AmountPerShare).HasColumnType("decimal(18,8)").IsRequired();
+        builder.Property(detail => detail.AmountPerShare).HasColumnType("decimal(18,8)");
         builder.Property(detail => detail.Currency).HasColumnType("char(3)").IsFixedLength().IsRequired();
         builder.Property(detail => detail.ImputationCredit).HasColumnType("decimal(18,4)").IsRequired();
         builder.Property(detail => detail.ReinvestedQuantity).HasColumnType("decimal(18,8)");
         builder.Property(detail => detail.ReinvestmentPrice).HasColumnType("decimal(18,8)");
-        builder.Property(detail => detail.ExDate).HasColumnType("date").IsRequired();
+        builder.Property(detail => detail.ExDate).HasColumnType("date");
         builder.Property(detail => detail.RecordDate).HasColumnType("date");
         builder.Property(detail => detail.PaymentDate).HasColumnType("date");
         builder.HasOne<Tenant>()

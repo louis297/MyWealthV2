@@ -293,7 +293,7 @@ Field rules: [interest-run](../features/interest-run.md). The Customer Portal re
 | --- | --- | --- | --- |
 | C28 | A Customer | Profile page | A "Tax details" section from `GET /users/me/tax-profile`: Tax residency, IRD number ("On file" / "Not on file"), RWT rate, and "Tax taken from your interest: <rate> %". Under it: "To change these details, contact your adviser." No form. |
 | C29 | A Customer with a Custodial account whose `accruedInterest` is above 0 | Account page | "Interest earned so far this period: <amount>" (the currency's minor unit, rounded down) under the balance, with "Paid after the end of the month." |
-| C30 | A Customer with an interest posting | Account page activity | The row is labelled "Interest" with its period, and shows Gross, "Tax withheld (<kind label> <rate> %)" and the net amount. A hand-entered `Interest` on an External account keeps today's row. |
+| C30 | A Customer with an interest posting | Account page activity | The row is labelled "Interest" with its period, and shows Gross, "Tax withheld (<kind label> <rate> %)" and the net amount. A hand-entered `Interest` on an External account has no period: C49. |
 
 ---
 
@@ -368,7 +368,7 @@ Field rules: [dividends](../features/dividends.md). No new BFF prefix: `dividend
 
 | ID | Given | When | Then |
 | --- | --- | --- | --- |
-| C42 | A Customer with a `Dividend` | Account page activity | The row is labelled "Dividend <symbol>", with "<quantity> shares × <amountPerShare>", the gross, one line per tax leg, "Imputation credit <amount>" when above 0, and the net cash amount. |
+| C42 | A Customer with a `Dividend` | Account page activity | The row is labelled "Dividend <symbol>", with "<quantity> shares × <amountPerShare>", the gross, one line per tax leg, "Imputation credit <amount>" when above 0, and the net cash amount. A hand-entered dividend: C48. |
 | C43 | A reinvested dividend | Account page activity | The row also shows "Reinvested in <reinvestedQuantity> shares at <reinvestmentPrice>", and the holding shows the new quantity. |
 | C44 | A Custodial account | Account page | "Dividends are reinvested" or "Dividends are paid in cash", read only, with "Ask your adviser to change this." |
 
@@ -383,6 +383,15 @@ Field rules: [valuation-history](../features/valuation-history.md). No new BFF p
 | C47 | Customer with a Custodial account | Account page | The chart of D109, with the Customer's words for an incomplete day ("Some holdings could not be valued on this day.") and "Not valued yet. The first value appears two days after the account was opened." An External account shows no chart. |
 
 ---
+
+### Income on External accounts
+
+Field rules: [external-income](../features/external-income.md). No new BFF prefix: a hand-entered dividend and the tax of a hand `Interest` come with the existing transaction reads.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C48 | A Customer with a hand-entered `Dividend` on an External account | Account page activity | The row of C42, with "<quantity> shares" alone when there is no amount per share. |
+| C49 | A Customer with a hand-entered `Interest` that has tax | Account page activity | The row is labelled "Interest" and shows Gross, "Tax withheld (<kind label> <rate> %)" per tax and the net amount, as C30 without a period. Without tax the row is today's. |
 
 ## Tests
 
@@ -423,3 +432,4 @@ What changed in this file after it was accepted. Each row is a section above. Th
 | 2026-11-24 | [dividends](../features/dividends.md) | Dividends |
 | 2026-11-26 | [valuation-history](../features/valuation-history.md) | Valuation history |
 | 2026-11-26 | — | The amendments became the sections above. No behaviour changed |
+| 2026-11-27 | [external-income](../features/external-income.md) | Income on External accounts |

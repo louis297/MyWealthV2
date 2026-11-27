@@ -69,7 +69,7 @@ Accepted with [ADR 0021](0021-outside-parties-behind-ports.md) rule 25 and [feat
 - It signs in only on client `simulator` (client × role allow-list). No other client allows it, and it is on no other client's row.
 - `RolePermissions` grants it nothing. `webapi` answers 401 to its token on every route, so it is never a resource-API caller and holds no row in the [api-design.md](../api-design.md) §3.1 table.
 - It is created by the `webapi` bootstrap from configuration and by the Development seed, not by a route.
-- Still true: tenants cannot invent roles; no Operations / ReadOnly / Support role inside a tenant. Operations work inside a tenant stays a set of permissions mapped to TenantAdmin first ([custodial-roadmap.md](../custodial-roadmap.md) D5).
+- Still true: tenants cannot invent roles; no Operations / ReadOnly / Support role inside a tenant. Operations work inside a tenant stays a set of permissions mapped to TenantAdmin first ([custodial-roadmap.md](../roadmaps/custodial-roadmap.md) D5).
 
 `CK_Users_RoleShape` (conceptual, after `0036`): `SystemAdmin` and `SimulatorOperator` → `TenantId` null, `AdviserId` null.
 

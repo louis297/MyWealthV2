@@ -227,6 +227,215 @@ public class Transaction : BaseAuditableEntity
         return transaction;
     }
 
+    /// <summary>
+    /// External-income R14, R16, R17: a dividend an outside party paid into an External account, as the caller states
+    /// it. <paramref name="grossAmount"/>, <paramref name="imputationCredit"/> and each tax amount are in the quote
+    /// currency; with <paramref name="fxRate"/> (quote currency → Account currency, source <c>Caller</c>) each is
+    /// converted as <c>Round(amount × rate, decimalPlaces, AwayFromZero)</c> and the rate is stored. One <c>Principal</c>
+    /// leg of the gross and one <c>Tax</c> leg per tax with its tax detail (a tax that converts to 0 books no leg); a
+    /// dividend detail; no security leg. Source <c>Manual</c> only. Nothing is multiplied and no rate is applied (R4).
+    /// </summary>
+    public static Transaction PostEnteredDividend(
+        int tenantId,
+        int accountId,
+        string accountCurrency,
+        int decimalPlaces,
+        int instrumentId,
+        string quoteCurrency,
+        decimal quantity,
+        decimal? amountPerShare,
+        decimal grossAmount,
+        DividendTaxSource taxSource,
+        decimal imputationCredit,
+        IReadOnlyList<EnteredTax> taxes,
+        AppliedFxRate? fxRate,
+        DateOnly? exDate,
+        DateOnly? recordDate,
+        DateOnly? paymentDate,
+        DateTimeOffset bookedAt,
+        string? memo,
+        string? reference,
+        TransactionSource source)
+    {
+        if (source.Kind != TransactionSourceKind.Manual)
+        {
+            throw new DomainException("An entered dividend is entered by a person.");
+        }
+
+        if (quantity <= 0m || grossAmount <= 0m)
+        {
+            throw new DomainException("An entered dividend has a quantity and a gross amount above 0.");
+        }
+
+        if (imputationCredit < 0m || imputationCredit > grossAmount)
+        {
+            throw new DomainException("The imputation credit is 0 or more and not above the gross amount.");
+        }
+
+        if (imputationCredit > 0m && taxSource != DividendTaxSource.NewZealand)
+        {
+            throw new DomainException("Only a New Zealand company attaches imputation credits.");
+        }
+
+        if (EnteredTaxes.RefusalOf(taxes) is { } shape)
+        {
+            throw new DomainException(shape.Message);
+        }
+
+        if (EnteredTaxes.RefusalOf(taxes, taxSource) is { } pair)
+        {
+            throw new DomainException(pair.Message);
+        }
+
+        var currency = Money.Create(0m, accountCurrency).Currency;
+        var quote = Money.Create(0m, quoteCurrency).Currency;
+        var converted = !string.Equals(currency, quote, StringComparison.Ordinal);
+        if (converted && fxRate is null)
+        {
+            throw new DomainException("A dividend in another currency than the Account's needs the rate it is converted at.");
+        }
+
+        if (fxRate is not null && (!converted
+            || !string.Equals(fxRate.BaseCurrency, quote, StringComparison.Ordinal)
+            || !string.Equals(fxRate.QuoteCurrency, currency, StringComparison.Ordinal)))
+        {
+            throw new DomainException("The rate must be for the quote currency to the Account's currency.");
+        }
+
+        var gross = ConvertEntered(grossAmount, fxRate, decimalPlaces);
+        var credit = ConvertEntered(imputationCredit, fxRate, decimalPlaces);
+        if (gross <= 0m)
+        {
+            throw new DomainException(EnteredGrossConvertsTo0Message);
+        }
+
+        var cashLegs = new List<TransactionCashLeg> { TransactionCashLeg.Create(tenantId, accountId, gross, currency) };
+        var taxDetails = EnteredTaxLegs(
+            tenantId, accountId, currency, gross, taxes,
+            tax => ConvertEntered(tax.Amount, fxRate, decimalPlaces),
+            kind => kind == TaxKind.Rwt ? gross + credit : gross,
+            cashLegs);
+
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            Type = TransactionType.Dividend,
+            BookedAt = bookedAt.ToUniversalTime(),
+            Memo = NormaliseMemo(memo),
+            Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
+            PublicId = Guid.NewGuid(),
+            CashLegs = cashLegs,
+            TaxDetails = taxDetails,
+            FxDetail = fxRate is null ? null : TransactionFxDetail.Create(tenantId, fxRate),
+            DividendDetail = TransactionDividendDetail.Create(
+                tenantId, instrumentId, quantity, amountPerShare, quote, taxSource, credit, null, null, exDate, recordDate,
+                paymentDate)
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
+
+    /// <summary>
+    /// External-income R22, R23: a hand <c>Interest</c> on an External account with the tax an outside payer withheld.
+    /// One <c>Principal</c> leg of <paramref name="grossAmount"/> (above 0) and one <c>Tax</c> leg per tax with its tax
+    /// detail on the gross; at least one tax; no interest detail. Source <c>Manual</c> only. A hand <c>Interest</c>
+    /// without tax is <see cref="Post"/>.
+    /// </summary>
+    public static Transaction PostEnteredInterest(
+        int tenantId,
+        int accountId,
+        string accountCurrency,
+        decimal grossAmount,
+        IReadOnlyList<EnteredTax> taxes,
+        DateTimeOffset bookedAt,
+        string? memo,
+        string? reference,
+        TransactionSource source)
+    {
+        if (source.Kind != TransactionSourceKind.Manual)
+        {
+            throw new DomainException("An entered interest is entered by a person.");
+        }
+
+        if (taxes.Count == 0)
+        {
+            throw new DomainException("An entered interest has at least one tax. Interest without tax is a plain Interest.");
+        }
+
+        if (grossAmount <= 0m)
+        {
+            throw new DomainException(InterestWithTaxNeedsGrossMessage);
+        }
+
+        if (EnteredTaxes.RefusalOf(taxes) is { } shape)
+        {
+            throw new DomainException(shape.Message);
+        }
+
+        var currency = Money.Create(0m, accountCurrency).Currency;
+        var cashLegs = new List<TransactionCashLeg> { TransactionCashLeg.Create(tenantId, accountId, grossAmount, currency) };
+        var taxDetails = EnteredTaxLegs(
+            tenantId, accountId, currency, grossAmount, taxes, tax => tax.Amount, _ => grossAmount, cashLegs);
+
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            Type = TransactionType.Interest,
+            BookedAt = bookedAt.ToUniversalTime(),
+            Memo = NormaliseMemo(memo),
+            Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
+            PublicId = Guid.NewGuid(),
+            CashLegs = cashLegs,
+            TaxDetails = taxDetails
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
+
+    /// <summary>External-income R22.</summary>
+    public const string InterestWithTaxNeedsGrossMessage = "Interest with tax withheld needs a gross amount above 0.";
+
+    /// <summary>External-income R14: a gross that converts to 0 in the Account's currency.</summary>
+    public const string EnteredGrossConvertsTo0Message = "GrossAmount converts to 0 in the account currency.";
+
+    private static decimal ConvertEntered(decimal amount, AppliedFxRate? fxRate, int decimalPlaces) => fxRate is null
+        ? amount
+        : decimal.Round(amount * fxRate.Rate, decimalPlaces, MidpointRounding.AwayFromZero);
+
+    /// <summary>External-income R7, R8: one <c>Tax</c> leg of minus the booked amount per entered tax, added to
+    /// <paramref name="cashLegs"/>, each with its tax detail (the stated rate and <paramref name="basis"/> of its kind). A
+    /// tax booked as 0 has no leg. The booked taxes may not add up to more than <paramref name="gross"/>.</summary>
+    private static List<TransactionTaxDetail> EnteredTaxLegs(
+        int tenantId,
+        int accountId,
+        string currency,
+        decimal gross,
+        IReadOnlyList<EnteredTax> taxes,
+        Func<EnteredTax, decimal> booked,
+        Func<TaxKind, decimal> basis,
+        List<TransactionCashLeg> cashLegs)
+    {
+        var amounts = taxes.Select(tax => (Tax: tax, Amount: booked(tax))).ToList();
+        if (EnteredTaxes.AboveGross(amounts.Select(row => row.Amount), gross))
+        {
+            throw new DomainException(EnteredTaxes.AboveGrossMessage);
+        }
+
+        var details = new List<TransactionTaxDetail>();
+        foreach (var (tax, amount) in amounts.Where(row => row.Amount > 0m))
+        {
+            var detail = TransactionTaxDetail.Create(tenantId, tax.Kind, tax.RatePercent, basis(tax.Kind), amount, currency);
+            cashLegs.Add(TransactionCashLeg.CreateTax(tenantId, accountId, -amount, currency, detail));
+            details.Add(detail);
+        }
+
+        return details;
+    }
+
     /// <summary>R37: <c>Dividend ACME.SIM 0.72 per share</c>, the amount with at least two decimals.</summary>
     private static string DividendMemo(string symbol, decimal amountPerShare) =>
         string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Dividend {symbol} {amountPerShare:0.00######} per share");

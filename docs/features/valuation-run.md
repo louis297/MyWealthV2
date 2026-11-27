@@ -7,7 +7,7 @@ owner: ""
 created: 2026-11-26
 last_updated: 2026-11-26
 related:
-  - ../valuation-roadmap.md
+  - ../roadmaps/valuation-roadmap.md
   - ../future-plans.md
   - account-valuation.md
   - market-data-history.md
@@ -28,7 +28,7 @@ related:
 
 # Valuation run
 
-Step 3 of [valuation-roadmap.md](../valuation-roadmap.md) §8. It covers roadmap item **V3** and writes the decisions **Q5** (when a day is final), **Q6** (External accounts are not stored) and the stored half of **Q7** (a stored line keeps both values and the rate used) as rules. It stores what [account-valuation.md](account-valuation.md) works out; it adds no valuation rule of its own.
+Step 3 of [valuation-roadmap.md](../roadmaps/valuation-roadmap.md) §8. It covers roadmap item **V3** and writes the decisions **Q5** (when a day is final), **Q6** (External accounts are not stored) and the stored half of **Q7** (a stored line keeps both values and the rate used) as rules. It stores what [account-valuation.md](account-valuation.md) works out; it adds no valuation rule of its own.
 
 Every day the platform values each Custodial account for each day that has not been valued yet, up to the **last final day** (the day before yesterday, UTC), and stores the result: a **stored valuation** per account and day, with one line per holding that keeps the price and the rate it used. A stored valuation is never changed. Each account keeps the last day it was valued through. One execution of this work for one Tenant is a **valuation run**; it is stored, like an interest run. The stored rows are the "holding snapshots" of the business roadmap and the "daily snapshots" that [function-plan.md](../function-plan.md) §5.4 leaves open.
 
@@ -550,6 +550,6 @@ Still open, not this slice:
 
 Made when this spec was accepted (2026-11-26):
 
-[account-valuation.md](account-valuation.md) (R13: a stored valuation is made from the day before yesterday on; §2 Out and "Still open": the V3 rows point here), [accounts.md](accounts.md) (`valuedThrough` on the account item), [account-closure.md](account-closure.md) (a Closed Custodial account is valued through the day its closure completed, note), [custody-mode-grouping.md](custody-mode-grouping.md) and [net-worth.md](net-worth.md) (funds under management of a past day is R26 here; "daily snapshots" in Out point here, the series stays V4), [back-office.md](../backoffice/back-office.md) (BO34, BO35), [api-design.md](../api-design.md) (§3.1 two permission rows, §6 resource rows, a new §7.18 Valuations, a §7.6 note on `valuedThrough` and the two account routes, change log), [domain-model.md](../domain-model.md) (§8.5 `ValuedThrough`, §8.23 the stored valuation and the run), [database-design.md](../database-design.md) (§11.22 and the change log), [architecture.md](../architecture.md) (§10 the `worker` job and queue), [function-plan.md](../function-plan.md) §5.4 ("daily snapshots" is no longer open), [glossary.md](../glossary.md) (the review terms become accepted; "Funds under management" gains its past-day reading; "Final row" and "Valuation" point at the stored valuation), [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §1 (step 3 is done when this lands; step 4 can open), and [valuation-roadmap.md](../valuation-roadmap.md) (Q5 reworded by point 1, §5 V3, §8).
+[account-valuation.md](account-valuation.md) (R13: a stored valuation is made from the day before yesterday on; §2 Out and "Still open": the V3 rows point here), [accounts.md](accounts.md) (`valuedThrough` on the account item), [account-closure.md](account-closure.md) (a Closed Custodial account is valued through the day its closure completed, note), [custody-mode-grouping.md](custody-mode-grouping.md) and [net-worth.md](net-worth.md) (funds under management of a past day is R26 here; "daily snapshots" in Out point here, the series stays V4), [back-office.md](../backoffice/back-office.md) (BO34, BO35), [api-design.md](../api-design.md) (§3.1 two permission rows, §6 resource rows, a new §7.18 Valuations, a §7.6 note on `valuedThrough` and the two account routes, change log), [domain-model.md](../domain-model.md) (§8.5 `ValuedThrough`, §8.23 the stored valuation and the run), [database-design.md](../database-design.md) (§11.22 and the change log), [architecture.md](../architecture.md) (§10 the `worker` job and queue), [function-plan.md](../function-plan.md) §5.4 ("daily snapshots" is no longer open), [glossary.md](../glossary.md) (the review terms become accepted; "Funds under management" gains its past-day reading; "Final row" and "Valuation" point at the stored valuation), [features/README.md](README.md) row status, [future-plans.md](../future-plans.md) §1 (step 3 is done when this lands; step 4 can open), and [valuation-roadmap.md](../roadmaps/valuation-roadmap.md) (Q5 reworded by point 1, §5 V3, §8).
 
 When it landed (2026-11-26): [custody-modes.md](custody-modes.md) §9.1 (the seeded Sell and TransferIn, the open date and the cash balance of the demo Custodial account).

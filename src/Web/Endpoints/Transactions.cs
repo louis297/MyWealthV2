@@ -1,6 +1,7 @@
 using MyWealthV2.Application.Common.Security;
 using MyWealthV2.Application.Transactions;
 using System.Text.Json;
+using MyWealthV2.Application.Transactions.Commands.CreateDividend;
 using MyWealthV2.Application.Transactions.Commands.CreateFxConversion;
 using MyWealthV2.Application.Transactions.Commands.CreateInternalTransfer;
 using MyWealthV2.Application.Transactions.Commands.CreateTransaction;
@@ -25,6 +26,7 @@ public class Transactions : IEndpointGroup
         groupBuilder.MapPost(CreateInternalTransfer, "transfer").RequireAuthorization(Policies.TransactionsCreate);
         groupBuilder.MapPost(CreateFxConversion, "fx").RequireAuthorization(Policies.TransactionsCreate);
         groupBuilder.MapPost(GetFxConversionQuote, "fx/quote").RequireAuthorization(Policies.TransactionsCreate);
+        groupBuilder.MapPost(CreateDividend, "dividend").RequireAuthorization(Policies.TransactionsCreate);
         groupBuilder.MapPost(ReverseTransaction, "{id}/reverse").RequireAuthorization(Policies.TransactionsCreate);
     }
 
@@ -63,6 +65,28 @@ public class Transactions : IEndpointGroup
         command.RequestMethod = httpRequest.Method;
         command.RequestPath = httpRequest.Path.Value ?? "/transactions";
         var result = await sender.Send(command);
+        return Results.Content(result.Body, "application/json", statusCode: result.StatusCode);
+    }
+
+    [EndpointSummary("Record a dividend on an External account")]
+    [EndpointDescription("Records a dividend an outside party paid into an External account, with the gross, each tax withheld and the imputation credit as the caller states them. Requires Idempotency-Key.")]
+    public static async Task<IResult> CreateDividend(
+        ISender sender,
+        HttpRequest httpRequest,
+        CreateDividendCommand command)
+    {
+        var key = httpRequest.Headers["Idempotency-Key"].ToString();
+        command.IdempotencyKey = string.IsNullOrWhiteSpace(key) ? null : key;
+        command.RequestMethod = httpRequest.Method;
+        command.RequestPath = httpRequest.Path.Value ?? "/transactions/dividend";
+        var result = await sender.Send(command);
+        if (result.StatusCode == StatusCodes.Status201Created)
+        {
+            using var body = JsonDocument.Parse(result.Body);
+            httpRequest.HttpContext.Response.Headers.Location =
+                $"/transactions/{body.RootElement.GetProperty("id").GetGuid()}";
+        }
+
         return Results.Content(result.Body, "application/json", statusCode: result.StatusCode);
     }
 
