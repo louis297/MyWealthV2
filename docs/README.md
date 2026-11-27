@@ -3,7 +3,7 @@ title: Documentation
 status: draft
 language: en
 created: 2026-09-05
-updated: 2026-11-26
+updated: 2026-11-27
 ---
 
 # MyWealthV2 documentation
@@ -93,6 +93,7 @@ Implement **accepted** specs for the current phase only. `draft` and `note` are 
 | [future-plans.md](future-plans.md) | Reminder list of large future directions (`note`) | Any build contract, priority or backlog |
 | [custodial-roadmap.md](roadmaps/custodial-roadmap.md) | Plan for making Custodial accounts flow-driven, and the simulator of outside parties (`note`) | Any build contract; field-level shapes |
 | [valuation-roadmap.md](roadmaps/valuation-roadmap.md) | Plan for historical valuation, step 3 of the business roadmap in future-plans §1 (`note`) | Any build contract; field-level shapes |
+| [fif-roadmap.md](roadmaps/fif-roadmap.md) | Plan for the FIF tax report, step 6 of the business roadmap in future-plans §1 (`note`) | Any build contract; field-level shapes; any tax rate or threshold |
 | [glossary.md](glossary.md) | Names | Design arguments |
 | [architecture.md](architecture.md) | Host, layers, ports, cross-cutting | Per-slice commands |
 | [domain-model.md](domain-model.md) | Accepted aggregates and invariants | Unlocked future shapes |

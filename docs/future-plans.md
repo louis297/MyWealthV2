@@ -32,6 +32,7 @@ related:
   - features/dividends.md
   - roadmaps/valuation-roadmap.md
   - features/external-income.md
+  - roadmaps/fif-roadmap.md
 ---
 
 # Future plans
@@ -66,7 +67,7 @@ Order. Each step depends only on earlier steps:
 | 3 | Historical valuation | Prices and FX rates as of a date, and holding snapshots. Every period report needs them. Closes the open daily snapshots in [function-plan.md](function-plan.md) §5.4. Several features, not one: planned in [valuation-roadmap.md](roadmaps/valuation-roadmap.md) (`note`, 2026-11-25). Its items V1 to V3 are this step, and all three have landed (V3: [features/valuation-run.md](features/valuation-run.md), 2026-11-26), so step 4 can open. | instrument-prices, fx-rates |
 | 4 | Advisory fee | Tiered or blended rates, daily accrual, pro rata for part periods, billing in advance or in arrears, and what happens when cash is short. | Step 3 |
 | 5 | Performance report | Time-weighted return (TWR) and money-weighted return (MWR), gross and net of fees. | Steps 3, 4 |
-| 6 | FIF tax report | Main goal. FDR and CV methods, the de minimis test, the quick sale adjustment, exempt ASX-listed shares, and the NZ tax year (1 April to 31 March). FIF reports published by NZ investment platforms can serve as test oracles. | Steps 2, 3 |
+| 6 | FIF tax report | Main goal. FDR and CV methods, the de minimis test, the quick sale adjustment, exempt ASX-listed shares, and the NZ tax year (1 April to 31 March). FIF reports published by NZ investment platforms can serve as test oracles. Several features, not one: planned in [fif-roadmap.md](roadmaps/fif-roadmap.md) (`note`, 2026-11-27), five items and one optional item, none started. Its decisions are recommendations until confirmed; one of them is that this step opens neither ledger replay nor period close (§9 below). | Steps 2, 3 |
 
 Working method: work each topic out by hand in a spreadsheet with a real or synthetic data set before its spec is written. The worked numbers become the tests.
 
@@ -78,9 +79,9 @@ Questions to settle when step 1 opens:
 
 To check against IRD when the related step opens:
 
-- Whether brokerage is part of the cost base, and how the CV method treats it (steps 1, 6).
+- Whether brokerage is part of the cost base, and how the CV method treats it (steps 1, 6). Read 2026-11-27: transaction fees are part of the cost for the $50,000 threshold; the CV half is still to be read from the Act ([fif-roadmap.md](roadmaps/fif-roadmap.md) Q10).
 - GST on advisory fees (step 4).
-- Whether individuals can deduct advisory fees (steps 4, 6).
+- Whether individuals can deduct advisory fees (steps 4, 6). Not part of FIF income under either method, so it stays with step 4 ([fif-roadmap.md](roadmaps/fif-roadmap.md) §7).
 
 ---
 
