@@ -122,10 +122,20 @@ public class Instrument : BaseAuditableEntity
     /// Instrument-tax-attributes R10, R11: the treatment of a tax year. The latest row not after the year stands for
     /// it, unless that row is an exemption for an earlier year. No such row → <see cref="FifTreatment.NotClassified"/>.
     /// </summary>
-    public FifTreatment FifTreatmentFor(int taxYear) => FifTreatment.NotClassified;
+    public FifTreatment FifTreatmentFor(int taxYear) =>
+        FifTreatmentRowFor(taxYear)?.Treatment ?? FifTreatment.NotClassified;
 
     /// <summary>R11, R28: the row <see cref="FifTreatmentFor"/> took its answer from, or none when not classified.</summary>
-    public InstrumentFifTreatment? FifTreatmentRowFor(int taxYear) => null;
+    public InstrumentFifTreatment? FifTreatmentRowFor(int taxYear)
+    {
+        var row = _fifTreatments.Where(candidate => candidate.TaxYear <= taxYear).MaxBy(candidate => candidate.TaxYear);
+        if (row is null || (row.TaxYear != taxYear && row.Treatment.IsExemption()))
+        {
+            return null;
+        }
+
+        return row;
+    }
 
     /// <summary>R5, R9, R12: every reason the tax attributes cannot be stored, keyed by field; empty when they can.</summary>
     public static IReadOnlyList<TaxAttributeRefusal> TaxAttributeRefusals(
