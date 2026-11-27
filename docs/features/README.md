@@ -180,6 +180,16 @@ Step 3 of the roadmap in [future-plans.md](../future-plans.md) §1. Its own plan
 
 ---
 
+## Business domain — FIF tax report (opened 2026-11-27)
+
+Step 6 of the roadmap in [future-plans.md](../future-plans.md) §1. Its own plan is [fif-roadmap.md](../roadmaps/fif-roadmap.md) (`note`): five items and one optional item, TR1 to TR6. This table grows one row per item.
+
+| Spec | Status | Who | Ships | Why it stays its own slice |
+| --- | --- | --- | --- | --- |
+| [instrument-tax-attributes](instrument-tax-attributes.md) | review (2026-11-27) | TenantAdmin and SystemAdmin (`instruments.manage`) classify; Adviser reads (`instruments.read`); any authenticated caller (the country list); Customer none | FIF roadmap step 1 (TR1). An Instrument states its issuer country (an ISO 3166-1 alpha-2 code from a constant list in Domain) and a FIF treatment per tax year: `NotForeign`, `ExemptAsxListed`, `ExemptOther` (with a note), `Attributing` or `AttributingNoFdr`. An exemption stands for its own tax year; any other treatment stands until the next row; with no row the Instrument is not classified for the year. Classified by hand, per Tenant; no outside tool is called. `PUT /instruments/{id}/tax-attributes` replaces the country and every row under the Instrument's `rowVersion`; `issuerCountry` and `fifTreatments` on the instrument item; `GET /countries`. The country and the rows must agree (`NZ` ⇔ `NotForeign`, `ExemptAsxListed` needs `AU`). Nothing reads the attributes yet: later items ask `Instrument.FifTreatmentFor(taxYear)`. A dividend's tax source is not checked against the country. The demo catalog is classified by the seeds for tax year 2027. Script `0061`. Back Office tax attributes section. No permission, problem code, event, job or portal change | Every later item of the roadmap starts by asking which holdings count. Structural groundwork with no behaviour, like account-custody-mode |
+
+---
+
 ## Ledger — custody modes (opened 2026-11-17)
 
 Decision in [ADR 0020](../adr/0020-account-custody-mode.md) (accepted 2026-11-17): every Account is `External` or `Custodial`. The work is cut into slices; the list is in [future-plans.md](../future-plans.md) §9. All five slices have a spec.
