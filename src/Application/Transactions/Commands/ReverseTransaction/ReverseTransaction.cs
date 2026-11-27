@@ -231,12 +231,14 @@ public class ReverseTransactionCommandHandler(
             query = query.Where(row => row.TenantId == currentUser.TenantId);
         }
 
-        // The FX, adjustment and fee details are copied to the Reversal (FX conversions R17, adjustments R18,
-        // trade-fees R19).
+        // The FX, adjustment, fee, tax and dividend details are copied to the Reversal (FX conversions R17,
+        // adjustments R18, trade-fees R19, external-income R19).
         var transaction = await query
                               .Include(row => row.FxDetail)
                               .Include(row => row.AdjustmentDetail)
                               .Include(row => row.FeeDetails)
+                              .Include(row => row.TaxDetails)
+                              .Include(row => row.DividendDetail)
                               .SingleOrDefaultAsync(cancellationToken)
                           ?? throw new NotFoundException("Transaction", publicId);
 

@@ -306,7 +306,7 @@ public class Transaction : BaseAuditableEntity
         var credit = ConvertEntered(imputationCredit, fxRate, decimalPlaces);
         if (gross <= 0m)
         {
-            throw new DomainException("A dividend posting needs a gross amount above 0.");
+            throw new DomainException(EnteredGrossConvertsTo0Message);
         }
 
         var cashLegs = new List<TransactionCashLeg> { TransactionCashLeg.Create(tenantId, accountId, gross, currency) };
@@ -398,6 +398,9 @@ public class Transaction : BaseAuditableEntity
 
     /// <summary>External-income R22.</summary>
     public const string InterestWithTaxNeedsGrossMessage = "Interest with tax withheld needs a gross amount above 0.";
+
+    /// <summary>External-income R14: a gross that converts to 0 in the Account's currency.</summary>
+    public const string EnteredGrossConvertsTo0Message = "GrossAmount converts to 0 in the account currency.";
 
     private static decimal ConvertEntered(decimal amount, AppliedFxRate? fxRate, int decimalPlaces) => fxRate is null
         ? amount

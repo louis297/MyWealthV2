@@ -109,7 +109,9 @@ internal static class TransactionLegReader
                 detail,
                 ActionId = transaction.SourceKind == Domain.Enums.TransactionSourceKind.CorporateAction
                     ? transaction.SourcePublicId
-                    : original == null ? null : original.SourcePublicId,
+                    : original != null && original.SourceKind == Domain.Enums.TransactionSourceKind.CorporateAction
+                        ? original.SourcePublicId
+                        : null,
                 Instrument = new TransactionDividendInstrumentDto(instrument.PublicId, instrument.Symbol, instrument.Name)
             }).ToListAsync(cancellationToken);
 
@@ -309,7 +311,7 @@ internal static class TransactionLegReader
             dividendRows.ToDictionary(
                 row => row.detail.TransactionId,
                 row => new TransactionDividendDto(
-                    row.ActionId ?? Guid.Empty,
+                    row.ActionId,
                     row.Instrument,
                     row.detail.Quantity,
                     row.detail.AmountPerShare,

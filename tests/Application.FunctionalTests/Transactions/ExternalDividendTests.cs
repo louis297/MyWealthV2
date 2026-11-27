@@ -321,7 +321,7 @@ public class ExternalDividendTests : TestBase
             .ShouldBe(["FxRate is required when the instrument currency differs from the account currency."]);
         await AssertNothingWrittenAsync(across);
 
-        var within = await WorldAsync("NZD", "NZD");
+        var within = await WorldAsync("NZD", "NZD", tenantCode: "east-advisory");
         var with = ExampleA(within);
         with["fxRate"] = 1.5m;
         (await CustodialHttp.ErrorsAsync(await PostAsync(within.Token, with)))["FxRate"]
