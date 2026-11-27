@@ -352,7 +352,52 @@ public class Transaction : BaseAuditableEntity
         DateTimeOffset bookedAt,
         string? memo,
         string? reference,
-        TransactionSource source) => throw new NotImplementedException();
+        TransactionSource source)
+    {
+        if (source.Kind != TransactionSourceKind.Manual)
+        {
+            throw new DomainException("An entered interest is entered by a person.");
+        }
+
+        if (taxes.Count == 0)
+        {
+            throw new DomainException("An entered interest has at least one tax. Interest without tax is a plain Interest.");
+        }
+
+        if (grossAmount <= 0m)
+        {
+            throw new DomainException(InterestWithTaxNeedsGrossMessage);
+        }
+
+        if (EnteredTaxes.RefusalOf(taxes) is { } shape)
+        {
+            throw new DomainException(shape.Message);
+        }
+
+        var currency = Money.Create(0m, accountCurrency).Currency;
+        var cashLegs = new List<TransactionCashLeg> { TransactionCashLeg.Create(tenantId, accountId, grossAmount, currency) };
+        var taxDetails = EnteredTaxLegs(
+            tenantId, accountId, currency, grossAmount, taxes, tax => tax.Amount, _ => grossAmount, cashLegs);
+
+        var transaction = new Transaction
+        {
+            TenantId = tenantId,
+            Type = TransactionType.Interest,
+            BookedAt = bookedAt.ToUniversalTime(),
+            Memo = NormaliseMemo(memo),
+            Reference = NormaliseReference(reference),
+            SourceKind = source.Kind,
+            SourcePublicId = source.PublicId,
+            PublicId = Guid.NewGuid(),
+            CashLegs = cashLegs,
+            TaxDetails = taxDetails
+        };
+        transaction.AddDomainEvent(new TransactionPosted(transaction));
+        return transaction;
+    }
+
+    /// <summary>External-income R22.</summary>
+    public const string InterestWithTaxNeedsGrossMessage = "Interest with tax withheld needs a gross amount above 0.";
 
     private static decimal ConvertEntered(decimal amount, AppliedFxRate? fxRate, int decimalPlaces) => fxRate is null
         ? amount
