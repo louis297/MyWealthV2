@@ -227,6 +227,36 @@ public class Transaction : BaseAuditableEntity
         return transaction;
     }
 
+    /// <summary>
+    /// External-income R14, R16, R17: a dividend an outside party paid into an External account, as the caller states
+    /// it. <paramref name="grossAmount"/>, <paramref name="imputationCredit"/> and each tax amount are in the quote
+    /// currency; with <paramref name="fxRate"/> (quote currency → Account currency, source <c>Caller</c>) each is
+    /// converted as <c>Round(amount × rate, decimalPlaces, AwayFromZero)</c> and the rate is stored. One <c>Principal</c>
+    /// leg of the gross and one <c>Tax</c> leg per tax with its tax detail (a tax that converts to 0 books no leg); a
+    /// dividend detail; no security leg. Source <c>Manual</c> only. Nothing is multiplied and no rate is applied (R4).
+    /// </summary>
+    public static Transaction PostEnteredDividend(
+        int tenantId,
+        int accountId,
+        string accountCurrency,
+        int decimalPlaces,
+        int instrumentId,
+        string quoteCurrency,
+        decimal quantity,
+        decimal? amountPerShare,
+        decimal grossAmount,
+        DividendTaxSource taxSource,
+        decimal imputationCredit,
+        IReadOnlyList<EnteredTax> taxes,
+        AppliedFxRate? fxRate,
+        DateOnly? exDate,
+        DateOnly? recordDate,
+        DateOnly? paymentDate,
+        DateTimeOffset bookedAt,
+        string? memo,
+        string? reference,
+        TransactionSource source) => throw new NotImplementedException();
+
     /// <summary>R37: <c>Dividend ACME.SIM 0.72 per share</c>, the amount with at least two decimals.</summary>
     private static string DividendMemo(string symbol, decimal amountPerShare) =>
         string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Dividend {symbol} {amountPerShare:0.00######} per share");
