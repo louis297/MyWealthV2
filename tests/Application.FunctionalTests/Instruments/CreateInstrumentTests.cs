@@ -63,6 +63,8 @@ public class CreateInstrumentTests : TestBase
         item.RootElement.GetProperty("isActive").GetBoolean().ShouldBeTrue();
         item.RootElement.GetProperty("rowVersion").GetString().ShouldNotBeNullOrEmpty();
         item.RootElement.TryGetProperty("price", out _).ShouldBeFalse();
+        item.RootElement.GetProperty("issuerCountry").ValueKind.ShouldBe(JsonValueKind.Null);
+        item.RootElement.GetProperty("fifTreatments").EnumerateArray().ShouldBeEmpty();
     }
 
     [Test]
