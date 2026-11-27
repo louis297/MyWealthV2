@@ -26,6 +26,7 @@ public class BackOfficePageTests
     private static readonly Guid MissingTenantId = Guid.Parse("77777777-7777-7777-7777-777777777777");
     private static readonly Guid MarketTenantId = Guid.Parse("88888888-8888-8888-8888-888888888888");
     private static readonly Guid MarketInstrumentId = Guid.Parse("99999999-9999-9999-9999-999999999999");
+    private static readonly Guid ClassifiedInstrumentId = Guid.Parse("33333333-aaaa-3333-3333-333333333333");
     private static readonly Guid ClientMoneyUsdId = Guid.Parse("88888888-8888-8888-8888-888888888888");
     private static readonly Guid ClientMoneyAudId = Guid.Parse("88888888-8888-8888-8888-8888888888aa");
     private static readonly Guid ClientMoneyNzdId = Guid.Parse("99999999-9999-9999-9999-999999999999");
@@ -803,6 +804,58 @@ public class BackOfficePageTests
         body.ShouldNotContain("/accounts");
     }
 
+    // Instrument-tax-attributes BO-I9, BO-I11: the section under the rename form, for an instrument with no line.
+    [Test]
+    public async Task InstrumentDetail_ShowsTheTaxAttributesSection_NotClassified()
+    {
+        var countriesBefore = _api.CountryListCalls;
+
+        var body = await GetAsync($"/instruments/{InstrumentId}");
+
+        _api.CountryListCalls.ShouldBeGreaterThan(countriesBefore);
+        var renameAt = body.IndexOf(">Save<", StringComparison.Ordinal);
+        var sectionAt = body.IndexOf(">Tax attributes<", StringComparison.Ordinal);
+        renameAt.ShouldBeGreaterThanOrEqualTo(0);
+        sectionAt.ShouldBeGreaterThan(renameAt);
+        body.ShouldContain("Issuer country");
+        body.ShouldContain("FIF treatment");
+        body.ShouldContain(">Not classified<");
+        body.ShouldContain(">Add tax year<");
+        body.ShouldContain(">Save tax attributes<");
+        body.ShouldContain("A treatment that is not an exemption stands for the later tax years until the next line. An exemption stands for its own tax year only.");
+    }
+
+    // Instrument-tax-attributes BO-I9, BO-I10: one line per row with its tax year, its label and its note.
+    [Test]
+    public async Task InstrumentDetail_ShowsEachLineOfTheFifTreatment()
+    {
+        var body = await GetAsync($"/instruments/{ClassifiedInstrumentId}");
+
+        body.ShouldContain("Australia (AU)");
+        body.ShouldContain("2026");
+        body.ShouldContain("2027");
+        body.ShouldContain("Attributing interest");
+        body.ShouldContain("Exempt: ASX-listed Australian share");
+        body.ShouldContain("Checked in the tool.");
+        body.ShouldContain("Remove tax year");
+        body.ShouldNotContain(">Not classified<");
+    }
+
+    // Instrument-tax-attributes BO-I12: the Country and FIF treatment columns.
+    [Test]
+    public async Task Instruments_ShowTheCountryAndTheFifTreatmentColumns()
+    {
+        var body = await GetAsync($"/instruments?tenantId={TenantId}");
+
+        body.ShouldContain(">Country<");
+        body.ShouldContain(">FIF treatment<");
+        body.ShouldContain(">US<");
+        body.ShouldContain(">AU<");
+        body.ShouldContain("Attributing interest from 2027");
+        body.ShouldContain("Exempt: ASX-listed Australian share 2027");
+        body.ShouldContain("Not classified");
+    }
+
     [Test]
     public async Task InstrumentDetail_ShowsEnableWhenInactive()
     {
@@ -1193,12 +1246,16 @@ public class BackOfficePageTests
 
             return Task.FromResult(new InstrumentPage(
                 [
-                    new InstrumentItem(InstrumentId, tenantId, "ZZZ", "Zulu", "USD", false, "rv1"),
-                    new InstrumentItem(SecondInstrumentId, tenantId, "VTI", "Vanguard", "NZD", true, "rv2")
+                    new InstrumentItem(InstrumentId, tenantId, "ZZZ", "Zulu", "USD", false, "rv1",
+                        IssuerCountry: "US", FifTreatments: [new FifTreatmentItem(2027, "Attributing", null)]),
+                    new InstrumentItem(SecondInstrumentId, tenantId, "VTI", "Vanguard", "NZD", true, "rv2"),
+                    new InstrumentItem(ClassifiedInstrumentId, tenantId, "BHP", "BHP Group", "AUD", true, "rv3",
+                        IssuerCountry: "AU",
+                        FifTreatments: [new FifTreatmentItem(2026, "ExemptAsxListed", null), new FifTreatmentItem(2027, "ExemptAsxListed", null)])
                 ],
                 page,
                 pageSize,
-                2));
+                3));
         }
 
         public readonly record struct TenantListRequest(int Page, int PageSize, bool? IsEnabled, string? Search);
@@ -1230,6 +1287,17 @@ public class BackOfficePageTests
                 return Task.FromResult(new InstrumentItem(id, TenantId, "ACME.SIM", "Acme Simulated Holdings", "USD", true, "rv3", "simulator"));
             }
 
+            if (id == ClassifiedInstrumentId)
+            {
+                return Task.FromResult(new InstrumentItem(id, TenantId, "BHP", "BHP Group", "AUD", true, "rv4",
+                    IssuerCountry: "AU",
+                    FifTreatments:
+                    [
+                        new FifTreatmentItem(2026, "Attributing", null),
+                        new FifTreatmentItem(2027, "ExemptAsxListed", "Checked in the tool.")
+                    ]));
+            }
+
             return Task.FromResult(new InstrumentItem(id, TenantId, "VTI", "Vanguard", "USD", true, "rv1"));
         }
 
@@ -1245,6 +1313,23 @@ public class BackOfficePageTests
             Task.CompletedTask;
 
         public Task EnableInstrumentAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public int CountryListCalls { get; private set; }
+
+        public Task<IReadOnlyList<CountryItem>> ListCountriesAsync(CancellationToken cancellationToken = default)
+        {
+            CountryListCalls++;
+            return Task.FromResult<IReadOnlyList<CountryItem>>(
+                [new CountryItem("AU", "Australia"), new CountryItem("NZ", "New Zealand"), new CountryItem("US", "United States of America")]);
+        }
+
+        public Task SetInstrumentTaxAttributesAsync(
+            Guid id,
+            string? issuerCountry,
+            IReadOnlyList<FifTreatmentItem> fifTreatments,
+            string rowVersion,
+            CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
         public List<Guid> InterestRunLists { get; } = [];

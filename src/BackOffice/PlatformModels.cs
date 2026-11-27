@@ -57,7 +57,15 @@ public sealed record InstrumentItem(
     string QuoteCurrency,
     bool IsActive,
     string RowVersion,
-    string? MarketDataConnection = null);
+    string? MarketDataConnection = null,
+    string? IssuerCountry = null,
+    IReadOnlyList<FifTreatmentItem>? FifTreatments = null);
+
+/// <summary>One FIF treatment row of an instrument (instrument-tax-attributes §8.1).</summary>
+public sealed record FifTreatmentItem(int TaxYear, string Treatment, string? Note);
+
+/// <summary>One entry of <c>GET /countries</c>: an ISO 3166-1 alpha-2 code and its English short name.</summary>
+public sealed record CountryItem(string Code, string Name);
 
 public sealed record InstrumentPage(
     IReadOnlyList<InstrumentItem> Items,
