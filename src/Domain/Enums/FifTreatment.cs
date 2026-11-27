@@ -28,9 +28,15 @@ public enum FifTreatment
 
 public static class FifTreatmentExtensions
 {
+    /// <summary>R7: a value a row may hold. <see cref="FifTreatment.NotClassified"/> is never stored.</summary>
+    public static bool IsStored(this FifTreatment treatment) =>
+        treatment is >= FifTreatment.NotForeign and <= FifTreatment.AttributingNoFdr;
+
     /// <summary>R10: an exemption stands for its own tax year only.</summary>
-    public static bool IsExemption(this FifTreatment treatment) => false;
+    public static bool IsExemption(this FifTreatment treatment) =>
+        treatment is FifTreatment.ExemptAsxListed or FifTreatment.ExemptOther;
 
     /// <summary>An attributing interest, with or without the fair dividend rate method.</summary>
-    public static bool IsAttributing(this FifTreatment treatment) => false;
+    public static bool IsAttributing(this FifTreatment treatment) =>
+        treatment is FifTreatment.Attributing or FifTreatment.AttributingNoFdr;
 }
