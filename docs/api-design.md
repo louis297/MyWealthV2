@@ -334,6 +334,7 @@ This is not “a User with child collections”. Do not use `/users/{id}/adviser
 | Advisers | `/users/advisers` | same | `advisers.manage` |
 | Customers | `/users/customers` | same; sub-resource `…/{customerId}/tax-profile` GET / PUT (features/interest-run.md) | `customers.manage` or `customers.manage-own` |
 | Currencies | `/currencies` | GET | Authenticated |
+| Countries | `/countries` | GET (the ISO 3166-1 alpha-2 list in Domain, `{ code, name }` sorted by name, no paging). See features/instrument-tax-attributes.md | Authenticated |
 | FX rates | `/fx-rates` | GET (the stored rates of one directed pair; platform data). See features/market-data-history.md | Authenticated |
 | Tenants | `/tenants` | list / get / create / update / disable / enable | `tenants.manage` |
 | Client money accounts | `/tenants/{tenantId}/client-money-accounts` | list / get / create / disable / enable. See features/client-money-accounts.md; `bankConnection`, `bankFeed` in features/deposit-matching.md | `tenants.manage` |
@@ -397,6 +398,8 @@ Field rules belong in each Feature Spec. This section only locks the catalog and
 | Omitted or `false` | All rows (including disabled) |
 | `true` | Enabled rows only |
 | Any other value | 400 |
+
+Countries ([features/instrument-tax-attributes.md](features/instrument-tax-attributes.md) R6): `GET /countries` for any authenticated caller, no policy. It returns every officially assigned ISO 3166-1 alpha-2 code with its English short name as `{ code, name }`, sorted by name, without paging. The list is a constant in Domain; there is no table and no write route.
 
 Item: `{ code, name, decimalPlaces, isActive }`. Sorted by `code`. No “disabled-only” query. No pagination. No write API. No `GET /currencies/{code}`. Column and JSON renamed 2026-09-21: `IsEnabled` → `IsActive`.
 
@@ -489,12 +492,14 @@ Field rules: [features/instruments.md](features/instruments.md).
 | PUT | `/instruments/{id}` | `instruments.manage` | 204 |
 | POST | `/instruments/{id}/disable` | `instruments.manage` | 204 |
 | POST | `/instruments/{id}/enable` | `instruments.manage` | 204 |
+| PUT | `/instruments/{id}/tax-attributes` | `instruments.manage` | 204 |
 
 - TenantAdmin / Adviser: current tenant. Body / list query must omit `tenantId`.
 - SystemAdmin: list and create require tenant PublicId. Get / PUT / disable / enable may cross tenants.
 - Customer → 403.
-- Item includes `id`, `tenantId`, `symbol`, `name`, `quoteCurrency`, `isActive`, `marketDataConnection`, `rowVersion`. No price. `marketDataConnection` is the name of the market data connection whose symbol suffix the symbol ends with, or `null`; it is worked out from the symbol and the configuration, and there is no filter on it ([features/simulated-instruments.md](features/simulated-instruments.md) R6).
+- Item includes `id`, `tenantId`, `symbol`, `name`, `quoteCurrency`, `isActive`, `marketDataConnection`, `issuerCountry`, `fifTreatments`, `rowVersion`. No price. `marketDataConnection` is the name of the market data connection whose symbol suffix the symbol ends with, or `null`; it is worked out from the symbol and the configuration, and there is no filter on it ([features/simulated-instruments.md](features/simulated-instruments.md) R6).
 - Create on a disabled tenant → §4.1 `target=tenant`.
+- Tax attributes ([features/instrument-tax-attributes.md](features/instrument-tax-attributes.md) R16–R21): `PUT /instruments/{id}/tax-attributes` takes `{ issuerCountry, fifTreatments: [{ taxYear, treatment, note }], rowVersion }` and replaces the country and every row; both fields are required (`issuerCountry` may be `null`, `fifTreatments` may be empty) and any other field → 400. The instrument's `rowVersion` guards it: stale → 409 `stale_row_version`. The item carries `issuerCountry` (code or `null`) and `fifTreatments` sorted by `taxYear`. `POST /instruments` takes no tax attribute and `PUT /instruments/{id}` refuses one.
 - Prices ([features/market-data-history.md](features/market-data-history.md) R19, R21–R23): optional `from` and `to` (`yyyy-MM-dd`, inclusive) and paging. The instrument is found as `GET /instruments/{id}` finds it (other Tenant or missing → 404; SystemAdmin any Tenant). An inactive instrument is readable. `?to={date}&pageSize=1` answers the row a price read as of that date chooses.
 
 ### 7.6 Accounts
@@ -900,3 +905,4 @@ One row per change. The text of each change is in git (`git log -p -- docs/api-d
 | 2026-11-26 | Valuation history (§6, §7.18): `GET /net-worth/funds-under-management`; `folded` on the net-worth reads; `date` of the Adviser Balances Report. No permission or problem code |
 | 2026-11-27 | Docs caught up with the code: §1 diagram shows the BFF between the browser and `webapi`; §2 CORS is none on `webapi`; §4 login failures are uniform (`Invalid login.`), no longer open; §7.8 the Customer's `reports.customer.create` and the Tenant pair; §4.2 `concurrent_modification` marked retired; §5 end session returns to `{bffOrigin}/` |
 | 2026-11-27 | Income on External accounts (§7.7): `POST /transactions/dividend`; `taxes` on a hand `Interest`; `POST /transactions` refuses `Dividend`; a hand-entered dividend on the item. No permission or problem code |
+| 2026-11-27 | Tax attributes of an Instrument (§6, §7.2, §7.5): `PUT /instruments/{id}/tax-attributes`; `issuerCountry` and `fifTreatments` on the instrument item; `GET /countries`. No permission or problem code |

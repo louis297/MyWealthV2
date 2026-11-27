@@ -32,6 +32,8 @@ related:
   - features/dividends.md
   - roadmaps/valuation-roadmap.md
   - features/external-income.md
+  - roadmaps/fif-roadmap.md
+  - features/instrument-tax-attributes.md
 ---
 
 # Future plans
@@ -66,7 +68,7 @@ Order. Each step depends only on earlier steps:
 | 3 | Historical valuation | Prices and FX rates as of a date, and holding snapshots. Every period report needs them. Closes the open daily snapshots in [function-plan.md](function-plan.md) §5.4. Several features, not one: planned in [valuation-roadmap.md](roadmaps/valuation-roadmap.md) (`note`, 2026-11-25). Its items V1 to V3 are this step, and all three have landed (V3: [features/valuation-run.md](features/valuation-run.md), 2026-11-26), so step 4 can open. | instrument-prices, fx-rates |
 | 4 | Advisory fee | Tiered or blended rates, daily accrual, pro rata for part periods, billing in advance or in arrears, and what happens when cash is short. | Step 3 |
 | 5 | Performance report | Time-weighted return (TWR) and money-weighted return (MWR), gross and net of fees. | Steps 3, 4 |
-| 6 | FIF tax report | Main goal. FDR and CV methods, the de minimis test, the quick sale adjustment, exempt ASX-listed shares, and the NZ tax year (1 April to 31 March). FIF reports published by NZ investment platforms can serve as test oracles. | Steps 2, 3 |
+| 6 | FIF tax report | Main goal. FDR and CV methods, the de minimis test, the quick sale adjustment, exempt ASX-listed shares, and the NZ tax year (1 April to 31 March). FIF reports published by NZ investment platforms can serve as test oracles. Several features, not one: planned in [fif-roadmap.md](roadmaps/fif-roadmap.md) (`note`, 2026-11-27), five items and one optional item. Its first item, TR1, is accepted and landed (2026-11-27): [features/instrument-tax-attributes.md](features/instrument-tax-attributes.md), the issuer country and the FIF treatment of an Instrument per tax year. The other items are not started. Its decisions were confirmed on 2026-11-27. One of them is that this step opens neither ledger replay nor period close (§9 below); another is that only the tax year is cut in New Zealand time, and a day stays a UTC date everywhere else. | Steps 2, 3 |
 
 Working method: work each topic out by hand in a spreadsheet with a real or synthetic data set before its spec is written. The worked numbers become the tests.
 
@@ -78,9 +80,9 @@ Questions to settle when step 1 opens:
 
 To check against IRD when the related step opens:
 
-- Whether brokerage is part of the cost base, and how the CV method treats it (steps 1, 6).
+- Whether brokerage is part of the cost base, and how the CV method treats it (steps 1, 6). Read 2026-11-27: transaction fees are part of the cost for the $50,000 threshold; the CV half is still to be read from the Act ([fif-roadmap.md](roadmaps/fif-roadmap.md) Q10).
 - GST on advisory fees (step 4).
-- Whether individuals can deduct advisory fees (steps 4, 6).
+- Whether individuals can deduct advisory fees (steps 4, 6). Not part of FIF income under either method, so it stays with step 4 ([fif-roadmap.md](roadmaps/fif-roadmap.md) §7).
 
 ---
 
@@ -233,7 +235,7 @@ After slice 2, some writes on a Custodial account are still entered by hand or a
 - A simulator of the outside parties (a bank first, then a broker) to drive these flows without real connections.
 - Rebuilding an account's position by replaying its transactions in order. Deferred until after the items above are under way.
 
-Status on 2026-11-25: every flow in the list has landed. The roadmap has two steps left (an end-to-end run with the scenario library, and the review of an adjustment by a second person). Replay and period close are moved out of it: they open when §1 needs them, at the latest with step 6. After those two steps, work returns to §1 at what is left of step 2, then step 3 ([custodial-roadmap.md](roadmaps/custodial-roadmap.md) §13.1).
+Status on 2026-11-25: every flow in the list has landed. The roadmap has two steps left (an end-to-end run with the scenario library, and the review of an adjustment by a second person). Replay and period close are moved out of it: they open when §1 needs a write in the past. Step 6 was expected to be that point and is not: the FIF report reads the Transactions in order and writes nothing ([fif-roadmap.md](roadmaps/fif-roadmap.md) §1.2, decided 2026-11-27). After those two steps, work returns to §1 at what is left of step 2, then step 3 ([custodial-roadmap.md](roadmaps/custodial-roadmap.md) §13.1).
 
 Related: the advisory fee (§1 step 4) and platform billing (§8) can then use Custodial accounts as their base.
 

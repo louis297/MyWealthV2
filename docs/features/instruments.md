@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-09-18
-last_updated: 2026-11-26
+last_updated: 2026-11-27
 related:
   - ../function-plan.md
   - ../domain-model.md
@@ -18,6 +18,7 @@ related:
   - ../adr/0011-ledger-cash-holdings-reversal.md
   - ../adr/0013-roles-authorization-single-user-table.md
   - currencies.md
+  - instrument-tax-attributes.md
 ---
 
 # Instruments
@@ -25,6 +26,8 @@ related:
 Tenant instrument catalog on `webapi`: list / get / create / rename / disable / enable. First Phase-2 ledger slice. Adds script `0010_instruments.sql`, policies `instruments.read` / `instruments.create` / `instruments.manage`, aggregate `Instrument`, and ports `IMarketData` / `IFxRate`.
 
 Holdings, accounts, and posting are out. This slice does not persist a price. Later slices store `InstrumentId` only.
+
+An Instrument also has tax attributes: an issuer country and a FIF treatment per tax year. They are owned by [instrument-tax-attributes.md](instrument-tax-attributes.md) (accepted 2026-11-27), which this file points to.
 
 **Status is `accepted`.** Implementation follows this file.
 
@@ -38,7 +41,7 @@ Landed in GitHub `louis297/MyWealthV2` master 2026-09-20, last slice commit `9ea
 
 A TenantAdmin or Adviser creates an instrument in the **current** tenant (`symbol` = instrument code, `name` = display name, `quoteCurrency`). SystemAdmin does the same for a chosen tenant (`tenantId` on create and on the list query). `QuoteCurrency` must be an enabled platform currency and is immutable after create. Cost currency equals quote currency (no extra column). An Adviser may create and read. Update / disable / enable are TenantAdmin or SystemAdmin. Disabled instruments stay in the catalog; they cannot be chosen as a **new** holding when that slice exists. Existing holdings (later) keep the id, same rule as a later-disabled `ReportingCurrency`.
 
-The catalog is firm-wide, not per-Adviser. Customer receives 403. TenantAdmin / Adviser crossing tenants → 404. SystemAdmin may read and write any tenant’s row (Scalar or Back Office; page contract [../backoffice/back-office-instruments.md](../backoffice/back-office-instruments.md)). Adviser Portal has no SystemAdmin instruments screen.
+The catalog is firm-wide, not per-Adviser. Its tax attributes (issuer country, FIF treatment per tax year) are set by `instruments.manage` through their own route ([instrument-tax-attributes.md](instrument-tax-attributes.md)). Customer receives 403. TenantAdmin / Adviser crossing tenants → 404. SystemAdmin may read and write any tenant’s row (Scalar or Back Office; page contract [../backoffice/back-office-instruments.md](../backoffice/back-office-instruments.md)). Adviser Portal has no SystemAdmin instruments screen.
 
 ---
 
@@ -124,6 +127,8 @@ Added by later specs:
 | R23 | **`marketDataConnection`.** The instrument item of `GET /instruments` and `GET /instruments/{id}` carries `marketDataConnection`: the name of the configured market data connection whose symbol suffix the symbol ends with (compared without regard to case), or `null`. Every caller who can read the instrument sees it. No filter on it, and no column: it is worked out from the symbol and the configuration on each read. A symbol like `ACME.SIM` is an ordinary catalog symbol under R6 (simulated-instruments R4, R6). |
 | R24 | **Corporate actions.** A disabled Instrument may still get a corporate action, by hand or from the feed, because it may still be held. An Instrument served by a market data connection takes no hand-entered corporate action; its corporate actions come from the connection's feed (corporate-actions R12, R15, R16). |
 | R25 | **Prices.** `GET /instruments/{id}/prices` lists the stored prices ([instrument-prices.md](instrument-prices.md) R12). The item itself carries no price. |
+| R26 | **Tax attributes on the item.** The item of `GET /instruments` and `GET /instruments/{id}` carries `issuerCountry` (an ISO 3166-1 alpha-2 code or `null`) and `fifTreatments` (every row as `{ taxYear, treatment, note }`, sorted by `taxYear`, an empty list when there is none). Every caller who can read the instrument sees them ([instrument-tax-attributes.md](instrument-tax-attributes.md) R21). |
+| R27 | **Tax attributes are written on their own route.** `PUT /instruments/{id}/tax-attributes` (`instruments.manage`) replaces the issuer country and every FIF treatment row ([instrument-tax-attributes.md](instrument-tax-attributes.md) R16). `POST /instruments` takes no tax attribute, and `PUT /instruments/{id}` refuses one with 400 under R14. Renaming, disabling or enabling does not change them. |
 
 ---
 
@@ -133,6 +138,8 @@ Added by later specs:
 | --- | --- | --- |
 | `Instrument` | Aggregate | Tenant catalog row. Not a holding. |
 | `InstrumentCreated` / `InstrumentDisabled` / `InstrumentEnabled` | Event | Raise even with no subscriber yet. Rename raises nothing in this slice. |
+| `Instrument.IssuerCountry`, `Instrument.FifTreatments`, `SetTaxAttributes`, `FifTreatmentFor`, `FifTreatmentRowFor` | Members | Owned by [instrument-tax-attributes.md](instrument-tax-attributes.md) §5. `SetTaxAttributes` raises no event |
+| `InstrumentFifTreatment` | Entity, child of `Instrument` | One FIF treatment of one tax year. Built only by `Instrument`, which passes its `TenantId` down |
 | `IMarketData` | Port | Application. Reads `InstrumentPrices`. |
 | `IFxRate` | Port | Application. Reads `FxRates`. |
 
@@ -194,8 +201,9 @@ Phase 1 ends at `0009`. Do not back-fill. Do not add EF migrations.
 | LastModified | datetimeoffset | yes | |
 | LastModifiedBy | nvarchar(450) | yes | |
 | RowVersion | rowversion | no | |
+| IssuerCountry | char(2) | yes | ISO 3166-1 alpha-2, upper case. Added by `0061_instrument_tax_attributes.sql` ([instrument-tax-attributes.md](instrument-tax-attributes.md) §6) |
 
-No `Isin`, `Exchange`, `InstrumentKind`, `CostCurrency`, price, or quantity columns.
+No `Isin`, `Exchange`, `InstrumentKind`, `CostCurrency`, price, or quantity columns. The issuer country and the FIF treatment rows (table `InstrumentFifTreatments`) are tax attributes, not an ISIN, an exchange or a kind; those stay out.
 
 Keep [database-design.md](../database-design.md) in the same change.
 
@@ -242,6 +250,7 @@ This slice does not have to call the ports from a handler. It **registers** them
 | PUT | `/instruments/{id}` | `instruments.manage` | 204 | 401 / 403 / 400 / 404 / 409 |
 | POST | `/instruments/{id}/disable` | `instruments.manage` | 204 | 401 / 403 / 400 / 404 / 409 |
 | POST | `/instruments/{id}/enable` | `instruments.manage` | 204 | 401 / 403 / 400 / 404 / 409 |
+| PUT | `/instruments/{id}/tax-attributes` | `instruments.manage` | 204 | 401 / 403 / 400 / 404 / 409. Owned by [instrument-tax-attributes.md](instrument-tax-attributes.md) §8 |
 
 List envelope: `{ items, page, pageSize, totalCount }`.
 
@@ -296,11 +305,16 @@ List / get item:
   "name": "Vanguard Total Stock Market ETF",
   "quoteCurrency": "USD",
   "isActive": true,
+  "marketDataConnection": null,
+  "issuerCountry": "US",
+  "fifTreatments": [
+    { "taxYear": 2027, "treatment": "Attributing", "note": null }
+  ],
   "rowVersion": "<base64>"
 }
 ```
 
-GET list does not include a price.
+GET list does not include a price. `issuerCountry` and `fifTreatments` are R26.
 
 `GET /instruments` for SystemAdmin requires `?tenantId=`. TenantAdmin / Adviser must omit it.
 
@@ -342,6 +356,8 @@ Target: the existing Development demo tenant (Phase 1 people seed). CreatedBy = 
 
 Also seed table prices for VTI and AIA (not for the disabled row). Missing price on NZD-CASH is the empty-price case. Later expanded by [instrument-prices.md](instrument-prices.md).
 
+`TestSeed` also writes the tax attributes of the demo catalog ([demo-tenant-seed.md](demo-tenant-seed.md) §5.1), and `ACME.SIM` gets `US` with `2027 Attributing`, `KIWI.SIM` gets `NZ` with `2027 NotForeign`, and `NZD-CASH` gets none ([instrument-tax-attributes.md](instrument-tax-attributes.md) R25).
+
 Functional tests do **not** rely on these rows for isolation; they create their own instruments. One smoke test may assert the three symbols exist after TestAppHost start.
 
 ---
@@ -379,6 +395,7 @@ Locked:
 | Port methods | `IMarketData.TryGetPrice`, `IFxRate.GetRate` |
 | Portal | Adviser Portal has no Instruments management page. Back Office page contract: [../backoffice/back-office-instruments.md](../backoffice/back-office-instruments.md) (accepted 2026-11-09). SystemAdmin also uses Scalar |
 | TestSeed | VTI, AIA, NZD-CASH on the Development demo tenant. Later expanded, with table prices, by [instrument-prices.md](instrument-prices.md) |
+| Tax attributes | Issuer country and FIF treatment per tax year, on their own route; owned by [instrument-tax-attributes.md](instrument-tax-attributes.md) |
 
 Still open, not this slice:
 
@@ -400,3 +417,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-22 | [simulated-instruments.md](simulated-instruments.md), [corporate-actions.md](corporate-actions.md) | R23, R24, R14: `marketDataConnection`; corporate actions on an Instrument |
 | 2026-11-25 | [market-data-history.md](market-data-history.md) | R25: the price read route |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
+| 2026-11-27 | [instrument-tax-attributes.md](instrument-tax-attributes.md) | Intro, §1, R26, R27, §5, §6.1, §8, §9.1, §11: the tax attributes of an Instrument |

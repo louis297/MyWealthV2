@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MyWealthV2.Application.Broker;
 using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Application.Instruments;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.ValueObjects;
 
@@ -10,7 +11,8 @@ namespace MyWealthV2.Infrastructure.Data;
 
 /// <summary>
 /// The demo seed (demo-tenant-seed R4–R12): creates the demo tenant, its demo catalog and its
-/// report grants when missing. Never changes an existing row. One transaction per run.
+/// report grants when missing. Never changes an existing row, except that it classifies a demo catalog instrument
+/// with no tax attribute (instrument-tax-attributes R24). One transaction per run.
 /// The caller reloads the currency catalog first.
 /// </summary>
 public static class DemoTenantSeed
@@ -33,20 +35,23 @@ public static class DemoTenantSeed
         var currencies = services.GetRequiredService<ICurrencyCatalog>();
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(DemoTenantSeed));
         var withBroker = services.GetService<IBrokerConnections>()?.IsConfigured(BrokerConnection) == true;
+        var latestTaxYear = InstrumentTaxYears.Latest(services.GetService<TimeProvider>() ?? TimeProvider.System);
 
         Summary summary = default;
         await db.ExecuteInTransactionAsync(async token =>
         {
             db.ClearTrackedChanges();
-            summary = await SeedAsync(db, currencies, withBroker, logger, token);
+            summary = await SeedAsync(db, currencies, withBroker, latestTaxYear, logger, token);
         }, cancellationToken);
 
         logger.LogInformation(
-            "Demo seed: tenant {TenantCode} {TenantOutcome}; instruments {InstrumentsCreated} created, {InstrumentsExisting} existing; reports {ReportsGranted} granted, {ReportsExisting} existing",
+            "Demo seed: tenant {TenantCode} {TenantOutcome}; instruments {InstrumentsCreated} created, {InstrumentsExisting} existing; instruments classified {InstrumentsClassified}, already classified {InstrumentsAlreadyClassified}; reports {ReportsGranted} granted, {ReportsExisting} existing",
             DemoCatalog.TenantCode,
             summary.TenantCreated ? "created" : "existing",
             summary.InstrumentsCreated,
             summary.InstrumentsExisting,
+            summary.InstrumentsClassified,
+            summary.InstrumentsAlreadyClassified,
             summary.ReportsGranted,
             summary.ReportsExisting);
     }
@@ -55,6 +60,7 @@ public static class DemoTenantSeed
         ApplicationDbContext db,
         ICurrencyCatalog currencies,
         bool withBroker,
+        int latestTaxYear,
         ILogger logger,
         CancellationToken cancellationToken)
     {
@@ -79,23 +85,29 @@ public static class DemoTenantSeed
             logger.LogWarning("Demo seed: tenant {TenantCode} exists and is disabled.", DemoCatalog.TenantCode);
         }
 
-        var existingSymbols = await db.Instruments
-            .Where(row => row.TenantId == tenant.Id)
-            .Select(row => row.Symbol)
-            .ToListAsync(cancellationToken);
-        var known = existingSymbols.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var existing = (await db.Instruments
+                .Include(row => row.FifTreatments)
+                .Where(row => row.TenantId == tenant.Id)
+                .ToListAsync(cancellationToken))
+            .ToDictionary(row => row.Symbol, StringComparer.OrdinalIgnoreCase);
         var instrumentsCreated = 0;
+        var instrumentsClassified = 0;
         foreach (var item in DemoCatalog.Instruments)
         {
-            if (known.Contains(item.Symbol))
+            if (!existing.TryGetValue(item.Symbol, out var instrument))
             {
-                continue;
+                instrument = Instrument.Create(tenant.Id, item.Symbol, item.Name, Require(currencies, item.QuoteCurrency));
+                instrument.CreatedBy = CreatedBy;
+                db.Instruments.Add(instrument);
+                instrumentsCreated++;
             }
 
-            var instrument = Instrument.Create(tenant.Id, item.Symbol, item.Name, Require(currencies, item.QuoteCurrency));
-            instrument.CreatedBy = CreatedBy;
-            db.Instruments.Add(instrument);
-            instrumentsCreated++;
+            // Instrument-tax-attributes R24: a new instrument, or an existing one with no tax attribute at all.
+            if (DemoCatalog.ClassifyIfUnclassified(
+                    instrument, item.IssuerCountry, item.Treatment, item.Note, latestTaxYear, CreatedBy))
+            {
+                instrumentsClassified++;
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);
@@ -136,6 +148,8 @@ public static class DemoTenantSeed
             tenantCreated,
             instrumentsCreated,
             DemoCatalog.Instruments.Count - instrumentsCreated,
+            instrumentsClassified,
+            DemoCatalog.Instruments.Count - instrumentsClassified,
             reportsGranted,
             reportsExisting);
     }
@@ -148,6 +162,8 @@ public static class DemoTenantSeed
         bool TenantCreated,
         int InstrumentsCreated,
         int InstrumentsExisting,
+        int InstrumentsClassified,
+        int InstrumentsAlreadyClassified,
         int ReportsGranted,
         int ReportsExisting);
 }

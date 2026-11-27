@@ -431,6 +431,73 @@ public class BackOfficeApiTests
     }
 
     [Test]
+    public async Task InstrumentCalls_GetReadsTheTaxAttributes()
+    {
+        var instrumentId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, $$"""
+            {"id":"{{instrumentId}}","tenantId":"{{TenantId}}","symbol":"BHP","name":"BHP Group","quoteCurrency":"AUD","isActive":true,"marketDataConnection":null,"issuerCountry":"AU","fifTreatments":[{"taxYear":2027,"treatment":"ExemptAsxListed","note":"Checked."}],"rowVersion":"rv1"}
+            """);
+        var platform = Create(api);
+
+        var item = await platform.GetInstrumentAsync(instrumentId);
+
+        item.IssuerCountry.ShouldBe("AU");
+        item.FifTreatments.ShouldNotBeNull().ShouldBe([new FifTreatmentItem(2027, "ExemptAsxListed", "Checked.")]);
+    }
+
+    // Instrument-tax-attributes BO-I11: the country, every line and the rowVersion, and nothing else.
+    [Test]
+    public async Task InstrumentCalls_SetTaxAttributesSendsTheCountryEveryLineAndTheRowVersion()
+    {
+        var instrumentId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.NoContent, "");
+        api.Enqueue(HttpStatusCode.NoContent, "");
+        var platform = Create(api);
+
+        await platform.SetInstrumentTaxAttributesAsync(instrumentId, "AU",
+        [
+            new FifTreatmentItem(2027, "ExemptAsxListed", "Checked."),
+            new FifTreatmentItem(2028, "ExemptOther", null)
+        ], "rv1");
+        await platform.SetInstrumentTaxAttributesAsync(instrumentId, null, [], "rv2");
+
+        api.Requests.Count.ShouldBe(2);
+        AssertRequest(api.Requests[0], "PUT", $"/instruments/{instrumentId}/tax-attributes");
+        var body = Body(api.Requests[0]);
+        body.EnumerateObject().Select(property => property.Name).ShouldBe(["issuerCountry", "fifTreatments", "rowVersion"]);
+        body.GetProperty("issuerCountry").GetString().ShouldBe("AU");
+        body.GetProperty("rowVersion").GetString().ShouldBe("rv1");
+        var rows = body.GetProperty("fifTreatments").EnumerateArray().ToList();
+        rows.Count.ShouldBe(2);
+        rows[0].GetProperty("taxYear").GetInt32().ShouldBe(2027);
+        rows[0].GetProperty("treatment").GetString().ShouldBe("ExemptAsxListed");
+        rows[0].GetProperty("note").GetString().ShouldBe("Checked.");
+        rows[1].GetProperty("note").ValueKind.ShouldBe(JsonValueKind.Null);
+        rows[0].EnumerateObject().Count().ShouldBe(3);
+
+        var cleared = Body(api.Requests[1]);
+        cleared.GetProperty("issuerCountry").ValueKind.ShouldBe(JsonValueKind.Null);
+        cleared.GetProperty("fifTreatments").GetArrayLength().ShouldBe(0);
+        cleared.GetProperty("rowVersion").GetString().ShouldBe("rv2");
+    }
+
+    [Test]
+    public async Task CountryCalls_ListTheCountries()
+    {
+        var api = new ScriptedHandler();
+        api.Enqueue(HttpStatusCode.OK, """[{"code":"AU","name":"Australia"},{"code":"NZ","name":"New Zealand"}]""");
+        var platform = Create(api);
+
+        var countries = await platform.ListCountriesAsync();
+
+        countries.ShouldBe([new CountryItem("AU", "Australia"), new CountryItem("NZ", "New Zealand")]);
+        api.Requests.Count.ShouldBe(1);
+        AssertRequest(api.Requests[0], "GET", "/countries");
+    }
+
+    [Test]
     public async Task InstrumentCalls_DisableAndEnableSendRowVersionOnly()
     {
         var instrumentId = Guid.Parse("33333333-3333-3333-3333-333333333333");

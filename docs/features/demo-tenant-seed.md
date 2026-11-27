@@ -18,6 +18,7 @@ related:
   - tenant-custody-modes.md
   - production-hosting.md
   - ../known-issues/eodhd-nz-jp-coverage.md
+  - instrument-tax-attributes.md
 ---
 
 # Demo tenant seed
@@ -28,7 +29,7 @@ An operator runs a one-shot command on `webapi`, `--seed-demo`, to create the de
 
 ## 1. Summary
 
-The **demo seed** is an explicit command, not a start-up step. It creates tenant `demo` (`Demo Advisory`, reporting currency `USD`), the 18 instruments of the **demo catalog**, and grants for the three catalog reports (`customer-transactions`, `adviser-balances`, `bank-reconciliation`). It is idempotent on natural keys and never changes a row that already exists. Prices and FX rates come from the existing worker jobs, not from this command.
+The **demo seed** is an explicit command, not a start-up step. It creates tenant `demo` (`Demo Advisory`, reporting currency `USD`), the 18 instruments of the **demo catalog** with their tax attributes ([instrument-tax-attributes.md](instrument-tax-attributes.md) R24), and grants for the three catalog reports (`customer-transactions`, `adviser-balances`, `bank-reconciliation`). It is idempotent on natural keys and never changes a row that already exists, except that it classifies an existing demo catalog instrument that has no tax attribute at all (R6). Prices and FX rates come from the existing worker jobs, not from this command.
 
 This is the first part of [future-plans.md](../future-plans.md) §6 (demo data for visitors). The shared demo logins and the nightly reset are still open there.
 
@@ -50,7 +51,7 @@ This is the first part of [future-plans.md](../future-plans.md) §6 (demo data f
 - People: TenantAdmin, Adviser, Customer, or any login for visitors ([future-plans.md](../future-plans.md) §6)
 - Accounts, Transactions, Holdings, Portfolios, report schedules
 - Instrument prices and FX rates. The worker jobs own both ([instrument-prices.md](instrument-prices.md), [fx-rates.md](fx-rates.md))
-- Changing or repairing an existing tenant, instrument or grant
+- Changing or repairing an existing tenant, instrument or grant, apart from classifying an instrument with no tax attribute (R6)
 - A reset of the demo tenant, and deleting any row
 - An HTTP route or a Back Office page for the seed
 - A second demo tenant (`demo2` stays a Development fixture)
@@ -74,46 +75,48 @@ This is the first part of [future-plans.md](../future-plans.md) §6 (demo data f
 | R3 | The command runs in every environment. Nothing runs it automatically: not host start-up, not `deploy.sh`, not the deploy workflow. |
 | R4 | Tenant: Code `demo`, Name `Demo Advisory`, reporting currency `USD`, enabled. It is created through `Tenant.Create`, with the same validation as a tenant created through the API. The tenant allows both custody modes (`Tenant.Create` allows both). Its `brokerConnection` is set to `simulator` when a broker connection of that name is configured on `webapi`; otherwise it gets none (orders §9.1). |
 | R5 | When a tenant with Code `demo` already exists, the seed does not change it: name, reporting currency and enabled flag stay as they are. It still ensures the instruments (R6) and grants (R8) for that tenant. A disabled demo tenant is logged as a warning, not an error. That includes its allowed custody modes and its broker connection. The seed adds no client money account, on a new or an existing `demo` tenant: until SystemAdmin adds one in the Back Office, no new Custodial account can be opened in the demo tenant (client-money-accounts R11). The account numbers must match the simulator bank's accounts, which the seed cannot know. |
-| R6 | Instruments: every row of the demo catalog (§5.1), all active. Idempotent on `(TenantId, Symbol)`. An existing row with the same symbol is left unchanged, even if its name, quote currency or `IsActive` differ. |
+| R6 | Instruments: every row of the demo catalog (§5.1), all active, with the issuer country and the tax year 2027 FIF treatment of §5.1. Idempotent on `(TenantId, Symbol)`. An existing row with the same symbol is left unchanged, even if its name, quote currency or `IsActive` differ, with one exception: when it has no tax attribute at all (no issuer country and no FIF treatment row), the seed writes the tax attributes of §5.1 on it. An instrument with either is left unchanged ([instrument-tax-attributes.md](instrument-tax-attributes.md) R24). |
 | R7 | The NZD and JPY rows stay in the catalog, although EODHD has no price for them ([known-issues/eodhd-nz-jp-coverage.md](../known-issues/eodhd-nz-jp-coverage.md)). Until it does, valuation, Buy and Sell see no price for them, as on any tenant. |
 | R8 | Report grants: `customer-transactions`, `adviser-balances` and `bank-reconciliation` (bank-reconciliation R23). Idempotent on `(TenantId, ReportId)`. A platform-inactive catalog report is not granted and is logged as a warning, matching `POST /tenants/{tenantId}/reports`. A missing catalog code is an error (R11). |
-| R9 | The seed writes nothing else: no people, accounts, transactions, holdings, portfolios, schedules, instrument prices or FX rates. No other tenant is read or written. |
+| R9 | The seed writes nothing else besides the tax attributes of R6: no people, accounts, transactions, holdings, portfolios, schedules, instrument prices or FX rates. No other tenant is read or written. |
 | R10 | Audit `CreatedBy` = `system`, the same value as `TestSeed`. |
 | R11 | All writes of one run are in one database transaction. Any failure rolls the whole run back, logs the error, and exits with code 1. Success exits with code 0. A run that races another run fails on a unique index and can be run again. |
-| R12 | The log names the tenant and counts what was created and what already existed, for example `Demo seed: tenant created; instruments 18 created, 0 existing; reports 3 granted, 0 existing`. It never logs a connection string or a secret. |
-| R13 | The demo catalog has one definition. `TestSeed` uses it for `demo` and `demo2` in Development and adds its own Development-only extras on top: the disabled `NZD-CASH` row and the fake prices and FX rates. Those extras never reach the command. |
+| R12 | The log names the tenant and counts what was created and what already existed, for example `Demo seed: tenant demo created; instruments 18 created, 0 existing; instruments classified 18, already classified 0; reports 3 granted, 0 existing`. "Classified" counts the instruments the run wrote tax attributes on; "already classified" counts the existing ones it left unchanged because they had a tax attribute. It never logs a connection string or a secret. |
+| R13 | The demo catalog has one definition. `TestSeed` uses it for `demo` and `demo2` in Development and adds its own Development-only extras on top: the disabled `NZD-CASH` row (not classified), `ACME.SIM` (`US`, `2027 Attributing`) and `KIWI.SIM` (`NZ`, `2027 NotForeign`), and the fake prices and FX rates. It writes the tax attributes by the rule of R6 ([instrument-tax-attributes.md](instrument-tax-attributes.md) R25). Those extras never reach the command. |
 | R14 | The Development demo tenant keeps reporting currency `NZD`. `DevelopmentIdentitySeeder` creates it first, so R5 means the command does not change it when run locally. Only a database without a `demo` tenant gets `USD`. |
 
 ---
 
 ## 5. Domain
 
-No new types. The seed uses `Tenant.Create`, `Instrument.Create` and `TenantReport.Grant` as they are.
+No new types. The seed uses `Tenant.Create`, `Instrument.Create`, `Instrument.SetTaxAttributes` and `TenantReport.Grant` as they are.
 
 ### 5.1 Demo catalog
 
 Symbols are stored as in `TestSeed` today. The instrument-price job maps them to EODHD symbols ([instrument-prices.md](instrument-prices.md) §11).
 
-| Symbol | Name | Quote currency |
-| --- | --- | --- |
-| VTI | Vanguard Total Stock Market ETF | USD |
-| AAPL | Apple Inc. | USD |
-| MSFT | Microsoft Corporation | USD |
-| AIA | Auckland International Airport | NZD |
-| FPH | Fisher & Paykel Healthcare | NZD |
-| MEL | Meridian Energy | NZD |
-| BHP | BHP Group | AUD |
-| CBA | Commonwealth Bank of Australia | AUD |
-| WOW | Woolworths Group | AUD |
-| SAP | SAP SE | EUR |
-| AIR | Airbus SE | EUR |
-| OR | L'Oréal | EUR |
-| SHEL | Shell plc | GBP |
-| HSBA | HSBC Holdings | GBP |
-| ULVR | Unilever | GBP |
-| 7203 | Toyota Motor | JPY |
-| 6758 | Sony Group | JPY |
-| 9984 | SoftBank Group | JPY |
+| Symbol | Name | Quote currency | Issuer country | FIF treatment, tax year 2027 |
+| --- | --- | --- | --- | --- |
+| VTI | Vanguard Total Stock Market ETF | USD | `US` | `Attributing` |
+| AAPL | Apple Inc. | USD | `US` | `Attributing` |
+| MSFT | Microsoft Corporation | USD | `US` | `Attributing` |
+| AIA | Auckland International Airport | NZD | `NZ` | `NotForeign` |
+| FPH | Fisher & Paykel Healthcare | NZD | `NZ` | `NotForeign` |
+| MEL | Meridian Energy | NZD | `NZ` | `NotForeign` |
+| BHP | BHP Group | AUD | `AU` | `ExemptAsxListed` |
+| CBA | Commonwealth Bank of Australia | AUD | `AU` | `ExemptAsxListed` |
+| WOW | Woolworths Group | AUD | `AU` | `ExemptAsxListed` |
+| SAP | SAP SE | EUR | `DE` | `Attributing` |
+| AIR | Airbus SE | EUR | `NL` | `Attributing` |
+| OR | L'Oréal | EUR | `FR` | `Attributing` |
+| SHEL | Shell plc | GBP | `GB` | `Attributing` |
+| HSBA | HSBC Holdings | GBP | `GB` | `Attributing` |
+| ULVR | Unilever | GBP | `GB` | `Attributing` |
+| 7203 | Toyota Motor | JPY | `JP` | `Attributing` |
+| 6758 | Sony Group | JPY | `JP` | `Attributing` |
+| 9984 | SoftBank Group | JPY | `JP` | `Attributing` |
+
+The tax attributes are those of [instrument-tax-attributes.md](instrument-tax-attributes.md) §5.1, which gives the reasons. The three `ExemptAsxListed` rows carry the note `Assumed from tax year 2026: on 2026-11-27 Inland Revenue's FIF Australian listed share exemption tool showed the exemption for 1 April 2025 to 31 March 2026 only.` An exemption stands for its own tax year only, so for tax year 2028 the three are not classified until a person adds a row.
 
 18 symbols fit the EODHD free plan (20 calls a day). No other tenant in production has instruments today. A later tenant that adds symbols outside this list shares the same daily limit.
 
@@ -166,9 +169,10 @@ Prices and rates arrive on their own: the instrument-price job on its next daily
 | Project | Assert |
 | --- | --- |
 | Application.UnitTests (`Hosting/`, next to `HealthCheckCommandTests`) | `--seed-demo` as first argument is detected; any other first argument, or `--seed-demo` later in the list, is not |
-| Infrastructure.IntegrationTests | Empty database after the schema applicator: one run creates tenant `demo` / `Demo Advisory` / `USD`, enabled; 18 active instruments matching §5.1; grants for the three reports of R8 |
+| Infrastructure.IntegrationTests | Empty database after the schema applicator: one run creates tenant `demo` / `Demo Advisory` / `USD`, enabled; 18 active instruments matching §5.1, each with its issuer country and one FIF treatment row for tax year 2027; grants for the three reports of R8 |
 | Infrastructure.IntegrationTests | Second run creates no rows and leaves every row unchanged |
 | Infrastructure.IntegrationTests | Existing `demo` tenant with reporting currency `NZD`, one catalog instrument disabled and one missing: the run keeps `NZD`, keeps the disabled row disabled, adds the missing row, adds missing grants |
+| Infrastructure.IntegrationTests | An existing demo instrument with no tax attribute gets those of §5.1; one with an issuer country only, or with a FIF treatment row, is left unchanged; the log counts both |
 | Infrastructure.IntegrationTests | A platform-inactive report is not granted; the others are |
 | Infrastructure.IntegrationTests | A second tenant with its own instruments and grants is untouched. No rows appear in users, accounts, transactions, portfolios, `InstrumentPrices` or `FxRates` |
 | Infrastructure.IntegrationTests | A failure after the tenant insert (forced, for example a missing report code) leaves no `demo` tenant behind |
@@ -186,9 +190,9 @@ No new ADR.
 | --- | --- |
 | Caller | Operator, through `webapi --seed-demo`. No automatic caller |
 | Tenant | Code `demo`, Name `Demo Advisory`, reporting `USD` on create; existing tenant never changed |
-| Catalog | The 18 rows in §5.1, all active, NZD and JPY rows included |
+| Catalog | The 18 rows in §5.1, all active, NZD and JPY rows included, classified for tax year 2027. An existing instrument is classified only when it has no tax attribute |
 | Reports | `customer-transactions`, `adviser-balances`, `bank-reconciliation` |
-| Writes | Tenant, instruments, grants only. One transaction |
+| Writes | Tenant, instruments and their tax attributes, grants only. One transaction |
 | Scripts / policy | None |
 
 Amends (accepted 2026-11-14):
@@ -216,3 +220,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-23 | [orders.md](orders.md) | R4: the broker connection of a new demo tenant |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
 | 2026-11-27 | [bank-reconciliation.md](bank-reconciliation.md) | §1, R8, R12, §10, §11: the seed also grants `bank-reconciliation`, as bank-reconciliation R23 says and the code does |
+| 2026-11-27 | [instrument-tax-attributes.md](instrument-tax-attributes.md) | §1, R6, R9, R12, R13, §5, §5.1, §10, §11: the seed writes the tax attributes of the demo catalog, also on an existing instrument with none |

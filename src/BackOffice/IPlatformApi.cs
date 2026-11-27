@@ -141,4 +141,15 @@ public interface IPlatformApi
     Task DisableInstrumentAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default);
 
     Task EnableInstrumentAsync(Guid id, string rowVersion, CancellationToken cancellationToken = default);
+
+    /// <summary>Instrument-tax-attributes R6, BO-I9: every country, sorted by name.</summary>
+    Task<IReadOnlyList<CountryItem>> ListCountriesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Instrument-tax-attributes R16, BO-I11: replaces the issuer country and every FIF treatment row.</summary>
+    Task SetInstrumentTaxAttributesAsync(
+        Guid id,
+        string? issuerCountry,
+        IReadOnlyList<FifTreatmentItem> fifTreatments,
+        string rowVersion,
+        CancellationToken cancellationToken = default);
 }

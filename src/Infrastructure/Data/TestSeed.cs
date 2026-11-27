@@ -1,4 +1,5 @@
 using MyWealthV2.Application.Fees.TradeSchedules;
+using MyWealthV2.Application.Instruments;
 using MyWealthV2.Application.Interest.RateSchedules;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -211,7 +212,10 @@ public static class TestSeed
         string Name,
         string QuoteCurrency,
         bool Active,
-        decimal? Price);
+        decimal? Price,
+        string? IssuerCountry = null,
+        FifTreatment Treatment = FifTreatment.NotClassified,
+        string? Note = null);
 
     // Development-only fake prices for the shared demo catalog (demo-tenant-seed R13).
     private static readonly Dictionary<string, decimal> DevelopmentPrices = new(StringComparer.Ordinal)
@@ -241,14 +245,16 @@ public static class TestSeed
 
     private static readonly SeedInstrument[] Catalog =
     [
-        .. DemoCatalog.Instruments.Select(item =>
-            new SeedInstrument(item.Symbol, item.Name, item.QuoteCurrency, true, DevelopmentPrices[item.Symbol])),
+        .. DemoCatalog.Instruments.Select(item => new SeedInstrument(
+            item.Symbol, item.Name, item.QuoteCurrency, true, DevelopmentPrices[item.Symbol], item.IssuerCountry, item.Treatment, item.Note)),
+        // Instrument-tax-attributes R25: the disabled row stays not classified.
         new("NZD-CASH", "Demo disabled cash proxy", "NZD", false, null),
 
         // Simulated instruments §9.1: the simulator's standing instruments, so a host without the simulator still
         // has a price. A market data connection with suffix .SIM prices them from then on.
-        new("ACME.SIM", "Acme Simulated Holdings", "USD", true, 100m),
-        new("KIWI.SIM", "Kiwi Simulated Fund", "NZD", true, 5m)
+        // Instrument-tax-attributes R25: fixtures, so a Custodial account holds a classified Instrument of each kind.
+        new("ACME.SIM", "Acme Simulated Holdings", "USD", true, 100m, "US", FifTreatment.Attributing),
+        new("KIWI.SIM", "Kiwi Simulated Fund", "NZD", true, 5m, "NZ", FifTreatment.NotForeign)
     ];
 
     private static async Task SeedFirmAsync(
@@ -502,6 +508,13 @@ public static class TestSeed
             var currency = Currency.Create(item.QuoteCurrency, item.QuoteCurrency, 2);
             var instrument = await EnsureInstrumentAsync(
                 db, tenantId, item.Symbol, item.Name, currency, item.Active, cancellationToken);
+            if (item.IssuerCountry is { } country
+                && DemoCatalog.ClassifyIfUnclassified(
+                    instrument, country, item.Treatment, item.Note, InstrumentTaxYears.Latest(TimeProvider.System), CreatedBy))
+            {
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
             if (item.Price is not decimal price)
             {
                 continue;
@@ -573,7 +586,7 @@ public static class TestSeed
         bool enabled,
         CancellationToken cancellationToken)
     {
-        var existing = await db.Instruments.SingleOrDefaultAsync(
+        var existing = await db.Instruments.Include(row => row.FifTreatments).SingleOrDefaultAsync(
             row => row.TenantId == tenantId && row.Symbol == symbol, cancellationToken);
         if (existing is not null)
         {

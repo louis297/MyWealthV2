@@ -41,6 +41,55 @@
         </MudStack>
     </MudPaper>
 
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        <MudText Typo="Typo.h6" Class="mb-2">Tax attributes</MudText>
+        <MudStack Spacing="3">
+            <MudAutocomplete T="string" Label="Issuer country" Variant="Variant.Outlined" Style="max-width: 28rem;"
+                             @bind-Value="tax.IssuerCountry" SearchFunc="SearchCountries" Clearable="true"
+                             ToStringFunc="@(code => FifTreatmentChoice.CountryLabel(code, countries))"
+                             Error="@(TaxError("IssuerCountry") is not null)" ErrorText="@TaxError("IssuerCountry")" />
+            <MudText Typo="Typo.subtitle2">FIF treatment</MudText>
+            @if (tax.Lines.Count == 0)
+            {
+                <MudText Typo="Typo.body2">@FifTreatmentChoice.NotClassified</MudText>
+            }
+            @for (var index = 0; index < tax.Lines.Count; index++)
+            {
+                var position = index;
+                var line = tax.Lines[position];
+                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Start" Wrap="Wrap.Wrap">
+                    <MudNumericField T="int?" @bind-Value="line.TaxYear" Label="Tax year" Variant="Variant.Outlined" HideSpinButtons="true"
+                                     Style="max-width: 9rem;"
+                                     Error="@(TaxError($"FifTreatments[{position}].TaxYear") is not null)"
+                                     ErrorText="@TaxError($"FifTreatments[{position}].TaxYear")" />
+                    <MudSelect T="string" @bind-Value="line.Treatment" Label="Treatment" Variant="Variant.Outlined" Style="min-width: 18rem;"
+                               ToStringFunc="FifTreatmentChoice.Label"
+                               Error="@(TaxError($"FifTreatments[{position}].Treatment") is not null)"
+                               ErrorText="@TaxError($"FifTreatments[{position}].Treatment")">
+                        @foreach (var value in FifTreatmentChoice.Values)
+                        {
+                            <MudSelectItem T="string" Value="@value">@FifTreatmentChoice.Label(value)</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudTextField T="string" @bind-Value="line.Note" Label="Note" Variant="Variant.Outlined" Style="min-width: 18rem;"
+                                  Error="@(TaxError($"FifTreatments[{position}].Note") is not null)"
+                                  ErrorText="@TaxError($"FifTreatments[{position}].Note")" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" aria-label="Remove tax year" title="Remove tax year"
+                                   OnClick="@(() => RemoveLine(position))" />
+                </MudStack>
+            }
+            @if (TaxError("FifTreatments") is { } linesError)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Error">@linesError</MudText>
+            }
+            <MudText Typo="Typo.caption">@FifTreatmentChoice.Explanation</MudText>
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Outlined" OnClick="AddLine">Add tax year</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveTaxAttributes">Save tax attributes</MudButton>
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+
     @if (item.IsActive)
     {
         <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="Disable">Disable</MudButton>
@@ -65,6 +114,7 @@
     {
         try
         {
+            countries = await Api.ListCountriesAsync();
             await Reload();
         }
         catch (PlatformApiException exception)
@@ -154,6 +204,86 @@
         item = await Api.GetInstrumentAsync(Id);
         form.Symbol = item.Symbol;
         form.Name = item.Name;
+        tax.IssuerCountry = item.IssuerCountry;
+        tax.Lines.Clear();
+        foreach (var row in (item.FifTreatments ?? []).OrderBy(row => row.TaxYear))
+        {
+            tax.Lines.Add(new TaxLine { TaxYear = row.TaxYear, Treatment = row.Treatment, Note = row.Note });
+        }
+    }
+
+    private IReadOnlyList<CountryItem> countries = [];
+    private readonly TaxForm tax = new();
+    private IReadOnlyDictionary<string, string> taxErrors = new Dictionary<string, string>();
+
+    private string? TaxError(string field) => taxErrors.GetValueOrDefault(field);
+
+    private Task<IEnumerable<string>> SearchCountries(string? text, CancellationToken cancellationToken)
+    {
+        var query = text?.Trim() ?? "";
+        var matches = countries
+            .Where(country => query.Length == 0
+                              || country.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
+                              || country.Code.Equals(query, StringComparison.OrdinalIgnoreCase))
+            .Select(country => country.Code);
+        return Task.FromResult(matches);
+    }
+
+    private void AddLine() => tax.Lines.Add(new TaxLine());
+
+    private void RemoveLine(int index)
+    {
+        if (index >= 0 && index < tax.Lines.Count)
+        {
+            tax.Lines.RemoveAt(index);
+        }
+    }
+
+    private async Task SaveTaxAttributes()
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Api.SetInstrumentTaxAttributesAsync(
+                Id,
+                string.IsNullOrWhiteSpace(tax.IssuerCountry) ? null : tax.IssuerCountry,
+                tax.Lines.Select(line => new FifTreatmentItem(line.TaxYear ?? 0, line.Treatment ?? "", line.Note)).ToList(),
+                item.RowVersion);
+            await Reload();
+            taxErrors = new Dictionary<string, string>();
+            error = null;
+        }
+        catch (PlatformApiException exception)
+        {
+            taxErrors = ValidationErrors.From(exception);
+            if (taxErrors.Count > 0 && exception.Status == 400)
+            {
+                error = null;
+                return;
+            }
+
+            await ShowFailureAsync(exception);
+        }
+    }
+
+    private sealed class TaxForm
+    {
+        public string? IssuerCountry { get; set; }
+
+        public List<TaxLine> Lines { get; } = [];
+    }
+
+    private sealed class TaxLine
+    {
+        public int? TaxYear { get; set; }
+
+        public string? Treatment { get; set; }
+
+        public string? Note { get; set; }
     }
 
     private sealed class FormModel

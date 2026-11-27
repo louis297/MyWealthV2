@@ -4,6 +4,7 @@ using MyWealthV2.Application.Instruments;
 using MyWealthV2.Application.Instruments.Commands.CreateInstrument;
 using MyWealthV2.Application.Instruments.Commands.DisableInstrument;
 using MyWealthV2.Application.Instruments.Commands.EnableInstrument;
+using MyWealthV2.Application.Instruments.Commands.SetInstrumentTaxAttributes;
 using MyWealthV2.Application.Instruments.Commands.UpdateInstrument;
 using MyWealthV2.Application.Instruments.Queries.GetInstrumentById;
 using MyWealthV2.Application.Instruments.Queries.GetInstrumentPrices;
@@ -25,6 +26,7 @@ public class Instruments : IEndpointGroup
         groupBuilder.MapPut(UpdateInstrument, "{id}").RequireAuthorization(Policies.InstrumentsManage);
         groupBuilder.MapPost(DisableInstrument, "{id}/disable").RequireAuthorization(Policies.InstrumentsManage);
         groupBuilder.MapPost(EnableInstrument, "{id}/enable").RequireAuthorization(Policies.InstrumentsManage);
+        groupBuilder.MapPut(SetInstrumentTaxAttributes, "{id}/tax-attributes").RequireAuthorization(Policies.InstrumentsManage);
     }
 
     [EndpointSummary("List instruments")]
@@ -91,6 +93,18 @@ public class Instruments : IEndpointGroup
     [EndpointSummary("Enable an instrument")]
     [EndpointDescription("Re-enables an instrument. Idempotent.")]
     public static async Task<NoContent> EnableInstrument(ISender sender, Guid id, EnableInstrumentCommand command)
+    {
+        command.Id = id;
+        await sender.Send(command);
+        return TypedResults.NoContent();
+    }
+
+    [EndpointSummary("Set the tax attributes of an instrument")]
+    [EndpointDescription("Replaces the issuer country and every FIF treatment row of an instrument. Both are required; issuerCountry may be null and fifTreatments may be empty.")]
+    public static async Task<NoContent> SetInstrumentTaxAttributes(
+        ISender sender,
+        Guid id,
+        SetInstrumentTaxAttributesCommand command)
     {
         command.Id = id;
         await sender.Send(command);

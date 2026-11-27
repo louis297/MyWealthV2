@@ -3,9 +3,10 @@ title: Custodial accounts roadmap
 status: note
 language: en
 created: 2026-11-19
-updated: 2026-11-25
+updated: 2026-11-27
 related:
   - ../future-plans.md
+  - fif-roadmap.md
   - ../adr/0020-account-custody-mode.md
   - ../features/custody-modes.md
   - ../features/account-custody-mode.md
@@ -517,7 +518,7 @@ Every flow of the plan has landed. Of the five conditions of §2, four held afte
 | Step 17: X1 adjustment review | Landed 2026-11-25 | It completes condition 2. §10 called it large because it added the first status on a Transaction, which balances, holdings and reports would then have to ignore. Since §10 was written, three flows have put a second person's approval on a record of their own, before any Transaction exists: withdrawals, migration batches and in-kind transfers. [adjustment-review.md](../features/adjustment-review.md) follows that pattern and amends [posting.md](../features/posting.md) §1 and D3. |
 | O4 order aggregation and allocation | Parked | Nothing depends on it. It changes orders, trade settlement and the custodian reconciliation together. Open it only as a topic of its own. |
 | O5 FX through an outside party | Parked | Nothing depends on it, and §8 already calls it low priority. A Custodial `FxConversion` stays a hand entry at the reference rate, and the known difference `FxConversions` of B7. |
-| X2 replay, X3 period close | Moved out of this plan | They are not about Custodial accounts only. Replay is what booking at an outside date (D2), backdating and tax lots need, so it opens when the business roadmap needs it ([future-plans.md](../future-plans.md) §1, at the latest step 6, the FIF report). X3 follows X2. |
+| X2 replay, X3 period close | Moved out of this plan | They are not about Custodial accounts only. Replay is what booking at an outside date (D2), backdating and tax lots need, so it opens when the business roadmap needs a write in the past ([future-plans.md](../future-plans.md) §1). Step 6, the FIF report, does not: it reads the Transactions in order and writes nothing ([fif-roadmap.md](fif-roadmap.md) §1.2, decided 2026-11-27). X3 follows X2. |
 | X4 third-party payments | Unchanged | Refused (D14). No plan. |
 
 After steps 16 and 17 this plan is complete, and work returns to the business roadmap of [future-plans.md](../future-plans.md) §1. Step 2 is complete: income on External accounts landed 2026-11-27 with [external-income.md](../features/external-income.md). Next is step 3, historical valuation, which has its own plan: [valuation-roadmap.md](valuation-roadmap.md).

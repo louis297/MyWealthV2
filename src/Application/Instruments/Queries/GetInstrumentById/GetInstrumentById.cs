@@ -14,7 +14,7 @@ public class GetInstrumentByIdQueryHandler(IApplicationDbContext db, ICurrentUse
     public async Task<InstrumentDto> Handle(GetInstrumentByIdQuery request, CancellationToken cancellationToken)
     {
         var query =
-            from instrument in InstrumentVisibility.Readable(db, currentUser)
+            from instrument in InstrumentVisibility.Readable(db, currentUser).Include(row => row.FifTreatments)
             join tenant in db.Tenants.AsNoTracking() on instrument.TenantId equals tenant.Id
             where instrument.PublicId == request.Id
             select new { instrument, tenant };

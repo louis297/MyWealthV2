@@ -53,6 +53,8 @@ else if (list is not null)
                 <MudTh>Name</MudTh>
                 <MudTh>Quote currency</MudTh>
                 <MudTh>Active</MudTh>
+                <MudTh>Country</MudTh>
+                <MudTh>FIF treatment</MudTh>
                 <MudTh></MudTh>
             </HeaderContent>
             <RowTemplate>
@@ -66,6 +68,8 @@ else if (list is not null)
                 <MudTd DataLabel="Name">@context.Name</MudTd>
                 <MudTd DataLabel="Quote currency">@context.QuoteCurrency</MudTd>
                 <MudTd DataLabel="Active">@(context.IsActive ? "Active" : "Disabled")</MudTd>
+                <MudTd DataLabel="Country">@context.IssuerCountry</MudTd>
+                <MudTd DataLabel="FIF treatment">@FifTreatmentChoice.ListText(context.FifTreatments)</MudTd>
                 <MudTd DataLabel="Open"><MudLink Href="@($"/instruments/{context.Id}")">Open</MudLink></MudTd>
             </RowTemplate>
         </MudTable>

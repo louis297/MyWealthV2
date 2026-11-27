@@ -78,6 +78,8 @@ public interface IApplicationDbContext
 
     DbSet<Instrument> Instruments { get; }
 
+    DbSet<InstrumentFifTreatment> InstrumentFifTreatments { get; }
+
     DbSet<Account> Accounts { get; }
 
     DbSet<Transaction> Transactions { get; }
@@ -121,6 +123,9 @@ public interface IApplicationDbContext
     DbSet<ReportSchedule> ReportSchedules { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
+
+    /// <summary>Marks a tracked entity as changed, so the next save writes its row and moves its rowVersion.</summary>
+    void MarkModified(object entity);
 
     Task ExecuteInTransactionAsync(Func<CancellationToken, Task> action, CancellationToken cancellationToken);
 

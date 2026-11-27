@@ -287,6 +287,25 @@ Invariants:
 
 Field rules: [features/instruments.md](features/instruments.md). Landed in repo 2026-09-20 `9ea2f2a`.
 
+Tax attributes ([features/instrument-tax-attributes.md](features/instrument-tax-attributes.md) §5, accepted 2026-11-27):
+
+| Type | Kind | Notes |
+| --- | --- | --- |
+| `FifTreatment` | Enum | `NotClassified = 0`, `NotForeign = 1`, `ExemptAsxListed = 2`, `ExemptOther = 3`, `Attributing = 4`, `AttributingNoFdr = 5`. `IsExemption` for 2 and 3; `IsAttributing` for 4 and 5. `NotClassified` is an answer, never stored |
+| `InstrumentFifTreatment` | Entity, child of `Instrument` | `TenantId`, `InstrumentId`, `TaxYear`, `Treatment`, `Note?`, audit. Built only by `Instrument`, which passes its `TenantId` down |
+| `Countries` | Static | The officially assigned ISO 3166-1 alpha-2 codes with their English short names. `IsKnown(code)`, `All`, `NewZealand = "NZ"`, `Australia = "AU"`. Changes only with a spec amendment |
+| `Instrument.IssuerCountry`, `Instrument.FifTreatments` | Members | The issuer's country of tax residence (optional, one per Instrument) and the FIF treatment rows, one per tax year |
+| `Instrument.SetTaxAttributes(issuerCountry, rows, latestTaxYear)` | Method | Replaces the country and every row (update, add and remove by tax year). Raises no event |
+| `Instrument.FifTreatmentFor(taxYear)`, `FifTreatmentRowFor(taxYear)` | Methods | The treatment of a tax year: the latest row not after it; an exemption row stands for its own year only; none → `NotClassified`. The row variant returns the row chosen, or none |
+
+Invariants of the tax attributes:
+
+- At most one row per tax year and at most 50 rows; a tax year is 2008 to the calendar year of the UTC date plus 1 (passed in by Application).
+- An Instrument with a row has an issuer country, which is a code of `Countries`.
+- An issuer country `NZ` has only `NotForeign` rows; no other Instrument has a `NotForeign` row.
+- An `ExemptAsxListed` row needs issuer country `AU`. An `ExemptOther` row has a note.
+- A row belongs to the Tenant of its Instrument.
+
 Where an instrument's price comes from is a fact about its symbol and the configuration, not a field on the aggregate ([features/simulated-instruments.md](features/simulated-instruments.md) §5):
 
 | Type | Kind | Notes |

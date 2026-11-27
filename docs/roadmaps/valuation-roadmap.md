@@ -3,11 +3,12 @@ title: Historical valuation roadmap
 status: note
 language: en
 created: 2026-11-25
-updated: 2026-11-26
+updated: 2026-11-27
 related:
   - ../future-plans.md
   - ../function-plan.md
   - custodial-roadmap.md
+  - fif-roadmap.md
   - ../features/instrument-prices.md
   - ../features/fx-rates.md
   - ../adr/0019-fx-rate-source-and-refresh.md
@@ -161,11 +162,11 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 
 | Item | Where it goes |
 | --- | --- |
-| Cost and unrealised gain on a past day, tax lots, cost in NZD | Ledger replay ([custodial-roadmap.md](custodial-roadmap.md) X2). Opens when a step needs cost on a past day, at the latest step 6 |
+| Cost and unrealised gain on a past day, tax lots, cost in NZD | Ledger replay ([custodial-roadmap.md](custodial-roadmap.md) X2), which opens when a step needs a write in the past. Step 6 does not: the cost in NZD its threshold test needs is a read ([fif-roadmap.md](fif-roadmap.md) §1.2, TR3) |
 | Period close | Custodial-roadmap X3, after replay. It is what would let External accounts get stored valuations |
 | Changing a stored valuation after a late or corrected price | Not planned. Decide with step 4, which has to say what happens to a fee when its base changes |
 | Which movements are external flows, and gross or net of fees | Step 5 |
-| Which exchange rates Inland Revenue accepts for the FIF conversions, and the boundary of the tax year in New Zealand time | Step 6, checked against the primary source. If the answer is a published rate table, it is a second rate set and not `FxRates` |
+| Which exchange rates Inland Revenue accepts for the FIF conversions, and the boundary of the tax year in New Zealand time | Step 6: [fif-roadmap.md](fif-roadmap.md) Q3 and Q4 (decided 2026-11-27). The rate of the day from `FxRates`, with no second rate set; the tax year is cut in New Zealand time, and H2 stays as it is for every other feature |
 | Income earned but not posted, as part of a value | Left out of the first version (Q8); revisit in step 5 |
 | Real-time or intraday prices, a second price source, NZX and Tokyo prices | Unchanged. The known issue stays open; a holding in those markets is unpriced (H5) |
 | A valuation-only record for property and loans | future-plans §9, still open |

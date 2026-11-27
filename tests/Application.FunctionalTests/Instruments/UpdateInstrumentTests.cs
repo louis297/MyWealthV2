@@ -121,6 +121,69 @@ public class UpdateInstrumentTests : TestBase
     }
 
     [Test]
+    public async Task PutWithIssuerCountry_Returns400()
+    {
+        var (_, tokens) = await InstrumentHttp.SignInTenantAdmin();
+        var id = await CreateAsync(tokens.AccessToken);
+        var rowVersion = await ReadRowVersion(id, tokens.AccessToken);
+
+        var response = await InstrumentHttp.Send(
+            HttpMethod.Put, $"/instruments/{id}", tokens.AccessToken, new
+            {
+                name = "Renamed",
+                issuerCountry = "US",
+                rowVersion
+            });
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        using var item = await ReadItem(id, tokens.AccessToken);
+        item.RootElement.GetProperty("name").GetString().ShouldBe("Vanguard Total Stock Market ETF");
+    }
+
+    [Test]
+    public async Task PutWithFifTreatments_Returns400()
+    {
+        var (_, tokens) = await InstrumentHttp.SignInTenantAdmin();
+        var id = await CreateAsync(tokens.AccessToken);
+        var rowVersion = await ReadRowVersion(id, tokens.AccessToken);
+
+        var response = await InstrumentHttp.Send(
+            HttpMethod.Put, $"/instruments/{id}", tokens.AccessToken, new
+            {
+                name = "Renamed",
+                fifTreatments = new[] { new { taxYear = 2027, treatment = "Attributing" } },
+                rowVersion
+            });
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task RenameDisableAndEnable_KeepTheTaxAttributes()
+    {
+        var (_, tokens) = await InstrumentHttp.SignInTenantAdmin();
+        var id = await CreateAsync(tokens.AccessToken);
+        (await InstrumentHttp.Send(HttpMethod.Put, $"/instruments/{id}/tax-attributes", tokens.AccessToken, new
+        {
+            issuerCountry = "US",
+            fifTreatments = new[] { new { taxYear = 2027, treatment = "Attributing", note = (string?)null } },
+            rowVersion = await ReadRowVersion(id, tokens.AccessToken)
+        })).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        (await InstrumentHttp.Send(HttpMethod.Put, $"/instruments/{id}", tokens.AccessToken,
+            new { name = "Renamed", rowVersion = await ReadRowVersion(id, tokens.AccessToken) })).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await InstrumentHttp.Send(HttpMethod.Post, $"/instruments/{id}/disable", tokens.AccessToken,
+            new { rowVersion = await ReadRowVersion(id, tokens.AccessToken) })).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        (await InstrumentHttp.Send(HttpMethod.Post, $"/instruments/{id}/enable", tokens.AccessToken,
+            new { rowVersion = await ReadRowVersion(id, tokens.AccessToken) })).StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        using var item = await ReadItem(id, tokens.AccessToken);
+        item.RootElement.GetProperty("name").GetString().ShouldBe("Renamed");
+        item.RootElement.GetProperty("issuerCountry").GetString().ShouldBe("US");
+        var row = item.RootElement.GetProperty("fifTreatments").EnumerateArray().ShouldHaveSingleItem();
+        row.GetProperty("taxYear").GetInt32().ShouldBe(2027);
+        row.GetProperty("treatment").GetString().ShouldBe("Attributing");
+    }
+
+    [Test]
     public async Task MissingRowVersion_Returns400()
     {
         var (_, tokens) = await InstrumentHttp.SignInTenantAdmin();

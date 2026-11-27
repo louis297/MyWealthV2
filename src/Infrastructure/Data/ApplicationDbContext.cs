@@ -124,6 +124,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<Instrument> Instruments => Set<Instrument>();
 
+    public DbSet<InstrumentFifTreatment> InstrumentFifTreatments => Set<InstrumentFifTreatment>();
+
     public DbSet<Account> Accounts => Set<Account>();
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
@@ -226,6 +228,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public Task LoadSecurityLegsAsync(Transaction transaction, CancellationToken cancellationToken) =>
         Entry(transaction).Collection(row => row.SecurityLegs).LoadAsync(cancellationToken);
+
+    public void MarkModified(object entity) => Entry(entity).State = EntityState.Modified;
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

@@ -388,6 +388,7 @@ Beyond PK / unique constraints already listed:
 0058_adjustment_requests.sql                -- AdjustmentRequests; source kind 11 (AdjustmentRequest)
 0059_stored_valuations.sql                  -- ValuationRuns, StoredValuations, StoredValuationLines; Accounts.ValuedThrough
 0060_external_income.sql                    -- TransactionDividendDetails.AmountPerShare and ExDate nullable; CK_TransactionDividendDetails_AmountPerShare allows NULL
+0061_instrument_tax_attributes.sql          -- Instruments.IssuerCountry char(2) NULL + CHECK; InstrumentFifTreatments (tenant composite FK to Instruments)
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -415,6 +416,11 @@ Name, Role, Status, AdviserId change only on `Users`. After password change, dis
 ### 11.1 Instruments (accepted)
 
 Script `0010_instruments.sql`. Columns and uniqueness: [features/instruments.md](features/instruments.md) §6. No ISIN / Exchange / Kind / price. No seed in the script — `TestSeed` only.
+
+Tax attributes (`0061_instrument_tax_attributes.sql`, [features/instrument-tax-attributes.md](features/instrument-tax-attributes.md) §6):
+
+- `Instruments.IssuerCountry char(2) NULL`. `CK_Instruments_IssuerCountry`: `NULL` or two upper-case letters `A`–`Z` (a binary collation, so `nz` is refused). No back-fill.
+- `InstrumentFifTreatments` — `Id` (internal PK, no `PublicId`), `TenantId`, `InstrumentId`, `TaxYear smallint` (CHECK 2008–2199), `Treatment tinyint` (CHECK 1–5: `NotClassified` is never stored), `Note nvarchar(500) NULL` (CHECK not `NULL` when `Treatment = 3`), audit. No `RowVersion`: the Instrument's guards the write. Unique `(InstrumentId, TaxYear)`. Tenant composite FK `(TenantId, InstrumentId)` → `Instruments (TenantId, Id)` RESTRICT; FK `TenantId` → `Tenants` RESTRICT. The agreement of the rows with the issuer country spans two tables and is held by `Instrument.SetTaxAttributes`.
 
 ### 11.2 Naming amendment `IsEnabled` → `IsActive` + Users derived bit
 
@@ -769,6 +775,7 @@ One row per change. §9 lists what each script did. The text of each change is i
 | 2026-11-26 | — | The amendments were folded into §6.5, §11 and §14. No table changed |
 | 2026-11-26 | `0059` | Stored valuations and valuation runs (§11.22); `Accounts.ValuedThrough` (§11.3) |
 | 2026-11-27 | `0060` | Income on External accounts: `TransactionDividendDetails.AmountPerShare` and `ExDate` nullable |
+| 2026-11-27 | `0061` | Tax attributes of an Instrument (§11.1): `Instruments.IssuerCountry`, `InstrumentFifTreatments` |
 
 ---
 

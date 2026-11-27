@@ -68,6 +68,49 @@ public class DemoTenantSeedTests
         (await GrantedCodesAsync(db, tenant.Id)).ShouldBe(["adviser-balances", "bank-reconciliation", "customer-transactions"]);
     }
 
+    // Instrument-tax-attributes R24, §5.1: each instrument of the demo catalog is classified for tax year 2027.
+    [Test]
+    public async Task EmptyDatabase_ClassifiesTheCatalogForTaxYear2027()
+    {
+        await using var provider = BuildProvider();
+
+        await RunAsync(provider);
+
+        (await TaxAttributesAsync(provider, "demo")).ShouldBe(ExpectedTaxAttributes
+            .OrderBy(row => row.Symbol, StringComparer.Ordinal)
+            .Select(row => $"{row.Symbol}|{row.Country}|2027 {row.Treatment} {row.Note}|system"));
+    }
+
+    // Instrument-tax-attributes R24: an existing instrument is classified only when it has no tax attribute at all.
+    [Test]
+    public async Task ExistingDemoInstruments_AreClassifiedOnlyWhenTheyHaveNoTaxAttribute()
+    {
+        await _database.ExecuteAsync("""
+            INSERT INTO [Tenants] ([PublicId], [Name], [Code], [Created], [LastModified], [ReportingCurrency], [IsActive], [AllowsExternalAccounts], [AllowsCustodialAccounts])
+            VALUES (NEWID(), N'Demo Advisory', N'demo', SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET(), 'USD', 1, 1, 1);
+            DECLARE @t int = SCOPE_IDENTITY();
+            INSERT INTO [Instruments] ([PublicId], [TenantId], [Symbol], [Name], [QuoteCurrency], [IsActive], [Created], [CreatedBy], [LastModified])
+            VALUES (NEWID(), @t, N'VTI', N'Vanguard Total Stock Market ETF', 'USD', 1, SYSDATETIMEOFFSET(), N'someone', SYSDATETIMEOFFSET());
+            INSERT INTO [Instruments] ([PublicId], [TenantId], [Symbol], [Name], [QuoteCurrency], [IsActive], [IssuerCountry], [Created], [CreatedBy], [LastModified])
+            VALUES (NEWID(), @t, N'AAPL', N'Apple Inc.', 'USD', 1, 'GB', SYSDATETIMEOFFSET(), N'someone', SYSDATETIMEOFFSET());
+            INSERT INTO [Instruments] ([PublicId], [TenantId], [Symbol], [Name], [QuoteCurrency], [IsActive], [Created], [CreatedBy], [LastModified])
+            VALUES (NEWID(), @t, N'MSFT', N'Microsoft Corporation', 'USD', 1, SYSDATETIMEOFFSET(), N'someone', SYSDATETIMEOFFSET());
+            INSERT INTO [InstrumentFifTreatments] ([TenantId], [InstrumentId], [TaxYear], [Treatment], [Note], [Created], [CreatedBy], [LastModified])
+            VALUES (@t, SCOPE_IDENTITY(), 2026, 5, N'by hand', SYSDATETIMEOFFSET(), N'someone', SYSDATETIMEOFFSET());
+            """);
+        await using var provider = BuildProvider();
+
+        await RunAsync(provider);
+
+        var attributes = await TaxAttributesAsync(provider, "demo");
+        attributes.ShouldContain("VTI|US|2027 Attributing |system");
+        attributes.ShouldContain("AAPL|GB||");
+        attributes.ShouldContain("MSFT||2026 AttributingNoFdr by hand|someone");
+        attributes.Count(row => row.EndsWith("|system", StringComparison.Ordinal)).ShouldBe(16);
+        _logs.Entries.ShouldContain(entry => entry.Level == LogLevel.Information
+            && entry.Message.Contains("instruments 15 created, 3 existing; instruments classified 16, already classified 2;"));
+    }
+
     // Orders §9.1: the demo tenant this run creates gets the broker connection `simulator` when the host has it.
     [Test]
     public async Task WithTheSimulatorBrokerConnectionConfigured_TheTenantItCreatesGetsIt()
@@ -104,6 +147,7 @@ public class DemoTenantSeedTests
         await RunAsync(provider);
         var before = await SnapshotAsync(provider);
         before.ShouldContain("|demo|");
+        before.ShouldContain("|2027|ExemptAsxListed|");
 
         await RunAsync(provider);
 
@@ -178,6 +222,9 @@ public class DemoTenantSeedTests
         var other = await db.Tenants.AsNoTracking().SingleAsync(row => row.Code == "other");
         (await db.Instruments.CountAsync(row => row.TenantId == other.Id)).ShouldBe(2);
         (await db.TenantReports.CountAsync(row => row.TenantId == other.Id)).ShouldBe(0);
+        (await db.Instruments.CountAsync(row => row.TenantId == other.Id && row.IssuerCountry != null)).ShouldBe(0);
+        (await db.InstrumentFifTreatments.CountAsync(row => row.TenantId == other.Id)).ShouldBe(0);
+        (await db.InstrumentFifTreatments.CountAsync()).ShouldBe(18);
     }
 
     [Test]
@@ -213,9 +260,9 @@ public class DemoTenantSeedTests
             .ToList();
         summaries.Count.ShouldBe(2);
         summaries[0].ShouldBe(
-            "Demo seed: tenant demo created; instruments 18 created, 0 existing; reports 3 granted, 0 existing");
+            "Demo seed: tenant demo created; instruments 18 created, 0 existing; instruments classified 18, already classified 0; reports 3 granted, 0 existing");
         summaries[1].ShouldBe(
-            "Demo seed: tenant demo existing; instruments 0 created, 18 existing; reports 0 granted, 3 existing");
+            "Demo seed: tenant demo existing; instruments 0 created, 18 existing; instruments classified 0, already classified 18; reports 0 granted, 3 existing");
     }
 
     private static readonly (string Symbol, string Name, string Quote)[] ExpectedCatalog =
@@ -239,6 +286,49 @@ public class DemoTenantSeedTests
         ("6758", "Sony Group", "JPY"),
         ("9984", "SoftBank Group", "JPY")
     ];
+
+    private const string AsxNote =
+        "Assumed from tax year 2026: on 2026-11-27 Inland Revenue's FIF Australian listed share exemption tool showed the exemption for 1 April 2025 to 31 March 2026 only.";
+
+    /// <summary>Instrument-tax-attributes §5.1: every row is for tax year 2027.</summary>
+    private static readonly (string Symbol, string Country, string Treatment, string Note)[] ExpectedTaxAttributes =
+    [
+        ("VTI", "US", "Attributing", ""),
+        ("AAPL", "US", "Attributing", ""),
+        ("MSFT", "US", "Attributing", ""),
+        ("AIA", "NZ", "NotForeign", ""),
+        ("FPH", "NZ", "NotForeign", ""),
+        ("MEL", "NZ", "NotForeign", ""),
+        ("BHP", "AU", "ExemptAsxListed", AsxNote),
+        ("CBA", "AU", "ExemptAsxListed", AsxNote),
+        ("WOW", "AU", "ExemptAsxListed", AsxNote),
+        ("SAP", "DE", "Attributing", ""),
+        ("AIR", "NL", "Attributing", ""),
+        ("OR", "FR", "Attributing", ""),
+        ("SHEL", "GB", "Attributing", ""),
+        ("HSBA", "GB", "Attributing", ""),
+        ("ULVR", "GB", "Attributing", ""),
+        ("7203", "JP", "Attributing", ""),
+        ("6758", "JP", "Attributing", ""),
+        ("9984", "JP", "Attributing", "")
+    ];
+
+    /// <summary>One line per instrument of the tenant: symbol, country, its rows and who wrote them.</summary>
+    private static async Task<List<string>> TaxAttributesAsync(ServiceProvider provider, string tenantCode)
+    {
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var tenant = await db.Tenants.AsNoTracking().SingleAsync(row => row.Code == tenantCode);
+        var instruments = await db.Instruments.AsNoTracking().Include(row => row.FifTreatments)
+            .Where(row => row.TenantId == tenant.Id)
+            .ToListAsync();
+        return instruments
+            .OrderBy(row => row.Symbol, StringComparer.Ordinal)
+            .Select(row => $"{row.Symbol}|{row.IssuerCountry}|"
+                           + string.Join(",", row.FifTreatments.OrderBy(fif => fif.TaxYear).Select(fif => $"{fif.TaxYear} {fif.Treatment} {fif.Note}"))
+                           + "|" + string.Join(",", row.FifTreatments.Select(fif => fif.CreatedBy).Distinct()))
+            .ToList();
+    }
 
     private static async Task RunAsync(ServiceProvider provider)
     {
@@ -264,13 +354,17 @@ public class DemoTenantSeedTests
             .ToListAsync();
         var instruments = await db.Instruments.AsNoTracking()
             .OrderBy(row => row.Id)
-            .Select(row => $"{row.Id}|{row.PublicId}|{row.Symbol}|{row.Name}|{row.IsActive}|{row.Created:O}")
+            .Select(row => $"{row.Id}|{row.PublicId}|{row.Symbol}|{row.Name}|{row.IsActive}|{row.IssuerCountry}|{row.Created:O}|{row.LastModified:O}")
+            .ToListAsync();
+        var treatments = await db.InstrumentFifTreatments.AsNoTracking()
+            .OrderBy(row => row.Id)
+            .Select(row => $"{row.Id}|{row.InstrumentId}|{row.TaxYear}|{row.Treatment}|{row.Note}|{row.LastModified:O}")
             .ToListAsync();
         var grants = await db.TenantReports.AsNoTracking()
             .OrderBy(row => row.Id)
             .Select(row => $"{row.Id}|{row.TenantId}|{row.ReportId}")
             .ToListAsync();
-        return string.Join("\n", tenants.Concat(instruments).Concat(grants));
+        return string.Join("\n", tenants.Concat(instruments).Concat(treatments).Concat(grants));
     }
 
     private async Task<string> OtherRowCountsAsync()
