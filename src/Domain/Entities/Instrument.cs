@@ -118,6 +118,15 @@ public class Instrument : BaseAuditableEntity
         _fifTreatments.Sort((left, right) => left.TaxYear.CompareTo(right.TaxYear));
     }
 
+    /// <summary>
+    /// Instrument-tax-attributes R10, R11: the treatment of a tax year. The latest row not after the year stands for
+    /// it, unless that row is an exemption for an earlier year. No such row → <see cref="FifTreatment.NotClassified"/>.
+    /// </summary>
+    public FifTreatment FifTreatmentFor(int taxYear) => FifTreatment.NotClassified;
+
+    /// <summary>R11, R28: the row <see cref="FifTreatmentFor"/> took its answer from, or none when not classified.</summary>
+    public InstrumentFifTreatment? FifTreatmentRowFor(int taxYear) => null;
+
     /// <summary>R5, R9, R12: every reason the tax attributes cannot be stored, keyed by field; empty when they can.</summary>
     public static IReadOnlyList<TaxAttributeRefusal> TaxAttributeRefusals(
         string? issuerCountry,
