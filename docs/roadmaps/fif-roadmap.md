@@ -47,7 +47,7 @@ How to use this document:
 - It is a `note`, not a build contract. Each item in §6 needs its own discussion and Feature Spec before any work starts. Do not create tables, routes or handlers from this file.
 - Names in this file are working names. They become glossary terms only when a spec adopts them.
 - The rules in §2 were read from Inland Revenue on 2026-11-27 (§11). They are a summary for planning. Each spec reads its rules again from the primary source and cites it, as [interest-run](../features/interest-run.md) R4 does. This file settles no rate and no threshold.
-- The decisions in §8 are **recommendations, not yet confirmed**. Confirm or change them here before the first spec is written.
+- The decisions in §8 are **decided** (2026-11-27). The first spec that needs one writes it as a rule and may refine it. Q9, Q10 and Q11 are working answers until their spec has read the Act (§11).
 - The order in §9 is a recommendation. When an item gets a spec, or lands, update its row in §9.
 - Nothing here is tax advice, and the report will say the same of itself.
 
@@ -69,7 +69,7 @@ Three questions decide the shape of the step.
 
 ### 1.2 Does it open ledger replay and period close
 
-**No.** [future-plans.md](../future-plans.md) §9 and [custodial-roadmap.md](custodial-roadmap.md) §13.1 say ledger replay (X2) and period close (X3) open "at the latest with step 6". This plan recommends that step 6 opens neither (Q2).
+**No.** Step 6 opens neither ledger replay (X2) nor period close (X3) of [custodial-roadmap.md](custodial-roadmap.md) (Q2). Earlier plans expected both at the latest with this step.
 
 - Ledger replay is a **write**: it rebuilds the `Holdings` projection after a Transaction is inserted or removed in the middle. The FIF report is a **read**. It needs the Transactions of a Customer walked in order (TR2, TR3), and it writes nothing back.
 - Most FIF inputs are not path-dependent. Quantities add up. Purchases, sales and dividends of a year are sums of the legs booked in that year. Market values need two days a year.
@@ -161,7 +161,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 | # | Principle | Why |
 | --- | --- | --- |
 | T1 | **The taxpayer is the Customer, not the Account.** Every figure is worked out over all Accounts of the Customer, of both custody modes, per Instrument. A move between two Accounts of the same Customer is not a purchase or a sale. | The rules are per person and per FIF. Holdings projections are per Account. |
-| T2 | **A tax year is 1 April to 31 March in New Zealand time,** named after the year it ends in. | The income year of an individual. A sale late on 31 March UTC is already in the next tax year in New Zealand. |
+| T2 | **A tax year is 1 April to 31 March in New Zealand time,** named after the year it ends in. Only the tax year of this plan is cut in New Zealand time (Q3). A day stays a UTC date in every other feature. | The income year of an individual. A sale late on 31 March UTC is already in the next tax year in New Zealand. valuation-roadmap H2 is not changed. |
 | T3 | **Every figure is in NZD,** whatever the Account's currency or the Tenant's reporting currency. | The return is in NZD. |
 | T4 | **One conversion rule for every amount of every year.** | Inland Revenue requires the chosen way to be used for all interests, consistently. |
 | T5 | **No invented number.** An Instrument that is not classified, a holding with no price, or an amount with no rate makes the result incomplete. It is not counted as zero and not left out silently. | valuation-roadmap H5. A tax figure may not be a guess. |
@@ -275,14 +275,14 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 
 ## 8. Decisions
 
-Every answer is a **recommendation, not yet confirmed**. The items in §6 assume them. Mark each `decided` with its date when it is confirmed, as [valuation-roadmap.md](valuation-roadmap.md) §7 does.
+Every question is **decided** (2026-11-27), as recommended, Q3 with its scope stated. The answer is what the items in §6 assume; the first spec that needs one writes it as a rule and may refine it. Q9, Q10 and Q11 are working answers: each names the section of the Act its spec reads first (§11).
 
-| # | Question | Recommended answer | First needed by |
+| # | Question | Answer | First needed by |
 | --- | --- | --- | --- |
 | Q1 | One spec or several? | Several: TR1 to TR5, and TR6 if wanted (§1.1) | now |
 | Q2 | Does step 6 open ledger replay or period close? | No. The report walks the Transactions as a read. TR2 decides the ordering key, which a later ledger replay reuses (§1.2) | TR2 |
-| Q3 | Is the tax year cut in New Zealand time or on UTC dates? | New Zealand time, one fixed zone for every Tenant. The year starts at 00:00 on 1 April in New Zealand, which is 11:00 UTC on 31 March. Alternative: UTC dates as everywhere else in the platform, with up to 13 hours of trades in the wrong year | TR2 |
-| Q4 | Which rate turns an amount into NZD? | The actual rate of the day. A cash leg already in NZD is used as it is. Any other amount is converted at the `FxRates` rate of its day. Alternatives: Inland Revenue's own mid-month and end-of-month tables, which are a second rate set with a loader (valuation-roadmap §6 foresaw this); or the rolling 12-month average, which must then be kept every year | TR2 |
+| Q3 | Is the tax year cut in New Zealand time or on UTC dates? | New Zealand time, for the tax year of this plan only (TR2 to TR6). The zone is one fixed zone, the same for every Tenant and not a setting, because the tax year is New Zealand law. The year starts at 00:00 on 1 April in New Zealand, which is 11:00 UTC on 31 March. Every other feature keeps the UTC date: the valuation day, the interest run, the date range of a report (valuation-roadmap H2). Not chosen: UTC dates here too, with up to 13 hours of trades in the wrong year | TR2 |
+| Q4 | Which rate turns an amount into NZD? | The actual rate of the day. A cash leg already in NZD is used as it is. Any other amount is converted at the `FxRates` rate of its day. Not chosen: Inland Revenue's own mid-month and end-of-month tables, which are a second rate set with a loader (valuation-roadmap §6 foresaw this); or the rolling 12-month average, which must then be kept every year | TR2 |
 | Q5 | Which price and which rate value a holding at the start and the end of the year? | The unadjusted close of the latest source date on or before 31 March, in the market's own dates, with the age limit of a valuation, converted at the rate of 31 March. The quantity is the one held at the New Zealand instant. The opening value of a year is then the closing value of the year before, by construction | TR2 |
 | Q6 | Who classifies an Instrument? | A person with `instruments.manage`, by hand, per Tenant, because the catalog is the Tenant's. The platform calls no Inland Revenue tool. Not classified is the default and makes a report incomplete | TR1 |
 | Q7 | What is one interest? | One Instrument held by one Customer, over all their Accounts (T1) | TR2 |
@@ -290,7 +290,7 @@ Every answer is a **recommendation, not yet confirmed**. The items in §6 assume
 | Q9 | Which cost does a disposal remove, for the threshold? | The average cost in NZD of that interest. The guide does not say; check the Act | TR3 |
 | Q10 | Are trade fees part of cost and proceeds? | Yes: a buy fee adds to the cost, a sell fee comes off the proceeds. S2 ¶8 says so for the threshold. For CV, check section EX 51. This answers the question future-plans §1 left for this step | TR2 |
 | Q11 | How is the actual gain of a quick sale worked out? | A disposal is matched to the purchases made earlier in the same year, last bought first, and the gain uses the average cost of the year's purchases, with the dividends on the matched shares pro rata (S1 p.15, S9). The sources differ in detail; read sections EX 52 and EX 54 before the spec | TR4 |
-| Q12 | What happens to an interest where FDR is not allowed? | It is listed and not computed, and the report is incomplete. Alternative: compute it under CV alone, with its loss allowed | TR4 |
+| Q12 | What happens to an interest where FDR is not allowed? | It is listed and not computed, and the report is incomplete. Not chosen: compute it under CV alone, with its loss allowed | TR4 |
 | Q13 | Which tax years can be reported? | A year that has ended and whose 31 March prices and rates are final, as a valuation day is final ([valuation-run](../features/valuation-run.md) R4). No estimate for a year in progress | TR5 |
 | Q14 | Does the platform store whether the rules apply to the Customer (transitional resident, the choice to opt in)? | No. For a `NewZealand` Customer the report always shows the threshold test and both methods, and the Customer reads the branch that applies. For an `Overseas` Customer the report is refused | TR5 |
 | Q15 | What if an External entry is backdated into a year already reported? | Nothing stops it. The stored execution is what was reported; a new run shows the ledger as it is now, with its own instant. Revisit with period close | TR5 |
@@ -331,7 +331,7 @@ When step 5 has landed, step 6 of [future-plans.md](../future-plans.md) §1 is c
 | [features/trade-fees.md](../features/trade-fees.md) | Its open point on brokerage and the cost base is answered | TR2 |
 | [features/reports.md](../features/reports.md), Adviser Portal and Customer Portal page contracts | A third and maybe a fourth report; entry points | TR5, TR6 |
 | [features/dividends.md](../features/dividends.md), [features/external-income.md](../features/external-income.md), [features/interest-run.md](../features/interest-run.md) | "No tax statement" points to the report | TR5, TR6 |
-| [custodial-roadmap.md](custodial-roadmap.md) §13.1, [glossary.md](../glossary.md) "Ledger replay", [future-plans.md](../future-plans.md) §9 | "At the latest with step 6" is reworded, once Q2 is confirmed | Q2 |
+| [custodial-roadmap.md](custodial-roadmap.md) §13.1, [glossary.md](../glossary.md) "Ledger replay", [future-plans.md](../future-plans.md) §9 | No longer say that ledger replay and period close open at the latest with step 6 (reworded 2026-11-27). [valuation-roadmap.md](valuation-roadmap.md) §6 points to Q2, Q3 and Q4 | Q2 |
 | [domain-model.md](../domain-model.md), [database-design.md](../database-design.md), [api-design.md](../api-design.md), [glossary.md](../glossary.md), [features/README.md](../features/README.md) | With each spec | all |
 | [future-plans.md](../future-plans.md) §1 | Points here for step 6 | now |
 
