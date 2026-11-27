@@ -16,9 +16,7 @@ public class InstrumentConfiguration : IEntityTypeConfiguration<Instrument>
         builder.Property(instrument => instrument.IsActive).IsRequired();
         builder.Property(instrument => instrument.CreatedBy).HasMaxLength(450).IsRequired();
         builder.Property(instrument => instrument.RowVersion).IsRowVersion();
-        // The tax attributes are mapped with script 0061 (instrument-tax-attributes §6).
-        builder.Ignore(instrument => instrument.IssuerCountry);
-        builder.Ignore(instrument => instrument.FifTreatments);
+        builder.Property(instrument => instrument.IssuerCountry).HasColumnType("char(2)").IsFixedLength();
         builder.HasIndex(instrument => instrument.PublicId).IsUnique();
         builder.HasIndex(instrument => new { instrument.TenantId, instrument.Symbol }).IsUnique();
         builder.HasOne<Tenant>()
@@ -29,5 +27,13 @@ public class InstrumentConfiguration : IEntityTypeConfiguration<Instrument>
             .WithMany()
             .HasForeignKey(instrument => instrument.QuoteCurrency)
             .OnDelete(DeleteBehavior.Restrict);
+        // Instrument-tax-attributes R16: a row the write leaves out is deleted with the Instrument's save.
+        builder.HasMany(instrument => instrument.FifTreatments)
+            .WithOne()
+            .HasForeignKey(row => row.InstrumentId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(instrument => instrument.FifTreatments)
+            .HasField("_fifTreatments")
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

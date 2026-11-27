@@ -124,6 +124,8 @@ public class ApplicationDbContext : IdentityUserContext<ApplicationUser>, IAppli
 
     public DbSet<Instrument> Instruments => Set<Instrument>();
 
+    public DbSet<InstrumentFifTreatment> InstrumentFifTreatments => Set<InstrumentFifTreatment>();
+
     public DbSet<Account> Accounts => Set<Account>();
 
     public DbSet<Transaction> Transactions => Set<Transaction>();

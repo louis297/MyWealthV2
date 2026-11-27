@@ -78,6 +78,8 @@ public interface IApplicationDbContext
 
     DbSet<Instrument> Instruments { get; }
 
+    DbSet<InstrumentFifTreatment> InstrumentFifTreatments { get; }
+
     DbSet<Account> Accounts { get; }
 
     DbSet<Transaction> Transactions { get; }
