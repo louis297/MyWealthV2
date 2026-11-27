@@ -318,7 +318,7 @@ internal static class TransactionLegReader
                     row.detail.ImputationCredit,
                     row.detail.ReinvestedQuantity,
                     row.detail.ReinvestmentPrice,
-                    row.detail.ExDate.ToString("yyyy-MM-dd"),
+                    row.detail.ExDate?.ToString("yyyy-MM-dd"),
                     row.detail.RecordDate?.ToString("yyyy-MM-dd"),
                     row.detail.PaymentDate?.ToString("yyyy-MM-dd"))));
     }

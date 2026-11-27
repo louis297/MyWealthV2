@@ -73,13 +73,13 @@ public sealed record TransactionDividendDto(
     Guid CorporateActionId,
     TransactionDividendInstrumentDto Instrument,
     decimal Quantity,
-    decimal AmountPerShare,
+    decimal? AmountPerShare,
     string Currency,
     string TaxSource,
     decimal ImputationCredit,
     decimal? ReinvestedQuantity,
     decimal? ReinvestmentPrice,
-    string ExDate,
+    string? ExDate,
     string? RecordDate,
     string? PaymentDate);
 

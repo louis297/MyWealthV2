@@ -4,7 +4,8 @@ namespace MyWealthV2.Domain.Entities;
 /// The dividend behind a <c>Dividend</c> Transaction (dividends R39): the Instrument, the entitled quantity, the amount
 /// per share and its currency, the tax source, the imputation credit in the Account's currency, the three dates, and
 /// with a reinvestment the reinvested quantity and the plan price. Exactly one on every <c>Dividend</c> and on its
-/// Reversal, none elsewhere; immutable.
+/// Reversal, none elsewhere; immutable. The amount per share and the ex-date are always set by a corporate action's
+/// dividend and may be missing on a hand-entered one (external-income R17).
 /// </summary>
 public class TransactionDividendDetail
 {
@@ -20,7 +21,7 @@ public class TransactionDividendDetail
 
     public decimal Quantity { get; private set; }
 
-    public decimal AmountPerShare { get; private set; }
+    public decimal? AmountPerShare { get; private set; }
 
     public string Currency { get; private set; } = string.Empty;
 
@@ -32,7 +33,7 @@ public class TransactionDividendDetail
 
     public decimal? ReinvestmentPrice { get; private set; }
 
-    public DateOnly ExDate { get; private set; }
+    public DateOnly? ExDate { get; private set; }
 
     public DateOnly? RecordDate { get; private set; }
 
@@ -42,19 +43,19 @@ public class TransactionDividendDetail
         int tenantId,
         int instrumentId,
         decimal quantity,
-        decimal amountPerShare,
+        decimal? amountPerShare,
         string currency,
         DividendTaxSource taxSource,
         decimal imputationCredit,
         decimal? reinvestedQuantity,
         decimal? reinvestmentPrice,
-        DateOnly exDate,
+        DateOnly? exDate,
         DateOnly? recordDate,
         DateOnly? paymentDate)
     {
         if (quantity <= 0m || amountPerShare <= 0m || imputationCredit < 0m)
         {
-            throw new DomainException("A dividend detail has a quantity and an amount per share above 0 and a credit of 0 or more.");
+            throw new DomainException("A dividend detail has a quantity above 0, no amount per share or one above 0, and a credit of 0 or more.");
         }
 
         if ((reinvestedQuantity is null) != (reinvestmentPrice is null))
