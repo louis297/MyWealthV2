@@ -44,8 +44,8 @@ public class CustodialManualEntryTests : TestBase
         yield return new TestCaseData("Split", "Corporate actions cannot be entered by hand on a Custodial account.");
         yield return new TestCaseData("Bonus", "Corporate actions cannot be entered by hand on a Custodial account.");
         yield return new TestCaseData("Scrip", "Corporate actions cannot be entered by hand on a Custodial account.");
-        // Dividends R43: written by corporate actions from the company's announcement.
-        yield return new TestCaseData("Dividend", "Dividends are paid by the platform from the company's announcement.");
+        // A Dividend is refused by the validator of POST /transactions (external-income R10); its Custodial message is
+        // on POST /transactions/dividend (ExternalDividendTests).
     }
 
     [TestCaseSource(nameof(RefusedTypes))]
