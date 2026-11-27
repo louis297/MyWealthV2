@@ -127,17 +127,18 @@ export type Activity = {
   migration?: { asOfDate: string; previousProvider: string } | null;
   /** in-kind-transfers R38: the transfer behind a StockIn or StockOut; otherwise null. */
   inKindTransfer?: { transferId: string; direction: string; counterpartyName: string } | null;
-  /** dividends R39: the dividend a Dividend pays; otherwise null. */
+  /** dividends R39: the dividend a Dividend pays; otherwise null. A hand-entered one on an External account has no
+   * corporate action and may have no amount per share and no ex-date (external-income R26). */
   dividend?: {
-    corporateActionId: string;
+    corporateActionId: string | null;
     instrument: { id: string; symbol: string; name: string };
     quantity: number;
-    amountPerShare: number;
+    amountPerShare: number | null;
     currency: string;
     imputationCredit: number;
     reinvestedQuantity: number | null;
     reinvestmentPrice: number | null;
-    exDate: string;
+    exDate: string | null;
     paymentDate: string | null;
   } | null;
   /** corporate-actions R37: the event behind an entitlement posting; otherwise null. */

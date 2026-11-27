@@ -173,20 +173,29 @@ function minorDigits(currency: string) {
   }
 }
 
-/** C30: the gross and the tax withheld of an interest posting; the amount above is the net. */
+/**
+ * C30: the gross and the tax withheld of an interest posting; the amount above is the net. C49: a hand Interest with
+ * tax on an External account shows the same with no period, its gross from the principal leg and one line per tax.
+ */
 function InterestLines({ row }: { row: Activity }) {
-  const tax = row.cash.find((leg) => leg.role === "Tax")?.tax;
+  const taxes = row.cash.filter((leg) => leg.role === "Tax" && leg.tax).map((leg) => leg.tax!);
   const currency = row.cash[0]?.currency ?? "";
+  const gross = row.interest?.grossAmount ?? row.cash.find((leg) => leg.role === "Principal")?.amount ?? 0;
   return (
     <>
-      <p className="text-muted-foreground text-xs">{`Gross ${formatPayout(row.interest!.grossAmount, currency)}`}</p>
-      {tax ? (
-        <p className="text-muted-foreground text-xs">
-          {`Tax withheld (${tax.kind === "Nrwt" ? "NRWT" : "RWT"} ${tax.ratePercent} %) ${formatPayout(tax.amount, currency)}`}
+      <p className="text-muted-foreground text-xs">{`Gross ${formatPayout(gross, currency)}`}</p>
+      {taxes.map((tax) => (
+        <p key={tax.kind} className="text-muted-foreground text-xs">
+          {`Tax withheld (${taxLabel(tax.kind)} ${tax.ratePercent} %) ${formatPayout(tax.amount, currency)}`}
         </p>
-      ) : null}
+      ))}
     </>
   );
+}
+
+/** C49: a hand Interest on an External account that carries tax. */
+function isTaxedHandInterest(row: Activity) {
+  return row.type === "Interest" && !row.interest && row.cash.some((leg) => leg.role === "Tax");
 }
 
 /** An amount per share or a price with at least two decimals: "1.00", "0.2575". */
@@ -550,7 +559,10 @@ export function AccountDetailPage() {
                         {row.dividend ? (
                           <>
                             <p className="text-muted-foreground text-xs">
-                              {`${row.dividend.quantity} shares × ${perShare(row.dividend.amountPerShare)}`}
+                              {/* C48: a hand-entered dividend may have no amount per share. */}
+                              {row.dividend.amountPerShare == null
+                                ? `${row.dividend.quantity} shares`
+                                : `${row.dividend.quantity} shares × ${perShare(row.dividend.amountPerShare)}`}
                             </p>
                             {row.dividend.reinvestedQuantity != null && row.dividend.reinvestmentPrice != null ? (
                               // C43.
@@ -575,7 +587,7 @@ export function AccountDetailPage() {
                       </TableCell>
                       <TableCell>{formatInstant(row.bookedAt)}</TableCell>
                       <TableCell>
-                        {row.interest || row.dividend
+                        {row.interest || row.dividend || isTaxedHandInterest(row)
                           ? formatPayout(
                             (row.cash ?? []).filter((leg) => leg.accountId === id)
                               .reduce((sum, leg) => sum + Math.round(leg.amount * 10000), 0) / 10000,
@@ -584,7 +596,7 @@ export function AccountDetailPage() {
                             .filter((leg) => leg.accountId === id)
                             .map((leg) => `${leg.amount} ${leg.currency}`)
                             .join(", ")}
-                        {row.interest ? <InterestLines row={row} /> : null}
+                        {row.interest || isTaxedHandInterest(row) ? <InterestLines row={row} /> : null}
                         {row.dividend ? <DividendLines row={row} /> : null}
                         {row.fx ? (
                           <p className="text-muted-foreground text-xs">
