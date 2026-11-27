@@ -22,7 +22,7 @@ The full feature map is in [`docs/function-plan.md`](docs/function-plan.md), and
 
 ## Status
 
-The platform foundation, the ledger, reports, the Customer Portal, custody modes, most of the Custodial roadmap, trade fees, historical valuation and income events (dividends and interest with their tax, on both custody modes) have landed. The FIF tax report has its first part: each Instrument states its issuer country and its FIF treatment per tax year. The showcase is deployed on one VPS with Docker Compose behind Caddy, by GitHub Actions.
+The platform foundation, the ledger, reports, the Customer Portal, custody modes, most of the Custodial roadmap, trade fees, historical valuation and income events (dividends and interest with their tax, on both custody modes) have landed. The FIF tax report has its first two parts: each Instrument states its issuer country and its FIF treatment per tax year, and a read turns one Customer's ledger into the tax events of a tax year in NZD. The showcase is deployed on one VPS with Docker Compose behind Caddy, by GitHub Actions.
 
 Next: an end-to-end run across all outside parties, then the advisory fee, performance reports (TWR / MWR) and the FIF tax report.
 

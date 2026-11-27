@@ -54,7 +54,19 @@ The slice computes no tax. The cost in NZD and the threshold test (TR3), FIF inc
 
 New: route `GET /users/customers/{customerId}/tax-years/{taxYear}`; Domain types `TaxYear`, `TaxEvent`, `TaxEventKind`, `TaxHolding`, `CustomerTaxYear` and the functions `TaxLedger.Build` and `CustomerTaxYear.Compute`; Application service `CustomerTaxLedger` and query `GetCustomerTaxYear`; `AccountPosition` carries the instant it was cut at, and `ValueAccount` can value a position it is given. No script, table, permission, problem code, domain event, `TransactionType`, port, job or setting. No write changes. No portal page and no simulator change.
 
-**Status is `accepted` (2026-11-28).** The seventeen points of §11 were confirmed on 2026-11-28, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract.
+**Status is `accepted` (2026-11-28).** The seventeen points of §11 were confirmed on 2026-11-28, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract. Landed 2026-11-28.
+
+Notes from landing:
+
+- R30: the messages are `TaxYear must be a whole number.` (also for an empty value or one too large for an integer), `TaxYear must be 2009 or later.` and `Tax year {Y} can be read from 2 April {Y}.`, all at `errors.TaxYear`. They are checked before the Customer is looked up, so a refused `taxYear` is 400 for any `customerId`.
+- R31: `sequence` counts the events of one tax holding, 1 for its first event of the year. Holdings are sorted by `instrument.symbol` with an ordinal comparison, then by `instrument.id`.
+- R31: `ledger` is `{ currency, principal, fee }` on an acquisition or a disposal and `{ currency, gross, foreignTax, rwt, nrwt, imputationCredit }` on a dividend, each a positive figure in the Account's currency; `null` on every other kind.
+- R14: a departure is valued as the quantity that left, so its `amount` is a positive market value while its `quantity` stays negative. An arrival or a departure is valued as a position of one line on the UTC date of its `bookedAt`, with no basis change.
+- R18: an NZD leg used as booked is also rounded to NZD's places, which changes no figure and gives every NZD figure NZD's places on the wire.
+- R24: a comparable quantity is cut toward zero at 8 decimal places, as account-valuation R18 restates a quantity.
+- R15: pairing is in the order of R8 over the departures, as written: with two departures and one arrival, the first departure takes the arrival, even when the second is nearer to it.
+- R6, R7: `CustomerTaxLedger` reads no reversed Transaction and no Reversal; `TaxLedger.Build` leaves them out again, so the Domain rule does not depend on the query.
+- §10: in the worked example through the API, A1 is opened as an External account so that its trades, split and stock in can be dated, and is made Custodial after them; its two dividends are written with `Transaction.PostDividend`, because a reinvested dividend is never entered by hand.
 
 The tax statements in this spec were read again from Inland Revenue on 2026-11-28 (§14). The Income Tax Act refused automated reads again; §14 says which rules rest on the guide alone. Nothing here is tax advice.
 
@@ -543,6 +555,12 @@ What the stored history must cover is not checked by the read. A tax year `Y` ca
 
 ## 10. Tests
 
+| Project | Where |
+| --- | --- |
+| Domain.UnitTests | `Tax/TaxYearTests.cs`, `Tax/TaxLedgerTests.cs`, `Tax/TaxLedgerMoveTests.cs`, `Tax/CustomerTaxYearAmountTests.cs`, `Tax/CustomerTaxYearValueTests.cs`, `Tax/CustomerTaxYearComparableTests.cs`, `Tax/CustomerTaxYearReasonTests.cs`, with the worked example in `Tax/TaxWorkedExample.cs`; `Valuations/AccountValuationBasisTests.cs` for a position cut at an instant |
+| Application.UnitTests | `TaxYears/GetCustomerTaxYearQueryValidatorTests.cs`: R4 with a fixed clock (1 April and 2 April) |
+| Application.FunctionalTests | `TaxYears/GetCustomerTaxYearTests.cs`, `TaxYears/GetCustomerTaxYearAccessTests.cs` (two tenants), with the worked example in `TaxYears/TaxYearWorld.cs`; `Valuations/` unchanged and green |
+
 | Project | Assert |
 | --- | --- |
 | Domain.UnitTests (`Tax/TaxYearTests`) | `Start` and `End` of 2026 and 2027 are 11:00 UTC on 31 March; `End(Y)` equals `Start(Y + 1)`; `Of` an instant one tick before, at and one tick after a start; 10:59 and 11:00 UTC on 31 March are two tax years |
@@ -648,18 +666,7 @@ Each doc was changed in place when this spec was accepted (2026-11-28).
 
 ## 13. Suggested commits
 
-The repository should build after each commit. Agents split each line into red then green.
-
-1. `TaxYear`: the two instants, `Of`, the first readable year (R3).
-2. `AccountPosition.CutAt` and the ex-date rule at an instant; `ValueAccount.ForPositionAsync` (R22, §5, §7).
-3. `TaxLedger.Build`: the facts, the ordering key, reversed Transactions left out, the mapping without moves (R6–R14, R16, R17).
-4. Moves: the pairs and the later instant (R15).
-5. `CustomerTaxYear.Compute`: the NZD amounts and their statuses (R18–R21).
-6. Opening and closing: the quantities at the instants and the lines (R22, R23).
-7. Comparable quantity and peak (R24, R25).
-8. The treatment, the reasons and the notices (R26–R29).
-9. `GET /users/customers/{customerId}/tax-years/{taxYear}`: access, `taxYear`, the item, the tenant isolation (R1, R2, R4, R30–R32).
-10. The landing commit: this spec marked landed, the roadmap row and the root README.
+Removed when the slice landed (2026-11-28). The commits are in git.
 
 ---
 

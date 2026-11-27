@@ -217,7 +217,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 - **Risk to test:** a trade between 11:00 UTC and 24:00 UTC on 31 March. It is in the next tax year (T2) and in the UTC day the valuation run stores. The FIF figures and the stored valuation of that day then differ, correctly.
 - **Amends:** holdings and posting (the walk and its ordering key), account-valuation (a cut at an instant, not only at the end of a UTC day).
 - **Worked example:** one Customer with two Accounts in two currencies over two tax years: a buy and a sell either side of the year end, a split, a cash dividend with foreign tax, a reinvested dividend, a reversal, and a move between the two Accounts.
-- **Spec:** [tax-year-events](../features/tax-year-events.md) (`accepted`, 2026-11-28). It names the events `Acquisition`, `Disposal`, `Dividend`, `Reorganisation`, `Arrival`, `Departure`, `Move` and `Correction`, and calls one Instrument over all Accounts of a Customer a tax holding. It settles the two rows the draft mapping left open: a `Scrip` is a reorganisation with a notice, and an `Adjustment` of a holding is a correction with a notice. A move is recognised on read by a rule, because no Transaction links its two sides. Its points 1 to 17 answer "Also decide" and were confirmed as recommended. Sections EX 51, EX 52 and EX 57 of the Act could not be read; the spec says which rules rest on the guide alone.
+- **Spec:** [tax-year-events](../features/tax-year-events.md) (`accepted` and landed, 2026-11-28). It names the events `Acquisition`, `Disposal`, `Dividend`, `Reorganisation`, `Arrival`, `Departure`, `Move` and `Correction`, and calls one Instrument over all Accounts of a Customer a tax holding. It settles the two rows the draft mapping left open: a `Scrip` is a reorganisation with a notice, and an `Adjustment` of a holding is a correction with a notice. A move is recognised on read by a rule, because no Transaction links its two sides. Its points 1 to 17 answer "Also decide" and were confirmed as recommended. Sections EX 51, EX 52 and EX 57 of the Act could not be read; the spec says which rules rest on the guide alone.
 
 ### TR3. Cost in NZD and the threshold test
 
@@ -311,7 +311,7 @@ Each step depends only on earlier steps.
 | Step | Item | Closes | Spec | Status |
 | --- | --- | --- | --- | --- |
 | 1 | TR1 tax attributes of an Instrument | "No ISIN / Exchange / Kind" stays; the country and the FIF treatment are new | [instrument-tax-attributes](../features/instrument-tax-attributes.md) | accepted and landed (2026-11-27) |
-| 2 | TR2 tax year events in NZD | The ordering key of Transactions, for a later ledger replay; the open point on brokerage and the cost base (trade-fees §11) | [tax-year-events](../features/tax-year-events.md) | spec accepted (2026-11-28) |
+| 2 | TR2 tax year events in NZD | The ordering key of Transactions, for a later ledger replay; the open point on brokerage and the cost base (trade-fees §11) | [tax-year-events](../features/tax-year-events.md) | accepted and landed (2026-11-28) |
 | 3 | TR3 cost in NZD and the threshold test | "Tax lots and a cost in NZD" of custodial-roadmap §10, as far as this step needs it | — | not started |
 | 4 | TR4 FIF income: FDR, quick sale, CV | — | — | not started |
 | 5 | TR5 the FIF report | "A tax statement for the Customer" (interest-run §11 point 19; dividends and external-income Out), for FIF income | — | not started |
