@@ -80,6 +80,42 @@ internal static class TaxWorkedExample
         Rate(2026, 3, 31, 1.7450m)
     ];
 
+    /// <summary>AAA: issuer country US, Attributing from tax year 2025.</summary>
+    public static IReadOnlyDictionary<int, TaxTreatment> Treatments => new Dictionary<int, TaxTreatment>
+    {
+        [Aaa] = new(FifTreatment.Attributing, 2025, null, "US")
+    };
+
+    /// <summary>What Application reads for each event: the USD row with the latest date on or before the UTC date of
+    /// its <c>bookedAt</c>.</summary>
+    public static IReadOnlyDictionary<(string Currency, DateOnly Date), StoredRate> RatesFor(
+        IEnumerable<TaxEvent> events, IReadOnlyList<StoredRate> rows)
+    {
+        var rates = new Dictionary<(string Currency, DateOnly Date), StoredRate>();
+        foreach (var date in events.Select(e => LedgerDay.Of(e.BookedAt)).Distinct())
+        {
+            if (rows.Where(row => row.AsOfDate <= date).MaxBy(row => row.AsOfDate) is { } row)
+            {
+                rates[("USD", date)] = row;
+            }
+        }
+
+        return rates;
+    }
+
+    /// <summary>The worked example's tax year <paramref name="taxYear"/>, with the rates of §1.1.</summary>
+    public static CustomerTaxYear Year(
+        int taxYear,
+        IReadOnlyList<LedgerFact>? facts = null,
+        IReadOnlyList<StoredRate>? rates = null,
+        TaxYearValues? values = null,
+        IReadOnlyDictionary<int, TaxTreatment>? treatments = null)
+    {
+        var events = TaxLedger.Build(facts ?? Facts);
+        return CustomerTaxYear.Compute(
+            taxYear, events, treatments ?? Treatments, RatesFor(events, rates ?? UsdRates), values ?? TaxYearValues.None, 2);
+    }
+
     public static StoredRate Rate(int year, int month, int day, decimal rate) => new(rate, new DateOnly(year, month, day), "Frankfurter");
 
     public static StoredPrice Price(int year, int month, int day, decimal amount) => new(amount, "USD", new DateOnly(year, month, day), "EODHD");
