@@ -17,8 +17,64 @@ public static class TaxCostLedger
         IReadOnlyList<TaxEvent> events,
         IReadOnlySet<int> costed,
         IReadOnlyDictionary<(string Currency, DateOnly Date), StoredRate> rates,
-        int decimalPlaces) =>
-        new([]);
+        int decimalPlaces)
+    {
+        var steps = new List<TaxCostStep>();
+        var states = new Dictionary<int, TaxCostState>();
+        foreach (var taxEvent in events.Where(e => costed.Contains(e.InstrumentId)))
+        {
+            var before = states.GetValueOrDefault(taxEvent.InstrumentId) ?? new TaxCostState(0m, TaxFx.Zero(decimalPlaces), null);
+            var step = Next(taxEvent, before, rates, decimalPlaces);
+            steps.Add(step);
+            states[taxEvent.InstrumentId] = new TaxCostState(step.QuantityAfter, step.CostAfter, step.Unknown);
+        }
+
+        return new TaxCostWalk(steps);
+    }
+
+    /// <summary>One event applied to the state of its tax holding before it.</summary>
+    private static TaxCostStep Next(
+        TaxEvent taxEvent,
+        TaxCostState before,
+        IReadOnlyDictionary<(string Currency, DateOnly Date), StoredRate> rates,
+        int decimalPlaces)
+    {
+        var quantity = before.Quantity + taxEvent.Changes.Sum(change => change.Quantity);
+        decimal? after = before.Cost;
+        if (before.Cost is { } cost)
+        {
+            after = taxEvent.Kind switch
+            {
+                // R6: the principal and the fee, each converted on its own.
+                TaxEventKind.Acquisition => cost + Acquired(taxEvent, rates, decimalPlaces),
+                // R7: the average of what is held before.
+                TaxEventKind.Disposal => cost - Released(cost, -taxEvent.Quantity, before.Quantity, decimalPlaces),
+                // R8: a reorganisation, a dividend and a move change nothing.
+                _ => cost
+            };
+        }
+
+        // R12: nothing held costs nothing.
+        if (quantity == 0m)
+        {
+            after = TaxFx.Zero(decimalPlaces);
+        }
+
+        var change = after - before.Cost;
+        return new TaxCostStep(taxEvent, quantity, change, after, null, null);
+    }
+
+    private static decimal Acquired(
+        TaxEvent taxEvent, IReadOnlyDictionary<(string Currency, DateOnly Date), StoredRate> rates, int decimalPlaces)
+    {
+        var trade = taxEvent.Trade!;
+        var (status, rate) = TaxFx.RateOf(trade.Currency, LedgerDay.Of(taxEvent.BookedAt), rates);
+        return TaxFx.Nzd(trade.Principal, status, rate, decimalPlaces)!.Value + TaxFx.Nzd(trade.Fee, status, rate, decimalPlaces)!.Value;
+    }
+
+    /// <summary>R7: <c>Round(cost × out ÷ before, dp)</c>; everything held taken out removes the whole cost.</summary>
+    private static decimal Released(decimal cost, decimal quantityOut, decimal quantityBefore, int decimalPlaces) =>
+        quantityOut == quantityBefore ? cost : TaxFx.Round(cost * quantityOut / quantityBefore, decimalPlaces);
 }
 
 /// <summary>The steps of the walk, one per event of a costed Instrument, in the order of the events.</summary>

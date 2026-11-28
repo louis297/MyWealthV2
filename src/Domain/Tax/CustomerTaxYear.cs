@@ -271,13 +271,8 @@ public sealed record CustomerTaxYear(
             case TaxEventKind.Disposal:
             case TaxEventKind.Dividend:
                 var currency = taxEvent.Trade?.Currency ?? taxEvent.Dividend!.Currency;
-                var (status, rate) = RateOf(currency, LedgerDay.Of(taxEvent.BookedAt), rates);
-                decimal? Nzd(decimal amount) => status switch
-                {
-                    TaxAmountStatus.Stated => Round(amount, decimalPlaces),
-                    TaxAmountStatus.Converted => Round(amount * rate!.Rate, decimalPlaces),
-                    _ => null
-                };
+                var (status, rate) = TaxFx.RateOf(currency, LedgerDay.Of(taxEvent.BookedAt), rates);
+                decimal? Nzd(decimal amount) => TaxFx.Nzd(amount, status, rate, decimalPlaces);
 
                 if (taxEvent.Dividend is { } dividend)
                 {
@@ -329,31 +324,12 @@ public sealed record CustomerTaxYear(
         return none with { Status = status, Amount = line.Value, Price = line.Price, Fx = line.Fx };
     }
 
-    /// <summary>R18, R21: an NZD leg is used as booked; any other needs a row of the pair no older than the age limit.</summary>
-    private static (TaxAmountStatus Status, StoredRate? Rate) RateOf(
-        string currency, DateOnly date, IReadOnlyDictionary<(string Currency, DateOnly Date), StoredRate> rates)
-    {
-        if (currency == Nzd)
-        {
-            return (TaxAmountStatus.Stated, null);
-        }
-
-        if (!rates.TryGetValue((currency, date), out var rate))
-        {
-            return (TaxAmountStatus.NoRate, null);
-        }
-
-        return ValuationRules.IsFresh(rate.AsOfDate, date) ? (TaxAmountStatus.Converted, rate) : (TaxAmountStatus.StaleRate, rate);
-    }
-
     /// <summary>R23: an opening and a closing value are worked out for an attributing and a not classified holding.</summary>
     public static bool NeedsValue(FifTreatment treatment) =>
         treatment is FifTreatment.Attributing or FifTreatment.AttributingNoFdr or FifTreatment.NotClassified;
 
     /// <summary>The currency of every figure of a tax year (R31).</summary>
     public const string Nzd = "NZD";
-
-    private static decimal Round(decimal amount, int places) => decimal.Round(amount, places, MidpointRounding.AwayFromZero);
 }
 
 /// <summary>R26: the treatment of an Instrument for the year, with what a report has to keep.</summary>
