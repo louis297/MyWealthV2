@@ -87,12 +87,15 @@ internal static class TaxWorkedExample
     };
 
     /// <summary>What Application reads for each event: the USD row with the latest date on or before the UTC date of
-    /// its <c>bookedAt</c>.</summary>
+    /// its <c>bookedAt</c>, and of an arrival's <c>acquiredOn</c> (tax-cost-threshold R14).</summary>
     public static IReadOnlyDictionary<(string Currency, DateOnly Date), StoredRate> RatesFor(
         IEnumerable<TaxEvent> events, IReadOnlyList<StoredRate> rows)
     {
         var rates = new Dictionary<(string Currency, DateOnly Date), StoredRate>();
-        foreach (var date in events.Select(e => LedgerDay.Of(e.BookedAt)).Distinct())
+        var list = events.ToList();
+        foreach (var date in list.Select(e => LedgerDay.Of(e.BookedAt))
+                     .Concat(list.Select(e => e.CarriedCost?.AcquiredOn).OfType<DateOnly>())
+                     .Distinct())
         {
             if (rows.Where(row => row.AsOfDate <= date).MaxBy(row => row.AsOfDate) is { } row)
             {
@@ -109,11 +112,12 @@ internal static class TaxWorkedExample
         IReadOnlyList<LedgerFact>? facts = null,
         IReadOnlyList<StoredRate>? rates = null,
         TaxYearValues? values = null,
-        IReadOnlyDictionary<int, TaxTreatment>? treatments = null)
+        IReadOnlyDictionary<int, TaxTreatment>? treatments = null,
+        IReadOnlyDictionary<(int InstrumentId, int TaxYear), FifTreatment>? earlierTreatments = null)
     {
         var events = TaxLedger.Build(facts ?? Facts);
         return CustomerTaxYear.Compute(
-            taxYear, events, treatments ?? Treatments, RatesFor(events, rates ?? UsdRates), values ?? TaxYearValues.None, 2);
+            taxYear, events, treatments ?? Treatments, RatesFor(events, rates ?? UsdRates), values ?? TaxYearValues.None, 2, earlierTreatments);
     }
 
     /// <summary>The stored prices of AAA in §1.1.</summary>
@@ -157,10 +161,14 @@ internal static class TaxWorkedExample
     }
 
     /// <summary>The worked example's tax year with its opening and closing valued.</summary>
-    public static CustomerTaxYear ValuedYear(int taxYear, IReadOnlyList<LedgerFact>? facts = null, IReadOnlyDictionary<int, TaxTreatment>? treatments = null)
+    public static CustomerTaxYear ValuedYear(
+        int taxYear,
+        IReadOnlyList<LedgerFact>? facts = null,
+        IReadOnlyDictionary<int, TaxTreatment>? treatments = null,
+        IReadOnlyDictionary<(int InstrumentId, int TaxYear), FifTreatment>? earlierTreatments = null)
     {
         var events = TaxLedger.Build(facts ?? Facts);
-        return Year(taxYear, facts, values: ValuesOf(taxYear, events), treatments: treatments);
+        return Year(taxYear, facts, values: ValuesOf(taxYear, events), treatments: treatments, earlierTreatments: earlierTreatments);
     }
 
     public static StoredRate Rate(int year, int month, int day, decimal rate) => new(rate, new DateOnly(year, month, day), "Frankfurter");

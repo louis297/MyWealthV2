@@ -51,5 +51,8 @@ public enum TaxNotice
     Move = 3,
     Scrip = 4,
     Correction = 5,
-    DividendTaxSourceDisagrees = 6
+    DividendTaxSourceDisagrees = 6,
+
+    /// <summary>Tax-cost-threshold R25: an arrival's carried cost is in the tax cost of the year.</summary>
+    CarriedCost = 7
 }

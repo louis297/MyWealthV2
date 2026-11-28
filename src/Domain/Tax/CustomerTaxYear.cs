@@ -13,13 +13,16 @@ public sealed record CustomerTaxYear(
     DateTimeOffset To,
     IReadOnlyList<TaxHolding> Holdings,
     bool Complete,
-    int IncompleteCount)
+    int IncompleteCount,
+    ThresholdTest Threshold)
 {
     /// <summary>
     /// R18, R21–R29 over the events of <see cref="TaxLedger.Build"/>. <paramref name="treatments"/> holds the treatment
     /// of each Instrument for the year (none: not classified); <paramref name="rates"/> the rate row into NZD read for a
     /// currency and the UTC date of a <c>bookedAt</c> (none: no row of the pair); <paramref name="values"/> the lines
     /// of the opening, the closing and each arrival or departure of the year; <paramref name="decimalPlaces"/> NZD's.
+    /// Tax-cost-threshold §5: <paramref name="rates"/> also holds the rows of <see cref="TaxCostLedger.RateKeys"/>, and
+    /// <paramref name="earlierTreatments"/> the treatment of an Instrument for an earlier tax year (none: not classified).
     /// </summary>
     public static CustomerTaxYear Compute(
         int taxYear,
@@ -27,7 +30,8 @@ public sealed record CustomerTaxYear(
         IReadOnlyDictionary<int, TaxTreatment> treatments,
         IReadOnlyDictionary<(string Currency, DateOnly Date), StoredRate> rates,
         TaxYearValues values,
-        int decimalPlaces)
+        int decimalPlaces,
+        IReadOnlyDictionary<(int InstrumentId, int TaxYear), FifTreatment>? earlierTreatments = null)
     {
         var from = Tax.TaxYear.Start(taxYear);
         var to = Tax.TaxYear.End(taxYear);
@@ -75,11 +79,14 @@ public sealed record CustomerTaxYear(
                 comparable?.Max(),
                 yearEvents,
                 Reasons(treatment, start, end, yearEvents, comparable is not null),
-                Notices(treatment, Of(opening, instrumentId), yearEvents)));
+                Notices(treatment, Of(opening, instrumentId), yearEvents),
+                TaxCost.NotRequired));
         }
 
         var incomplete = holdings.Count(holding => !holding.Complete);
-        return new CustomerTaxYear(taxYear, from, to, holdings, incomplete == 0, incomplete);
+        return new CustomerTaxYear(
+            taxYear, from, to, holdings, incomplete == 0, incomplete,
+            new ThresholdTest(null, 0m, new ThresholdPeak(0m, from, null, null), 0m, ThresholdOutcome.Unknown, [], []));
     }
 
     /// <summary>
@@ -260,7 +267,7 @@ public sealed record CustomerTaxYear(
         TaxYearValues values,
         int decimalPlaces)
     {
-        var none = new TaxYearEvent(sequence, taxEvent, 0m, null, null, TaxAmountStatus.None, null, null, null, null, null);
+        var none = new TaxYearEvent(sequence, taxEvent, 0m, null, null, TaxAmountStatus.None, null, null, null, null, null, null);
         switch (taxEvent.Kind)
         {
             case TaxEventKind.Arrival:
@@ -363,7 +370,8 @@ public sealed record TaxHolding(
     decimal? PeakQuantity,
     IReadOnlyList<TaxYearEvent> Events,
     IReadOnlyList<TaxIncompleteReason> Incomplete,
-    IReadOnlyList<TaxNotice> Notices)
+    IReadOnlyList<TaxNotice> Notices,
+    TaxCost Cost)
 {
     /// <summary>R27: complete if and only if no reason is listed.</summary>
     public bool Complete => Incomplete.Count == 0;
@@ -379,7 +387,8 @@ public sealed record TaxPoint(
     TaxValueStatus Status,
     IReadOnlyList<TaxValueLine> Lines);
 
-/// <summary>A tax event of the year with its NZD figures and the quantities after it (R18–R25, R31).</summary>
+/// <summary>A tax event of the year with its NZD figures and the quantities after it (R18–R25, R31), and its tax cost
+/// (tax-cost-threshold R24; none when the tax holding needs no tax cost).</summary>
 public sealed record TaxYearEvent(
     int Sequence,
     TaxEvent Event,
@@ -391,7 +400,8 @@ public sealed record TaxYearEvent(
     StoredPrice? Price,
     decimal? Principal,
     decimal? Fee,
-    TaxDividendAmounts? Dividend);
+    TaxDividendAmounts? Dividend,
+    TaxEventCost? Cost);
 
 /// <summary>R11: the figures of a dividend in NZD, each <c>null</c> when it could not be worked out.</summary>
 public sealed record TaxDividendAmounts(
