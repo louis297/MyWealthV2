@@ -4,7 +4,7 @@ status: accepted
 phase: 3
 language: en
 created: 2026-11-02
-updated: 2026-11-26
+updated: 2026-11-28
 related:
   - README.md
   - ../adviser-portal/frontend-conventions.md
@@ -32,6 +32,7 @@ related:
   - ../features/in-kind-transfers.md
   - ../features/dividends.md
   - ../features/valuation-history.md
+  - ../features/fif-report.md
 ---
 
 # Customer Portal
@@ -154,7 +155,7 @@ All routes are under `/api`. Policy and self-scope are enforced by the backend.
 
 ## Reports page (field bindings)
 
-Generate uses a hard-coded form for known Customer-scoped reports (first report: Customer Transactions). Selecting a report from the dropdown shows its form and Generate button. History is a separate panel that defaults to all own Customer-scoped executions; an optional report filter adds `reportId`.
+Generate uses a hard-coded form for known Customer-scoped reports: Customer Transactions and FIF Report. Selecting a report from the dropdown shows its form and Generate button. History is a separate panel that defaults to all own Customer-scoped executions; an optional report filter adds `reportId`.
 
 Customer Transactions parameters (portal sets `customerId` to self; the field is not editable):
 
@@ -164,6 +165,13 @@ Customer Transactions parameters (portal sets `customerId` to self; the field is
 | `from` | yes | Date. |
 | `to` | yes | Date. |
 | `includeClosedAccounts` | no | Default false. |
+
+FIF Report parameters ([fif-report](../features/fif-report.md) R6, R28):
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `customerId` | yes | Hidden; value from `/users/me`. |
+| `taxYear` | yes | A select of the tax years that can be reported today (C50). Sent as a number. |
 
 Empty, loading, error, and success states for the list, the form, and the history panel. Poll an execution until `Succeeded` or `Failed`. Show download only when `Succeeded`.
 
@@ -393,6 +401,15 @@ Field rules: [external-income](../features/external-income.md). No new BFF prefi
 | C48 | A Customer with a hand-entered `Dividend` on an External account | Account page activity | The row of C42, with "<quantity> shares" alone when there is no amount per share. |
 | C49 | A Customer with a hand-entered `Interest` that has tax | Account page activity | The row is labelled "Interest" and shows Gross, "Tax withheld (<kind label> <rate> %)" per tax and the net amount, as C30 without a period. Without tax the row is today's. |
 
+### FIF Report
+
+Field rules: [fif-report](../features/fif-report.md) R6, R7, R8, R28 (report `customer-fif`, `7d2f6b48-1a9c-4e35-a7d0-5c8e3b1f9a44`, manual only). No new BFF prefix: the existing `/reports` routes.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C50 | A Customer, the report granted | Reports page, "FIF Report" selected | The form has one field, "Tax year", a select of every tax year that can be reported today, the latest first and selected, each as "<Y> (1 April <Y − 1> to 31 March <Y>)"; tax year `Y` is offered from 2 April `Y` (UTC), down to 2009. Generate sends `{ reportId, parameters: { customerId: <self>, taxYear: <Y> } }`. No schedule controls. |
+| C51 | A Customer whose tax residency is `Overseas` | Generate the FIF Report | The report is in the list. The server's 400 message ("A FIF report is made for a customer whose tax residency is New Zealand.") is shown at the form, not "Report is not available." |
+
 ## Tests
 
 Portal tests assert routes, role visibility (Customer only), and API-client shapes. Do not re-prove backend isolation or the BFF protocol here.
@@ -405,7 +422,7 @@ Portal tests assert routes, role visibility (Customer only), and API-client shap
 - Report schedules for self.
 - Firm name in the shell (`tenants.read` for Customer).
 - Instrument detail pages.
-- Multi-report parameter forms beyond Customer Transactions.
+- A parameter schema for dynamic forms (the Reports page hard-codes two forms).
 
 ---
 
@@ -433,3 +450,4 @@ What changed in this file after it was accepted. Each row is a section above. Th
 | 2026-11-26 | [valuation-history](../features/valuation-history.md) | Valuation history |
 | 2026-11-26 | — | The amendments became the sections above. No behaviour changed |
 | 2026-11-27 | [external-income](../features/external-income.md) | Income on External accounts |
+| 2026-11-28 | [fif-report](../features/fif-report.md) | Reports page (field bindings), FIF Report (C50, C51), Still open |

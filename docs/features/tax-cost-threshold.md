@@ -157,7 +157,7 @@ What the example shows:
 **Out**
 
 - FIF income under either method, and the quick sale adjustment with its own average cost over the purchases of one year: [fif-income.md](fif-income.md) (its R11). That average is not the cost of this slice
-- The report, and what it says to a Customer whose test is `NotAbove`: TR5. The income summary: TR6
+- The report, and what it says to a Customer whose test is `NotAbove`: [fif-report.md](fif-report.md) §4.6. The income summary: TR6
 - Whether the FIF rules apply to the Customer for another reason: tax residency, a transitional resident, the choice to apply the rules below the threshold and its four-year rule (roadmap Q14, §7). The test says above or not, and nothing else
 - Joint holders, trusts and companies. A Customer is one person (ADR 0020)
 - The option of half the market value on 1 April 2007 for an interest acquired before 1 January 2000 (R23)
@@ -189,7 +189,7 @@ What the example shows:
 | ID | Rule |
 | --- | --- |
 | R1 | **Part of the tax year read.** The cost and the test are fields of the item of `GET /users/customers/{customerId}/tax-years/{taxYear}`. There is no route of their own. Access, scope, the 401, 403 and 404 cases, and which tax years can be read are those of tax-year-events R1, R4 and R30. No new permission and no new problem code. |
-| R2 | **A read only.** tax-year-events R2 holds: nothing is written, no lock is taken, and the Customer's tax profile is not read. An `Overseas` Customer gets the same test as a `NewZealand` one; what a report does with it is roadmap Q14. |
+| R2 | **A read only.** tax-year-events R2 holds: nothing is written, no lock is taken, and the Customer's tax profile is not read. An `Overseas` Customer gets the same test as a `NewZealand` one; what the report does with it is [fif-report.md](fif-report.md) R8: an `Overseas` Customer gets no report. |
 
 ### 4.2 Tax cost
 
@@ -215,7 +215,7 @@ What the example shows:
 | R15 | **The threshold of a tax year (roadmap T6).** `FifThreshold.For(Y)` is a value per tax year, a constant in Domain that changes only with an amendment to this spec, as `WithholdingRates` does (interest-run R4). It is NZ$50,000 for tax years 2009 to 2026. From tax year 2027 it has **no value yet**: a Bill before Parliament raises it to NZ$100,000 "for the 2026–27 and later income years" (S5), and it was not law in any source read on 2026-11-28. A tax year with no value gives the outcome `Unknown` with the reason `NoThreshold` (R19, R20). Tax year 2027 can first be read on 2 April 2027 (tax-year-events R4), so the row can be added before any read needs it. Sources: S1 p.9, p.10; S2 ¶8; S5 p.48–49. |
 | R16 | **Which tax holdings count.** A tax holding counts in the test of tax year `Y` when its treatment for `Y` is `Attributing` or `AttributingNoFdr`. An exempt interest and a New Zealand share are not counted (S2 ¶7). A `NotClassified` tax holding is not counted and makes the test incomplete (R20). The treatment is the one of `Y`, whatever it was when the shares were bought. |
 | R17 | **The total.** The total at a point of the year is the sum of the tax costs of the tax holdings that count, where known. It is taken at the opening (`Start(Y)`), after every event of the year on a tax holding that counts, in the order of tax-year-events R8 over all of them, and at the closing (`End(Y)`). |
-| R18 | **The highest total.** `peak` is the greatest total of R17, with the first point at which it was reached: the opening, or an event with its `bookedAt`. It is read after every event, not at the end of each day, so a purchase and a sale on one day show (S1 p.9, "on any day in the year"; S2 ¶8, "at any time during the income year"). The point is an instant in UTC; this slice gives no New Zealand date. |
+| R18 | **The highest total.** `peak` is the greatest total of R17, with the first point at which it was reached: the opening, or an event with its `bookedAt`. It is read after every event, not at the end of each day, so a purchase and a sale on one day show (S1 p.9, "on any day in the year"; S2 ¶8, "at any time during the income year"). The point is an instant in UTC; this slice gives no New Zealand date. The FIF report prints it in New Zealand time ([fif-report.md](fif-report.md) R13), with the sentence of its outcome (its §4.6). |
 | R19 | **Outcome.** `Above` when the highest total is more than the threshold; `NotAbove` when it is equal to it or less (S1 p.10, "equal to or less than $50,000 at all times in the year") and the test is complete; `Unknown` otherwise. Above the threshold at one point, every attributing tax holding is in the rules for the whole tax year, and the first $50,000 is not exempt (S1 p.9). The outcome says nothing about tax residency or about a choice to apply the rules (R23). |
 | R20 | **Incomplete (roadmap T5).** The test is incomplete when a reason of the table below applies, and it lists every one with its tax holding. An incomplete test is never `NotAbove`. It does not make a tax holding incomplete (tax-year-events R27), and it does not change `complete` of the tax year: FIF income can be worked out for a holding whose cost is unknown. The answer is 200. |
 | R21 | **A floor.** A tax cost is never below 0, so a total of the known costs is never more than the true total. An incomplete test whose highest total is above the threshold is therefore `Above`: the missing figures can only add to it. Its `peak` is then "at least" this figure, and `complete` `false` says so. |
@@ -419,7 +419,7 @@ Cross-tenant or wrong-collection id → **404**, not 403, as tax-year-events R1 
 
 ## 9. UI
 
-None in this slice. No page shows the test. The entry points are TR5's.
+None in this slice. No page shows the test. The report that prints it is [fif-report.md](fif-report.md), with its entry points (R27, R28).
 
 ### 9.1 Seeds and hosting
 
@@ -486,7 +486,7 @@ Confirmed on 2026-11-28, every one as recommended. Each point states the choice,
 7. **A departure removes the average, and a move changes nothing** (R8, R10). Recommended: roadmap Q8 ("a departure mirrors it") and T1.
 8. **A correction applies its two deltas as stated** (R11). Recommended: an adjustment is the caller's number in the ledger too, and its notice is already on the tax holding. Alternative A: any correction makes the tax cost unknown, so a person must look. Alternative B: a correction that lowers the quantity removes the average, and its `costChange` is ignored.
 9. **A tax cost only for attributing and not classified tax holdings** (R4). Recommended: as the values of tax-year-events R23; an exempt interest is not in the test, and no rate is read for it. Alternative: a tax cost for every tax holding, which TR6 does not need either.
-10. **The total is read after every event, and its point is an instant** (R17, R18). Recommended by the roadmap. A New Zealand date needs the zone data that tax-year-events point 1 chose not to depend on; TR5 decides how the report prints the day. Alternative: the end of each New Zealand day.
+10. **The total is read after every event, and its point is an instant** (R17, R18). Recommended by the roadmap. A New Zealand date needs the zone data that tax-year-events point 1 chose not to depend on; The report prints the instant in New Zealand time by the Domain rule `NewZealandTime` ([fif-report.md](fif-report.md) R13). Alternative: the end of each New Zealand day.
 11. **The threshold has no value from tax year 2027 until the Bill is law** (R15). Recommended: the figure of a Bill is not a threshold (roadmap T5, T6), no read can ask for tax year 2027 before 2 April 2027, and the row is one line of an amendment. Alternative A: write NZ$100,000 from 2027 now, as the Bill's commentary states it. Alternative B: NZ$50,000 with no end, which is wrong for 2027 if the Bill passes as introduced.
 12. **Above means more than the threshold** (R19). Recommended: S1 p.10 and S2 ¶8. S1 p.5 and the Bill's commentary also say "below" and "less than" (see "Found while writing").
 13. **An incomplete test does not make a tax holding or the tax year incomplete** (R20). Recommended: roadmap TR4, "TR3 decides whether the result applies, not how it is computed". Alternative: one `complete` for everything.
@@ -510,11 +510,9 @@ Confirmed on 2026-11-28, every one as recommended. Each point states the choice,
 
 Still open, not this slice:
 
-- The report, what it prints for each outcome, and the day of the peak in New Zealand time: TR5
 - The threshold of tax year 2027 and later, once the Bill is law (R15)
 - The deemed sale and purchase at market value when a treatment changes (R22), and the pre-2000 option (R23)
 - An NZD cost or several dated costs stated on an arrival, and tax lots
-- A run over every Customer of a Tenant, and whether the rate rows of the walk are then read in one query: TR5
 - Ledger replay and period close (roadmap §1.2)
 
 ---
@@ -572,3 +570,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | Date | With | Change here |
 | --- | --- | --- |
 | 2026-11-28 | [fif-income.md](fif-income.md) | §2 Out: FIF income and the average cost of the quick sale are that spec's (its R11). "Still open": the TR4 line goes |
+| 2026-11-28 | [fif-report.md](fif-report.md) | §2 Out, R2, R18, §9, point 10 and "Still open": the report prints the highest total in New Zealand time (its R13) and a sentence per outcome (its §4.6); there is no run over every Customer (its R5). The two TR5 lines go |

@@ -4,7 +4,7 @@ status: accepted
 phase: 3
 language: en
 created: 2026-10-14
-updated: 2026-11-27
+updated: 2026-11-28
 related:
   - adviser-portal.md
   - adviser-portal-dashboard.md
@@ -15,6 +15,7 @@ related:
   - ../adr/0017-background-worker.md
   - ../features/bank-reconciliation.md
   - ../features/valuation-history.md
+  - ../features/fif-report.md
 ---
 
 # Adviser Portal — Reports
@@ -31,10 +32,12 @@ Backend prerequisites (landed):
 - Shared pipeline + generators for Customer Transactions and Adviser Balances.
 - Hangfire worker (ADR 0017). PDF via QuestPDF. Shared volume for result files.
 - Policies: `reports.customer.read` / `reports.customer.create` and `reports.book.read` / `reports.book.create`. Customer has the customer read and create policies (create is a request for self only; reports R5). TenantAdmin and Adviser have all four; TenantAdmin also has `reports.tenant.read` / `reports.tenant.create`. SystemAdmin has none of them.
-- TestSeed and `webapi --seed-demo` grant the three seeded reports to the demo tenant.
+- TestSeed and `webapi --seed-demo` grant the four seeded reports to the demo tenant.
 - Seeded PublicIds (stable):
   - Customer Transactions: `8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11` (code `customer-transactions`, scope `Customer`).
   - Adviser Balances: `5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22` (code `adviser-balances`, scope `Book`).
+  - Bank reconciliation: `3e7b9d14-6c2a-4f58-b0e1-9a4d2c7f8e33` (code `bank-reconciliation`, scope `Tenant`).
+  - FIF Report: `7d2f6b48-1a9c-4e35-a7d0-5c8e3b1f9a44` (code `customer-fif`, scope `Customer`, manual only).
 
 ---
 
@@ -286,6 +289,14 @@ Field rules: [bank-reconciliation](../features/bank-reconciliation.md). Report s
 | --- | --- |
 | D52 | The Reports tab (`/reports`) also lists Tenant-scoped reports for a TenantAdmin (`GET /reports?scope=Tenant`), under the heading "Firm reports". For `bank-reconciliation` the generate and schedule forms ask for the client money account (from the overview of D51) and send no `reconciliationId`. An Adviser does not see the heading. The run page of D51 has no PDF button. |
 
+### FIF Report
+
+Field rules: [fif-report](../features/fif-report.md) R6, R7, R27 (report `customer-fif`, `7d2f6b48-1a9c-4e35-a7d0-5c8e3b1f9a44`, scope `Customer`, manual only). Calls: the existing `POST /reports/request`; no new route or BFF prefix. Tests: the form appears for the report's code; the tax years offered on 1 April and on 2 April of a year; the body; no schedule form; "Tax year <taxYear>" in the History summary; a 400 message at the form.
+
+| ID | Behaviour |
+| --- | --- |
+| D114 | Customer page, Reports section: when `customer-fif` is selected, the generate form has one field, "Tax year", a select of every tax year that can be reported today, the latest first and selected, each as "<Y> (1 April <Y − 1> to 31 March <Y>)". Tax year `Y` is offered from 2 April `Y` (UTC), down to 2009. Generate sends `{ reportId, parameters: { customerId: <page customer>, taxYear: <Y> } }`, `taxYear` a number. No schedule form, because the report does not allow `scheduled`. A 400 is shown at the form with the server's message (for example the `Overseas` refusal on `customerId`). History shows "Tax year <taxYear>" in the parameters summary when the snapshot has `taxYear`. |
+
 ### Adviser Balances for a past date
 
 Field rules: [valuation-history](../features/valuation-history.md) R16–R20 (the optional `date` of `adviser-balances`). Calls: the existing `POST /reports/request`; no new route or BFF prefix. Tests: the date input, `parameters.date` sent only when set, the disabled checkbox, a 400 on `date` shown at the input, and the History summary.
@@ -309,7 +320,7 @@ Portal tests assert routes, role visibility, that the Customer section calls `sc
 - Timezone display vs UTC cron (help text documents the first-cut limitation).
 - Result retention / purge (no UI for it).
 - Event-triggered executions (no UI).
-- Parameter schema for dynamic forms (hard-coded switch on the selected report for the two known shapes).
+- Parameter schema for dynamic forms (hard-coded switch on the selected report; the Customer page has two shapes, Customer Transactions and FIF Report, the Reports tab one per Book or Tenant report).
 
 ---
 
@@ -323,3 +334,4 @@ What changed in this file after it was accepted. Each row is a section above. Th
 | 2026-11-26 | [valuation-history](../features/valuation-history.md) | Adviser Balances for a past date |
 | 2026-11-26 | — | The amendments became the sections above. No behaviour changed |
 | 2026-11-27 | — | Backend prerequisites: the Customer's `reports.customer.create` and the Tenant policies; the demo tenant's three grants. No behaviour changed |
+| 2026-11-28 | [fif-report](../features/fif-report.md) | Backend prerequisites: four seeded reports and the FIF Report PublicId. FIF Report (D114). Still open |

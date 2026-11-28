@@ -198,7 +198,7 @@ The threshold test counts a holding by its treatment for the tax year tested, wh
 | --- | --- |
 | R16 | **One write for all of it.** `PUT /instruments/{id}/tax-attributes` takes `{ issuerCountry, fifTreatments, rowVersion }` and replaces the issuer country and every row with what the body states. `issuerCountry` and `fifTreatments` must both be present: `issuerCountry` may be `null`, and `fifTreatments` may be an empty list. A missing one → 400 at the field. Any other field in the body → 400. A row of the body with the tax year of a stored row replaces its treatment and note; a stored row whose tax year is not in the body is deleted. Success → 204. |
 | R17 | **`rowVersion`.** Required, the Instrument's own (instruments R13): missing → 400, stale → 409. A successful write always updates the Instrument row, so its `rowVersion` moves even when only a treatment row changed, and when the body equals what is stored. The rows have no `rowVersion` of their own. |
-| R18 | **Any Instrument.** A disabled Instrument can be classified: it may still be held, as instruments R24 says of corporate actions. Holdings, open orders and stored reports do not block the write, because nothing reads the attributes (R3). A report that later reads them keeps its own copy of what it used (roadmap T9), so a changed classification never changes a stored report. |
+| R18 | **Any Instrument.** A disabled Instrument can be classified: it may still be held, as instruments R24 says of corporate actions. Holdings, open orders and stored reports do not block the write, because nothing reads the attributes (R3). A report that later reads them keeps its own copy of what it used (roadmap T9), so a changed classification never changes a stored report: the FIF report prints the treatment it used in its PDF, the only stored copy ([fif-report.md](fif-report.md) R11, R18). |
 | R19 | **Other writes.** `POST /instruments` takes no tax attribute: a new Instrument has no country and is not classified, and an Adviser, who may create, cannot classify. `PUT /instruments/{id}` still takes `name` and `symbol` only and refuses any other field (instruments R14). Renaming, disabling or enabling an Instrument does not change its tax attributes. |
 | R20 | **No event.** `SetTaxAttributes` raises no domain event and writes no outbox message, as `Rename` does not. |
 
@@ -230,7 +230,7 @@ Not built in this slice. Written here so that TR2 to TR6 start from one contract
 | --- | --- |
 | R26 | **One question.** A later item asks `Instrument.FifTreatmentFor(taxYear)` and nothing else about the treatment. It does not read the rows itself and does not repeat R10 or R11. |
 | R27 | **Not classified is incomplete.** `NotClassified` is never read as "not foreign", "exempt" or "attributing". A result that depends on it is incomplete (roadmap T5). |
-| R28 | **What a report keeps.** A stored result keeps, per Instrument, the treatment it used, the tax year of the row it came from, the note and the issuer country (roadmap T9). |
+| R28 | **What a report keeps.** A stored result keeps, per Instrument, the treatment it used, the tax year of the row it came from, the note and the issuer country (roadmap T9). The FIF report prints the four in section 3 of its PDF, the country by its name ([fif-report.md](fif-report.md) R18). |
 
 Policies: none added. `instruments.manage` writes the tax attributes; `instruments.read` reads them.
 
@@ -519,7 +519,7 @@ Each point states the recommendation, written into the rules above, and the alte
 Still open, not this slice:
 
 - Running Inland Revenue's tool again for BHP, CBA and WOW once it answers for tax year 2027, and replacing the assumed rows of the demo catalog in each tenant that has them (§5.1)
-- Everything that reads the attributes: roadmap TR5 and TR6. TR2 reads them in [tax-year-events.md](tax-year-events.md), which marks a dividend whose tax source disagrees with the issuer country with a notice (its R29). TR3 reads the treatment of the year and of the earlier years a holding was held in ([tax-cost-threshold.md](tax-cost-threshold.md) R16, R22). TR4 reads the treatment of the year to decide which tax holdings it computes ([fif-income.md](fif-income.md) R3)
+- Everything that reads the attributes: roadmap TR6. TR5 prints them in the FIF report ([fif-report.md](fif-report.md) R18). TR2 reads them in [tax-year-events.md](tax-year-events.md), which marks a dividend whose tax source disagrees with the issuer country with a notice (its R29). TR3 reads the treatment of the year and of the earlier years a holding was held in ([tax-cost-threshold.md](tax-cost-threshold.md) R16, R22). TR4 reads the treatment of the year to decide which tax holdings it computes ([fif-income.md](fif-income.md) R3)
 - An Instruments page in the Adviser Portal, with the tax attributes, for the TenantAdmin
 - A list of the Instruments not classified for a tax year, and a way to confirm last year's exemptions for the next year in one step
 - An issuer that changes its country of tax residence (point 2)

@@ -1,6 +1,6 @@
 ---
 title: "The FIF report"
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -43,7 +43,7 @@ The report is a reader. It computes no tax figure of its own: every number it pr
 
 New: catalog report `customer-fif` (script `0062_fif_report.sql`, one row); its parameters `{ customerId, taxYear }`; Application types `CustomerFifBinder`, `CustomerFifReport`, `CustomerFifPdf` and `CustomerFifReportGenerator`; the Domain rule `NewZealandTime`; a branch in `RequestReport`; the fourth grant of the demo seed and of `TestSeed`; a parameter form on the Customer page of the Adviser Portal and on the Reports page of the Customer Portal. No route, table, permission, problem code, domain event, `TransactionType`, port, job or setting. No write to the ledger. `CustomerTaxLedger` and the tax year read do not change. No simulator change.
 
-**Status is `review` (2026-11-28).** It is not a build contract. The nineteen points of §11 wait for confirmation; each states a recommendation, and the rules are written as recommended. The changes to other docs in §12 are a plan until the spec is accepted.
+**Status is `accepted` (2026-11-28).** The nineteen points of §11 were confirmed on 2026-11-28, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract. The sentences the report prints about the tax rules were not read by a person who knows the rules when it was accepted; that stays open (§11).
 
 The tax statements the report makes about itself were read again from Inland Revenue on 2026-11-28 (§14), this time from the pages of the two PDFs themselves. The slice states no rule of the Income Tax Act that an earlier spec did not state, so no section of the Act was asked for. Nothing here is tax advice, and the report says the same of itself.
 
@@ -88,7 +88,7 @@ Lower: fair dividend rate
 Holdings: 1 attributing interest, 0 exempt or not foreign, 0 not classified.
 
 3. Holdings and classification
-AAA  Alpha Inc  United States  Attributing interest  (classified from tax year 2025)
+AAA  Alpha Inc  United States of America  Attributing interest  (classified from tax year 2025)
      opening 140  closing 240.8  FIF income: computed
 
 4. Threshold test
@@ -134,8 +134,8 @@ Quick sale: opening 280, peak 280, closing 240.8; peak holding differential 0
 Comparative value: (13026.08 + 2789.60 + 117.95) - (13108.48 + 1084.28) = 1740.87
 
 7. Tax taken from dividends
-AAA  United States  dividends 117.95  foreign tax 17.69  RWT 21.23  NRWT 0.00  imputation credits 0.00  FDR amount 655.42  CV amount 1740.87
-United States       dividends 117.95  foreign tax 17.69  RWT 21.23  NRWT 0.00  imputation credits 0.00
+AAA  United States of America  dividends 117.95  foreign tax 17.69  RWT 21.23  NRWT 0.00  imputation credits 0.00  FDR amount 655.42  CV amount 1740.87
+United States of America  dividends 117.95  foreign tax 17.69  RWT 21.23  NRWT 0.00  imputation credits 0.00
 Total               dividends 117.95  foreign tax 17.69  RWT 21.23  NRWT 0.00  imputation credits 0.00
 
 8. Prices, rates and values used
@@ -393,7 +393,7 @@ Invariants:
 
 Domain events: none.
 
-Update [domain-model.md](../domain-model.md) §8.24 in the change that accepts this spec.
+[domain-model.md](../domain-model.md) §8.24 holds `NewZealandTime`.
 
 ---
 
@@ -407,7 +407,7 @@ Script: `database/schema/0062_fif_report.sql`. It inserts the row when no row ha
 
 The generator reads the tables of tax-year-events §6 through `CustomerTaxLedger`, and `Tenants`, `Users`, `CustomerTaxProfiles` and `Accounts` for the names and the tax residency. Nothing new is stored: `ReportExecutions` keeps the snapshot of R6 and the key of the file (reports §6.3).
 
-Update [database-design.md](../database-design.md) §9 and §14 in the change that accepts this spec. Do not add EF migrations.
+[database-design.md](../database-design.md) §9 and §14 list the script and the row. Do not add EF migrations.
 
 ---
 
@@ -562,9 +562,9 @@ No new ADR.
 | Demo | The fourth grant; the tax attributes of the demo catalog unchanged |
 | Routes, tables, permissions, problem codes, events, ports, jobs, settings | None |
 
-### Points to confirm
+### Points confirmed
 
-Each point states the recommendation, written into the rules above, and the alternative.
+Confirmed on 2026-11-28, every one as recommended. Each point states the choice, written into the rules above, and the alternative that was not taken.
 
 1. **One catalog report, `customer-fif`, for FIF only** (R1). Recommended: roadmap TR5. The income summary (TR6) stays a report of its own, because it is what a Customer below the threshold returns and it reads interest, which no rule here touches. Alternative: one report with the income summary as a section, which makes the optional item part of this one.
 2. **Manual only, also when the catalog row is changed** (R4). Recommended by the roadmap. The schedule code already names the codes it accepts, so the report is refused there without a new rule. Alternative: `PUT /reports/{id}` refuses `"scheduled"` for a report that has no scheduled form, which is a new rule of the catalog.
@@ -589,7 +589,7 @@ Each point states the recommendation, written into the rules above, and the alte
 ### Found while writing
 
 - **The sources were read as pages.** The fetch tool saved the two PDFs, and the pages named in §14 were read from them directly, not through a restatement. The pages on the threshold (S1 p.9, p.10) and on the two methods (p.11 to p.16) were not read again: this slice states no rule on them, and tax-cost-threshold and fif-income cite them.
-- **The sentences of the report are the platform's, not Inland Revenue's.** Statement 2 of R16, the sentences of the threshold test and the note under section 7 summarise the sources of §14. A person who knows the rules should read them before this spec is accepted.
+- **The sentences of the report are the platform's, not Inland Revenue's.** Statement 2 of R16, the sentences of the threshold test and the note under section 7 summarise the sources of §14. A person who knows the rules should still read them; it was not done when the spec was accepted.
 - **"By country" is not in the pages read.** Roadmap §2 says the overseas income summary (IR1261) is "by country", citing S1 p.21 and S2 ¶10 to ¶11. S1 p.21 says individuals "must file an Overseas income summary – IR1261 form", and S2 ¶10 says it is filed "to declare your overseas income sources and claim foreign tax credits". Neither says "by country". R22 groups by issuer country because roadmap Q17 decided it; the form itself was not read.
 - **The tax profile was written for withholding.** interest-run R2 says tax residency "decides the withholding of R4 and nothing else". With this slice it also decides whether a FIF report is made.
 - **A New Zealand Customer can have NRWT.** A dividend paid while the profile said `Overseas` has an `Nrwt` leg. The report prints the column as booked and says nothing about it.
@@ -599,6 +599,7 @@ Each point states the recommendation, written into the rules above, and the alte
 - **The schedule code refuses the report by itself.** `ReportScheduleRules.EnsureAvailableAsync` and `ReportJob.RunScheduled` accept the three codes they name and answer "not found" or do nothing for any other, so R4 needs no change there. Read from the code on 2026-11-28.
 - **The report can be long.** A Customer with a hundred trades in a year gets a block of a hundred rows per holding. There is no limit and no short form.
 - **Three older texts are behind.** [deployment.md](../deployment.md) §12 step 14 says the demo seed writes "its two report grants"; it writes three today. [adviser-portal-reports.md](../adviser-portal/adviser-portal-reports.md) "Out" says the Customer has no portal client; the Customer Portal has existed since 2026-11-02. [reports.md](reports.md) §8 gives the `scope` of a catalog item and of the two list filters as `Customer` or `Book`, where its R4 says three scopes. The first is corrected with §12; the other two are reported here and not changed by this slice.
+- **The name of a country is the name of the platform's list.** §1.1 first printed "United States"; the list of instrument-tax-attributes R6 names `US` "United States of America", and R18 prints that name. The example was corrected when the spec was accepted.
 - **Inland Revenue's calculator is still not used.** fif-income left it open as a second check. A PDF of this report for the guide's quick sale example would be the natural thing to hold beside it.
 
 Still open, not this slice:
@@ -617,7 +618,7 @@ Still open, not this slice:
 
 ## 12. Changes to other docs
 
-A plan while this spec is in `review`. Each doc is changed in place when it is accepted.
+Each doc was changed in place when this spec was accepted (2026-11-28).
 
 | Doc | Change |
 | --- | --- |

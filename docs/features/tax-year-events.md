@@ -51,7 +51,7 @@ Step 2 of [fif-roadmap.md](../roadmaps/fif-roadmap.md) §9. It covers roadmap it
 
 The ledger is kept per Account, in the Account's currency, by UTC day, as it was booked. The tax rules look at one person, per company, in NZD, by the New Zealand tax year, at what happened. This slice is the read that turns the first into the second. For one Customer and one tax year it answers, per Instrument: the quantity and the market value at the start and at the end of the year, and between them an ordered list of **tax events**, each with a quantity and an NZD amount. Nothing is stored and no job runs.
 
-The slice computes no tax. The cost in NZD and the threshold test (TR3, [tax-cost-threshold.md](tax-cost-threshold.md)), FIF income (TR4, [fif-income.md](fif-income.md)) and the report (TR5) compute over its result.
+The slice computes no tax. The cost in NZD and the threshold test (TR3, [tax-cost-threshold.md](tax-cost-threshold.md)), FIF income (TR4, [fif-income.md](fif-income.md)) and the report (TR5, [fif-report.md](fif-report.md)) compute over its result.
 
 New: route `GET /users/customers/{customerId}/tax-years/{taxYear}`; Domain types `TaxYear`, `TaxEvent`, `TaxEventKind`, `TaxHolding`, `CustomerTaxYear` and the functions `TaxLedger.Build` and `CustomerTaxYear.Compute`; Application service `CustomerTaxLedger` and query `GetCustomerTaxYear`; `AccountPosition` carries the instant it was cut at, and `ValueAccount` can value a position it is given. No script, table, permission, problem code, domain event, `TransactionType`, port, job or setting. No write changes. No portal page and no simulator change.
 
@@ -166,7 +166,7 @@ What the example shows:
 
 - The cost in NZD of what is held, the cost a disposal removes, and the threshold test: [tax-cost-threshold.md](tax-cost-threshold.md). Its fields are on the item of this read (R31); the events, the order and the rates are this spec's
 - FIF income under either method, the peak holding differential, the quick sale adjustment and the matching of a disposal to purchases: [fif-income.md](fif-income.md). This read gives the quantities they need (R24, R25)
-- The report, its PDF, the portal entry points and which years a report may be asked for: TR5
+- The report, its PDF, the portal entry points and which years a report may be asked for: [fif-report.md](fif-report.md)
 - The income summary, and `Interest` in a tax year: TR6
 - Whether the FIF rules apply to the Customer. The read does not look at the tax profile (R2)
 - An estimate for a tax year in progress (roadmap Q13; R4)
@@ -199,7 +199,7 @@ What the example shows:
 | ID | Rule |
 | --- | --- |
 | R1 | **Access.** No new permission. `GET /users/customers/{customerId}/tax-years/{taxYear}` takes `accounts.read` with the Customer's scope, as `GET /users/customers/{id}/net-worth` does (net-worth R1, R3, R9). A TenantAdmin reads any Customer of the Tenant, an Adviser an assigned Customer, a Customer themselves, a SystemAdmin a Customer of any Tenant. Missing / dead Bearer → 401, never 302. Policy fail → 403. A disabled current tenant → 403. A Customer of another Tenant, an unassigned Customer, another Customer, or a missing id → 404. `{customerId}` is the Customer's `PublicId`. The route takes no `tenantId`. |
-| R2 | **A read only.** It writes nothing, takes no lock, raises no domain event and takes no `Idempotency-Key`. It does not read the Customer's tax profile: an `Overseas` Customer gets the same answer as a `NewZealand` one, and what a report does with it is roadmap Q14. A Disabled Customer is read like any other. |
+| R2 | **A read only.** It writes nothing, takes no lock, raises no domain event and takes no `Idempotency-Key`. It does not read the Customer's tax profile: an `Overseas` Customer gets the same answer as a `NewZealand` one, and what the report does with it is [fif-report.md](fif-report.md) R8: an `Overseas` Customer gets no report. A Disabled Customer is read like any other. |
 
 ### 4.2 The tax year
 
@@ -360,7 +360,7 @@ Domain events: none. Nothing is an entity and nothing is stored.
 
 None. No script.
 
-The read uses `Transactions` (`BookedAt`, `ReversedByTransactionId`, `Type`), `TransactionCashLegs` and `TransactionSecurityLegs` (`AccountId`), `TransactionDividendDetails`, `TransactionInKindTransferDetails`, `TransactionCorporateActionDetails`, `Accounts`, `Instruments` with `InstrumentFifTreatments`, `InstrumentPrices` and `FxRates`. It reads the Transactions of one Customer, which the legs' `AccountId` indexes already reach. Whether a run over every Customer of a Tenant needs an index is a question for TR5.
+The read uses `Transactions` (`BookedAt`, `ReversedByTransactionId`, `Type`), `TransactionCashLegs` and `TransactionSecurityLegs` (`AccountId`), `TransactionDividendDetails`, `TransactionInKindTransferDetails`, `TransactionCorporateActionDetails`, `Accounts`, `Instruments` with `InstrumentFifTreatments`, `InstrumentPrices` and `FxRates`. It reads the Transactions of one Customer, which the legs' `AccountId` indexes already reach. There is no run over every Customer of a Tenant ([fif-report.md](fif-report.md) R5), so no index is added.
 
 ---
 
@@ -368,7 +368,7 @@ The read uses `Transactions` (`BookedAt`, `ReversedByTransactionId`, `Type`), `T
 
 | Kind | Name | Change |
 | --- | --- | --- |
-| Service | `CustomerTaxLedger` (new) | `ReadAsync(customer, taxYear)`: the Customer's Accounts; the facts of R6; `TaxLedger.Build`; the rate rows the events of the year need (`IFxRate.GetRateDetailAsync`, a missing pair caught as "no rate"); the positions at the two instants and their values through `ValueAccount.ForPositionAsync`; the market value of each arrival and departure of the year the same way; the treatments; then `CustomerTaxYear.Compute`. It names the Customer and the Tenant itself and does not depend on the tenant query filter, so that a `worker` run can call it later. The one place a tax year is worked out; TR3 to TR5 call it. It also reads the rate rows of the cost walk and the treatments of earlier tax years ([tax-cost-threshold.md](tax-cost-threshold.md) §7) |
+| Service | `CustomerTaxLedger` (new) | `ReadAsync(customer, taxYear)`: the Customer's Accounts; the facts of R6; `TaxLedger.Build`; the rate rows the events of the year need (`IFxRate.GetRateDetailAsync`, a missing pair caught as "no rate"); the positions at the two instants and their values through `ValueAccount.ForPositionAsync`; the market value of each arrival and departure of the year the same way; the treatments; then `CustomerTaxYear.Compute`. It names the Customer and the Tenant itself and does not depend on the tenant query filter, so that a `worker` run can call it later. The one place a tax year is worked out; TR3 to TR5 call it. Its callers are this query on `webapi` and the FIF report generator on `worker` ([fif-report.md](fif-report.md) R9). It also reads the rate rows of the cost walk and the treatments of earlier tax years ([tax-cost-threshold.md](tax-cost-threshold.md) §7) |
 | Query | `GetCustomerTaxYear` (new) | R1, R4, R30–R32: finds the Customer as `GetCustomerNetWorth` does, checks `taxYear` with the platform's clock, calls `CustomerTaxLedger`, maps the item |
 | Service | `ValueAccount` (existing) | Gains `ForPositionAsync(position, currency)`: the prices, the rates into `currency`, the decimal places and the basis changes of the position's Account, then `AccountValuation.Compute`. `ForDayAsync(account, day)` becomes the position of the day and the Account's currency passed to it. No valuation of a day changes |
 | Service | `AccountPositions` (existing) | No change. It reads a position as booked (account-valuation R5), which is not the quantity of R22 |
@@ -545,7 +545,7 @@ Cross-tenant or wrong-collection id → **404**, not 403. Keep the resource cata
 
 None in this slice. No Adviser Portal, Customer Portal or Back Office page shows a tax year.
 
-`bff-adviser-portal` and `bff-customer-portal` already proxy the prefix `/users`, so the route can be reached through both by a signed-in user who may read the Customer. No page calls it. The entry points are TR5's.
+`bff-adviser-portal` and `bff-customer-portal` already proxy the prefix `/users`, so the route can be reached through both by a signed-in user who may read the Customer. No page calls it. The entry points of the report are [fif-report.md](fif-report.md) R27 and R28, and no page shows the tax year on screen.
 
 ### 9.1 Seeds and hosting
 
@@ -625,11 +625,10 @@ Each point states the recommendation, written into the rules above, and the alte
 - **A trade between an ex-date and the posting of its entitlement** is multiplied again by the entitlement (account-valuation "Found while writing"). R24 takes each Account's factor from its ledger quantities and inherits the error for that Account.
 - **Shares in transit over a split.** A departure of 100 and an arrival of 200 after a 2 for 1 split are not a move by R15, because the quantities differ. They stay a departure and an arrival, each with its notice.
 - **`OpeningHoldings` of an old External account.** An arrival years before the history floor date has no price, so the tax year it falls in is incomplete. Every later tax year is not affected: only its quantity counts there.
-- **Roadmap §3 "Tax residency"** says nothing has a date. This read does not need one (R2); TR5 does.
+- **Roadmap §3 "Tax residency"** says nothing has a date. This read does not need one (R2); the report reads the residency on file, with no date ([fif-report.md](fif-report.md) R8).
 
 Still open, not this slice:
 
-- The report, its stored copy of what it used, and what it does for an `Overseas` Customer: TR5
 - `Interest` and the income summary: TR6
 - A stated link between the two sides of a move, and a security transfer between two Accounts in one Transaction
 - A taxable bonus issue, and any non-cash dividend
@@ -696,3 +695,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | --- | --- | --- |
 | 2026-11-28 | [tax-cost-threshold.md](tax-cost-threshold.md) | §2 Out and R14: the cost in NZD and the threshold test are that spec's, and it converts the carried cost. R28: the notice `CarriedCost`. R31: `threshold` and the two `cost` fields. §5, §7: `CustomerTaxYear.Threshold` and the wider read of `CustomerTaxLedger`. "Still open": the TR3 line goes |
 | 2026-11-28 | [fif-income.md](fif-income.md) | §2 Out: FIF income is that spec's. R10: the fee is in both methods. R25: the peak is read by its R10. R31: `fifIncome` on the item and each holding. §5: `CustomerTaxYear.FifIncome`, `TaxHolding.Income`. "Found while writing": the sentence of roadmap Q5 was found in S8. "Still open": the TR4 line goes |
+| 2026-11-28 | [fif-report.md](fif-report.md) | §2 Out, §9 and "Still open": the report and its entry points are that spec's; the TR5 line goes. R2: an `Overseas` Customer gets no report (its R8). §6: no run over every Customer, so no index. §7: `CustomerTaxLedger` is also called by the report generator on `worker` |

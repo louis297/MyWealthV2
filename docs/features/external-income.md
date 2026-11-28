@@ -100,7 +100,7 @@ Worked examples, used by the tests. NZD and USD have 2 decimal places.
 - A check of the shares against a holding, and any change to a holding. An account may record a dividend of shares it no longer holds, or never recorded
 - The country of the payer of interest, and a tax source on an `Interest`
 - Taxable bonus issues, returns of capital, and a dividend paid in another currency than the Instrument's quote currency (dividends §2 leaves the same out)
-- A dividend or income report, a tax statement for the Customer, the FIF rules and a foreign tax credit in NZD ([future-plans.md](../future-plans.md) §1 step 6)
+- A dividend or income report, a tax statement for the Customer, the FIF rules and a foreign tax credit in NZD ([future-plans.md](../future-plans.md) §1 step 6). The tax taken from the dividends of attributing holdings, also on an External account, is listed in the FIF report ([fif-report.md](fif-report.md) R22); a dividend report under the ordinary rules stays out (fif-roadmap TR6)
 - Moving `Interest` to its own create route ([future-plans.md](../future-plans.md) §4)
 - Entering a dividend once for several accounts, an import from a file, and applying a corporate action to External accounts by the flow
 - A change to a Custodial account, the simulator, the corporate action pages or the bank reconciliation
@@ -489,3 +489,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | --- | --- | --- |
 | 2026-11-28 | [tax-year-events.md](tax-year-events.md) | R11: the tax year read marks a disagreement with the issuer country. R15: a dividend is in the tax year of its `bookedAt` |
 | 2026-11-28 | [fif-income.md](fif-income.md) | R15: a dividend is a CV gain at its gross plus the imputation credit, and adds nothing under FDR |
+| 2026-11-28 | [fif-report.md](fif-report.md) | §2 Out: the tax taken from the dividends of attributing holdings is listed in the FIF report; a dividend report under the ordinary rules stays out |

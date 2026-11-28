@@ -205,11 +205,11 @@ What the example shows:
 - Whether the FIF rules apply to the Customer: the threshold test ([tax-cost-threshold.md](tax-cost-threshold.md)), tax residency, a transitional resident, the choice to apply the rules below the threshold (roadmap Q14). The income is computed whatever the test says (R2)
 - The CV income of a tax holding for which FDR is not allowed, with its loss allowed (roadmap Q12; R3)
 - The other methods: cost, deemed rate of return, revenue account, attributable FIF income (roadmap §7). The periodic FDR method of unit valuers
-- Tax payable, the foreign tax credit allowed, the limit on an imputation credit, a refund of RWT, the IR3 and IR1261 forms (roadmap §7). The foreign tax, the RWT and the credits of each dividend are in the tax year read as booked; how a report shows them is TR5's (roadmap Q17)
+- Tax payable, the foreign tax credit allowed, the limit on an imputation credit, a refund of RWT, the IR3 and IR1261 forms (roadmap §7). The foreign tax, the RWT and the credits of each dividend are in the tax year read as booked; the report lists them per tax holding and issuer country beside the income ([fif-report.md](fif-report.md) R22)
 - Foreign income tax the Customer pays in another country on their own, a fee rebate, interest on money borrowed to buy shares, and any other figure that is not in the ledger (R18)
 - The deemed sale and purchase at market value when a treatment or the Customer's residence changes (roadmap §7), and when a person changes method from one year to the next
 - The anti-avoidance rules for purchases and sales that are not at market value (S1 p.22 note 7)
-- The report, its PDF and what it prints for each case: TR5. The income summary for dividends and interest under the ordinary rules: TR6
+- The report, its PDF and what it prints for each case: [fif-report.md](fif-report.md). The income summary for dividends and interest under the ordinary rules: TR6
 - Any stored result, any write, ledger replay and period close (roadmap §1.2)
 - Tax lots. The matching of R13 is within one tax year and keeps nothing
 - Any portal page
@@ -235,7 +235,7 @@ What the example shows:
 | ID | Rule |
 | --- | --- |
 | R1 | **Part of the tax year read.** FIF income is a field of the item of `GET /users/customers/{customerId}/tax-years/{taxYear}` and of each of its tax holdings. There is no route of its own. Access, scope, the 401, 403 and 404 cases, and which tax years can be read are those of tax-year-events R1, R4 and R30. No new permission and no new problem code. |
-| R2 | **A read only, and whatever the threshold test says.** tax-year-events R2 holds: nothing is written, no lock is taken, and the Customer's tax profile is not read. The income is computed for every tax year that can be read, whether `threshold.outcome` is `Above`, `NotAbove` or `Unknown`: the test decides whether the result applies, not how it is computed (roadmap TR3, TR4), and a person below the threshold may choose to apply the rules (S2 ¶8). An `Overseas` Customer gets the same answer as a `NewZealand` one; what a report does with it is roadmap Q14. |
+| R2 | **A read only, and whatever the threshold test says.** tax-year-events R2 holds: nothing is written, no lock is taken, and the Customer's tax profile is not read. The income is computed for every tax year that can be read, whether `threshold.outcome` is `Above`, `NotAbove` or `Unknown`: the test decides whether the result applies, not how it is computed (roadmap TR3, TR4), and a person below the threshold may choose to apply the rules (S2 ¶8). An `Overseas` Customer gets the same answer as a `NewZealand` one; what the report does with it is [fif-report.md](fif-report.md) R8: an `Overseas` Customer gets no report. |
 
 ### 4.2 Which tax holdings, and what is read
 
@@ -523,7 +523,7 @@ Cross-tenant or wrong-collection id → **404**, not 403, as tax-year-events R1 
 
 ## 9. UI
 
-None in this slice. No page shows FIF income. The entry points are TR5's.
+None in this slice. No page shows FIF income. The report that prints it is [fif-report.md](fif-report.md): for an incomplete result and for a holding where FDR is not allowed, its R17, R20 and §4.7.
 
 ### 9.1 Seeds and hosting
 
@@ -626,13 +626,11 @@ Confirmed on 2026-11-28, every one as recommended. Each point states the choice,
 
 Still open, not this slice:
 
-- The report: what it prints for each outcome of the threshold test, for an incomplete result and for a tax holding where FDR is not allowed; the foreign tax per interest and country beside the income: TR5
 - The income summary under the ordinary rules: TR6
 - The CV income of a non-ordinary share, and the deemed rate of return (roadmap Q12, §7)
 - Sections EX 51, EX 52 and EX 54 of the Act, and the calculator as a second check
 - A dividend's ex-date in the quick sale gain
 - Foreign income tax paid by the Customer themselves, fee rebates
-- A run over every Customer of a Tenant: TR5
 - Ledger replay and period close (roadmap §1.2)
 
 ---
@@ -680,3 +678,13 @@ Read on 2026-11-28. The codes are those of [fif-roadmap.md](../roadmaps/fif-road
 | — | Income Tax Act 2007, sections EX 51, EX 52 and EX 54 | The comparative value method, the fair dividend rate annual method with its quick sale adjustment, and the average cost after a reorganisation, in the Act's own words | Not read: `legislation.govt.nz`, NZLII and AustLII refused automated reads (403) |
 
 What follows from the refusal: R13 and R14 (the matching, the quantity the gain is on, the average cost and the dividend share) follow roadmap Q11, the guide and the two commentaries. R6 (a sell fee off the proceeds) follows roadmap Q10. R17 and R18 (which tax and which credit are in the gains and the costs) follow one sentence of the guide. Each is a point of §11. The two formulas, the 5 % rate, the peak holding method amount, the lesser of the two amounts, and a CV total not below zero are stated by Inland Revenue in the sources read.
+
+---
+
+## 15. History
+
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/fif-income.md`).
+
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-28 | [fif-report.md](fif-report.md) | §2 Out, R2, §9 and "Still open": what the report prints for an incomplete result and for a holding where FDR is not allowed is its R17, R20 and §4.7; the foreign tax beside the income is its R22; there is no run over every Customer (its R5). The two TR5 lines go |

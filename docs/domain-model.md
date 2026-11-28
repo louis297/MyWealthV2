@@ -712,7 +712,7 @@ Invariants: an `(Account, day)` has at most one stored valuation; an account's s
 
 ### 8.24 Tax year of a Customer (accepted — tax-year-events slice)
 
-A read model, not an entity: nothing is stored and no event is raised. Types in `src/Domain/Tax`. Field rules: [features/tax-year-events.md](features/tax-year-events.md); the tax cost and the threshold test: [features/tax-cost-threshold.md](features/tax-cost-threshold.md); FIF income: [features/fif-income.md](features/fif-income.md).
+A read model, not an entity: nothing is stored and no event is raised. Types in `src/Domain/Tax`. Field rules: [features/tax-year-events.md](features/tax-year-events.md); the tax cost and the threshold test: [features/tax-cost-threshold.md](features/tax-cost-threshold.md); FIF income: [features/fif-income.md](features/fif-income.md); New Zealand time: [features/fif-report.md](features/fif-report.md).
 
 | Type | Kind | Notes |
 | --- | --- | --- |
@@ -731,9 +731,10 @@ A read model, not an entity: nothing is stored and no event is raised. Types in 
 | `FifIncome` | Value | `Compute(taxYear, holdings, decimalPlaces)`: the FIF income of each tax holding and the totals: the FDR amounts, the peak holding method amounts and the quick sale gain amounts summed, the quick sale adjustment (the lesser of the two sums, a gain below zero as zero), the FDR income, the CV amounts summed and the CV income (not below zero), `Lower` (`FifLowerMethod`: `Fdr`, `Cv`, `Equal`), and the tax holdings not computed. No total when one is `NotClassified` or `HoldingIncomplete`. Reads no clock and no store |
 | `TaxHoldingIncome` | Value | The FIF income of one tax holding: status (`FifIncomeStatus`: `Computed`, `NotComputed`, `NotRequired`), reason (`FifIncomeReason`: `NotClassified`, `HoldingIncomplete`, `FdrNotAllowed`), the FDR amount, the `QuickSale` and the CV figures |
 | `QuickSale` | Value | The quick sale of one tax holding in comparable quantities: the peak holding differential, the purchases of the year and their average cost, the peak holding method amount, the sales matched to the purchases of the year last bought first sold, the matched proceeds, the dividend shares, the matched shares at the average cost and the gain amount |
+| `NewZealandTime` | Static rule | `Offset(instant)`: 13 hours from 14:00 UTC on the Saturday before the last Sunday of September until 14:00 UTC on the Saturday before the first Sunday of April, 12 hours otherwise, and none before 14:00 UTC on 29 September 2007; `Local(instant)`: the date and time in New Zealand. Reads no clock, no setting and no time zone data of the host. The FIF report prints its instants by it ([features/fif-report.md](features/fif-report.md) R13) |
 | `TaxIncompleteReason`, `TaxNotice` | Enums | `NotClassified`, `OpeningNotValued`, `ClosingNotValued`, `AmountMissing`, `NegativeQuantity`, `NoComparableQuantity`; `ExternalFigures`, `ArrivalAtMarketValue`, `DepartureAtMarketValue`, `Move`, `Scrip`, `Correction`, `DividendTaxSourceDisagrees`, `CarriedCost` |
 
-Invariants: a reversed Transaction and a Reversal give no event and count in no quantity; the closing quantity and value of tax year `Y` equal the opening of `Y + 1`; a `Dividend` and a `Move` never change a quantity; an event has an amount only when every figure it is made of could be worked out; a tax holding is complete if and only if it lists no reason; the comparable quantity at the closing equals the quantity. A tax cost is `≥ 0` or unknown, and 0.00 whenever the quantity is 0; a `Reorganisation`, a `Dividend` and a `Move` never change it; the closing tax cost of `Y` equals the opening of `Y + 1`; the highest total is never below the opening or the closing total; `NotAbove` comes only from a complete test; the test never changes `complete` of a tax holding or of the tax year. The FDR amount, the peak holding method amount, the quick sale adjustment, the FDR income and the CV income are `≥ 0`; the quick sale adjustment is never above the sum of the peak holding method amounts; the shares matched are never more than the shares purchased or sold in the year; FIF income totals are given only when no tax holding is `NotClassified` or `HoldingIncomplete`; FIF income never changes `complete` of a tax holding, of the tax year or of the threshold test.
+Invariants: a reversed Transaction and a Reversal give no event and count in no quantity; the closing quantity and value of tax year `Y` equal the opening of `Y + 1`; a `Dividend` and a `Move` never change a quantity; an event has an amount only when every figure it is made of could be worked out; a tax holding is complete if and only if it lists no reason; the comparable quantity at the closing equals the quantity. A tax cost is `≥ 0` or unknown, and 0.00 whenever the quantity is 0; a `Reorganisation`, a `Dividend` and a `Move` never change it; the closing tax cost of `Y` equals the opening of `Y + 1`; the highest total is never below the opening or the closing total; `NotAbove` comes only from a complete test; the test never changes `complete` of a tax holding or of the tax year. The FDR amount, the peak holding method amount, the quick sale adjustment, the FDR income and the CV income are `≥ 0`; the quick sale adjustment is never above the sum of the peak holding method amounts; the shares matched are never more than the shares purchased or sold in the year; FIF income totals are given only when no tax holding is `NotClassified` or `HoldingIncomplete`; FIF income never changes `complete` of a tax holding, of the tax year or of the threshold test. `NewZealandTime.Local(TaxYear.Start(Y))` is 00:00 on 1 April `Y − 1` for every tax year that can be read, and the offset is 12 or 13 hours and changes only at the two instants of a year the rule names.
 
 ## 9. Value objects (Domain assembly; may exist in Phase 1)
 
@@ -781,6 +782,7 @@ One row per change. The text of each change is in git (`git log -p -- docs/domai
 | 2026-11-28 | Tax year events in NZD: `TaxYear`, `LedgerFact`, `TaxEventKind`, `TaxEvent`, `TaxLedger`, `TaxHolding`, `CustomerTaxYear`, `TaxIncompleteReason`, `TaxNotice` (§8.24); `AccountPosition.CutAt` (§8.22). No entity or event. [features/tax-year-events.md](features/tax-year-events.md) |
 | 2026-11-28 | Cost in NZD and the threshold test: `FifThreshold`, `TaxCostLedger`, `TaxCost`, `TaxCostStatus`, `TaxCostUnknownCause`, `ThresholdTest`, `ThresholdOutcome`, `ThresholdIncompleteReason`; `TaxNotice.CarriedCost`; `CustomerTaxYear.Threshold` (§8.24). No entity or event. [features/tax-cost-threshold.md](features/tax-cost-threshold.md) |
 | 2026-11-28 | FIF income: `FairDividendRate`, `FifIncome`, `TaxHoldingIncome`, `QuickSale`, `FifIncomeStatus`, `FifIncomeReason`, `FifLowerMethod`; `CustomerTaxYear.FifIncome`, `TaxHolding.Income` (§8.24). No entity or event. [features/fif-income.md](features/fif-income.md) |
+| 2026-11-28 | FIF report: `NewZealandTime` (§8.24); the catalog row `customer-fif` is data (§11). No entity or event. [features/fif-report.md](features/fif-report.md) |
 
 ---
 
@@ -806,7 +808,8 @@ Invariants:
 - A schedule and an execution each reference exactly one Report.
 - ParametersJson is a bound snapshot (max 8 KB, known fields only).
 - ResultStorageKey is a relative key (`{tenantPublicId}/{executionPublicId}.pdf`) or null. Absolute paths are not stored.
-- Adviser Balances `asOf` is server-set when the execution is created. Not a client field.
+- Adviser Balances `asOf` is server-set when the execution is created. Not a client field. The FIF Report has no `asOf`.
+- A fourth catalog row, `customer-fif` ([features/fif-report.md](features/fif-report.md)), is data, not a type.
 - Platform IsActive is writable by SystemAdmin (`PUT /reports/{id}`, `tenants.manage`). Disable cascades a full revoke of tenant grants.
 
 Generator registry maps Report Code / PublicId to `IReportGenerator`. Hangfire entry point is fixed. PDF is QuestPDF. Shared volume via Aspire.
@@ -820,3 +823,4 @@ Generator registry maps Report Code / PublicId to `IReportGenerator`. Hangfire e
 | 2026-10-26 | Catalog IsActive write + cascade revoke. Disable removes all TenantReports for the report (Hangfire cleaned; schedule/execution rows stay). Re-enable restores no grants. |
 | 2026-10-26 | Tenant grant list omits platform-inactive reports. Granting an inactive catalog report is rejected. `GET /reports/catalog` lists every catalog row for SystemAdmin. |
 | 2026-11-21 | Third report scope `Tenant` (policies `reports.tenant.*`, TenantAdmin only) and report `bank-reconciliation` ([features/bank-reconciliation.md](features/bank-reconciliation.md)). |
+| 2026-11-28 | Fourth catalog row `customer-fif`, scope `Customer`, manual only, no `asOf` ([features/fif-report.md](features/fif-report.md)). No type. |
