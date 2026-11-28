@@ -59,6 +59,7 @@ const netWorth = {
 };
 
 const reportId = "8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11";
+const fifReportId = "7d2f6b48-1a9c-4e35-a7d0-5c8e3b1f9a44";
 
 function callOf(input: RequestInfo | URL, init?: RequestInit) {
   const request = input instanceof Request ? input : null;
@@ -90,6 +91,7 @@ function renderAt(
     taxProfile?: unknown;
     series?: unknown;
     valuations?: unknown;
+    requestReport?: () => Response;
   } = {},
 ) {
   const accounts = options.accounts ?? [
@@ -178,10 +180,11 @@ function renderAt(
       return json([
         { id: reportId, code: "customer-transactions", name: "Customer Transactions" },
         { id: "unknown-report", code: "mystery", name: "Mystery" },
+        { id: fifReportId, code: "customer-fif", name: "FIF Report" },
       ]);
     }
     if (url.endsWith("/reports/request") && method === "POST") {
-      return json({ id: "execution-1" }, 202);
+      return options.requestReport?.() ?? json({ id: "execution-1" }, 202);
     }
     if (url.includes("/reports/executions?")) {
       return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
@@ -219,6 +222,10 @@ function urls(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
 }
 
 describe("Customer Portal", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     sessionStorage.clear();
     vi.stubGlobal("fetch", vi.fn());
@@ -553,6 +560,62 @@ describe("Customer Portal", () => {
     expect(request.headers.get("X-MyWealth-Request")).toBe("1");
     expect(request.headers.get("Authorization")).toBeNull();
     expect(request.credentials).toBe("include");
+  });
+
+  async function requestBody(fetchMock: ReturnType<typeof vi.mocked<typeof fetch>>) {
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([input, init]) => callOf(input, init).url.endsWith("/reports/request"))).toBe(true);
+    });
+    const call = fetchMock.mock.calls.find(([input, init]) => callOf(input, init).url.endsWith("/reports/request"))!;
+    const raw = call[0] instanceof Request ? await call[0].clone().text() : String(call[1]?.body);
+    return JSON.parse(raw) as unknown;
+  }
+
+  it("C50: the FIF Report form offers the tax years that can be reported and sends the caller's id and the year", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-04-02T00:30:00Z"));
+    const { fetchMock } = renderAt("/reports");
+    await chooseOption("Report", "FIF Report");
+
+    expect(screen.queryByLabelText("From")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /schedule/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Tax year")).toHaveTextContent("2026 (1 April 2025 to 31 March 2026)");
+    await openSelect("Tax year");
+    const options = screen.getAllByRole("option").map((option) => option.textContent);
+    expect(options[0]).toBe("2026 (1 April 2025 to 31 March 2026)");
+    expect(options.at(-1)).toBe("2009 (1 April 2008 to 31 March 2009)");
+    await pickOption("2025 (1 April 2024 to 31 March 2025)");
+    fireEvent.submit(screen.getByRole("button", { name: "Generate" }).closest("form")!);
+
+    expect(await requestBody(fetchMock)).toEqual({
+      reportId: fifReportId,
+      parameters: { customerId: me.id, taxYear: 2025 },
+    });
+  });
+
+  it("C50: on 1 April the tax year just ended is not offered yet", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-04-01T12:00:00Z"));
+    renderAt("/reports");
+    await chooseOption("Report", "FIF Report");
+
+    expect(screen.getByLabelText("Tax year")).toHaveTextContent("2025 (1 April 2024 to 31 March 2025)");
+  });
+
+  it("C51: an Overseas customer sees the server's message at the form", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-28T03:12:45Z"));
+    renderAt("/reports", me, [], "External", {
+      requestReport: () => json(
+        { errors: { customerId: ["A FIF report is made for a customer whose tax residency is New Zealand."] } },
+        400,
+      ),
+    });
+    await chooseOption("Report", "FIF Report");
+    fireEvent.submit(screen.getByRole("button", { name: "Generate" }).closest("form")!);
+
+    expect(await screen.findByText("A FIF report is made for a customer whose tax residency is New Zealand.")).toBeInTheDocument();
+    expect(screen.queryByText("Report is not available.")).not.toBeInTheDocument();
   });
 
   it("starts login again after a password change", async () => {
