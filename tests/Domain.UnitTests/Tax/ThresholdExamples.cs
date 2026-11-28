@@ -91,6 +91,6 @@ internal static class ThresholdExamples
             .ToHashSet();
         var walk = TaxCostLedger.Walk(events, costed, RatesOfWalk(events, costed, rates ?? []), 2);
         return ThresholdTest.Compute(
-            taxYear, walk, treatments, earlierTreatments, noThreshold ? null : threshold ?? FifThreshold.For(taxYear));
+            taxYear, walk, treatments, earlierTreatments, noThreshold ? null : threshold ?? FifThreshold.For(taxYear), 2);
     }
 }

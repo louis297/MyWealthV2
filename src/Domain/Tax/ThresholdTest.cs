@@ -21,15 +21,72 @@ public sealed record ThresholdTest(
     /// R15–R22 over <paramref name="walk"/>. <paramref name="treatments"/> holds the treatment of each Instrument for
     /// <paramref name="taxYear"/> (none: not classified); <paramref name="earlierTreatments"/> the treatment of an
     /// Instrument for an earlier tax year (none: not classified); <paramref name="threshold"/> is
-    /// <see cref="FifThreshold.For"/> of the year.
+    /// <see cref="FifThreshold.For"/> of the year; <paramref name="decimalPlaces"/> are NZD's.
     /// </summary>
     public static ThresholdTest Compute(
         int taxYear,
         TaxCostWalk walk,
         IReadOnlyDictionary<int, TaxTreatment> treatments,
         IReadOnlyDictionary<(int InstrumentId, int TaxYear), FifTreatment>? earlierTreatments,
-        decimal? threshold) =>
-        new(null, -1m, new ThresholdPeak(-1m, default, null, null), -1m, ThresholdOutcome.Unknown, [], []);
+        decimal? threshold,
+        int decimalPlaces)
+    {
+        var from = TaxYear.Start(taxYear);
+        var to = TaxYear.End(taxYear);
+        var zero = TaxFx.Zero(decimalPlaces);
+
+        // R16: the tax holdings that count, by their treatment for the year.
+        var counted = walk.Steps.Select(step => step.Event.InstrumentId)
+            .Distinct()
+            .Where(id => Counts(TreatmentOf(treatments, id).FifTreatment))
+            .ToDictionary(id => id, id => walk.At(id, from).Cost);
+        decimal Total() => counted.Values.Aggregate(zero, (sum, cost) => sum + (cost ?? 0m));
+
+        // R17, R18: the total at the opening and after every event of the year on a tax holding that counts.
+        var opening = Total();
+        var peak = new ThresholdPeak(opening, from, null, null);
+        var steps = new List<ThresholdStep>();
+        var sequences = new Dictionary<int, int>();
+        foreach (var step in walk.Steps.Where(step => step.Event.BookedAt >= from && step.Event.BookedAt < to))
+        {
+            var instrumentId = step.Event.InstrumentId;
+            var sequence = sequences[instrumentId] = sequences.GetValueOrDefault(instrumentId) + 1;
+            if (!counted.TryGetValue(instrumentId, out var before))
+            {
+                continue;
+            }
+
+            var previous = Total();
+            counted[instrumentId] = step.CostAfter;
+            var total = Total();
+            if (total != previous || (before is not null && step.CostAfter is null))
+            {
+                steps.Add(new ThresholdStep(step.Event, sequence, step.Change, total));
+            }
+
+            if (total > peak.Total)
+            {
+                peak = new ThresholdPeak(total, step.Event.BookedAt, instrumentId, step.Event);
+            }
+        }
+
+        var incomplete = new List<ThresholdIncomplete>();
+        return new ThresholdTest(threshold, opening, peak, Total(), OutcomeOf(peak.Total, threshold, incomplete.Count == 0), incomplete, steps);
+    }
+
+    /// <summary>R16: an attributing interest counts.</summary>
+    private static bool Counts(FifTreatment treatment) => treatment is FifTreatment.Attributing or FifTreatment.AttributingNoFdr;
+
+    /// <summary>R19, R21: above when the highest total is more than the threshold, the known costs being a floor; not
+    /// above only when complete; otherwise unknown.</summary>
+    private static ThresholdOutcome OutcomeOf(decimal peak, decimal? threshold, bool complete) =>
+        threshold is not { } amount ? ThresholdOutcome.Unknown
+        : peak > amount ? ThresholdOutcome.Above
+        : complete ? ThresholdOutcome.NotAbove
+        : ThresholdOutcome.Unknown;
+
+    private static TaxTreatment TreatmentOf(IReadOnlyDictionary<int, TaxTreatment> treatments, int instrumentId) =>
+        treatments.GetValueOrDefault(instrumentId) ?? TaxTreatment.NotClassified();
 }
 
 /// <summary>R18: the highest total and the first point it was reached: the opening (no Instrument and no event), or an
