@@ -122,25 +122,12 @@ public sealed record ThresholdTest(
     private static bool TreatmentChanged(
         int instrumentId, int taxYear, TaxCostWalk walk, IReadOnlyDictionary<(int InstrumentId, int TaxYear), FifTreatment>? earlierTreatments)
     {
-        var from = TaxYear.Start(taxYear);
-        if (earlierTreatments is null || walk.At(instrumentId, from).Quantity == 0m)
+        if (earlierTreatments is null || walk.HeldSince(instrumentId, TaxYear.Start(taxYear)) is not { } since)
         {
             return false;
         }
 
-        DateTimeOffset? leftZero = null;
-        var quantity = 0m;
-        foreach (var step in walk.Steps.Where(step => step.Event.InstrumentId == instrumentId && step.Event.BookedAt < from))
-        {
-            if (quantity == 0m && step.QuantityAfter != 0m)
-            {
-                leftZero = step.Event.BookedAt;
-            }
-
-            quantity = step.QuantityAfter;
-        }
-
-        for (var year = TaxYear.Of(leftZero!.Value); year < taxYear; year++)
+        for (var year = TaxYear.Of(since); year < taxYear; year++)
         {
             if (earlierTreatments.GetValueOrDefault((instrumentId, year)) is FifTreatment.NotForeign or FifTreatment.ExemptAsxListed or FifTreatment.ExemptOther)
             {

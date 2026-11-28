@@ -174,6 +174,27 @@ public sealed record TaxCostWalk(IReadOnlyList<TaxCostStep> Steps)
         Steps.LastOrDefault(step => step.Event.InstrumentId == instrumentId && step.Event.BookedAt < instant) is { } step
             ? new TaxCostState(step.QuantityAfter, step.CostAfter, step.Unknown)
             : new TaxCostState(0m, 0m, null);
+
+    /// <summary>
+    /// Tax-cost-threshold R22, R25: the instant the quantity of <paramref name="instrumentId"/> last left 0 before
+    /// <paramref name="instant"/>, or none when nothing is held at it.
+    /// </summary>
+    public DateTimeOffset? HeldSince(int instrumentId, DateTimeOffset instant)
+    {
+        DateTimeOffset? since = null;
+        var quantity = 0m;
+        foreach (var step in Steps.Where(step => step.Event.InstrumentId == instrumentId && step.Event.BookedAt < instant))
+        {
+            if (quantity == 0m && step.QuantityAfter != 0m)
+            {
+                since = step.Event.BookedAt;
+            }
+
+            quantity = step.QuantityAfter;
+        }
+
+        return quantity == 0m ? null : since;
+    }
 }
 
 /// <summary>

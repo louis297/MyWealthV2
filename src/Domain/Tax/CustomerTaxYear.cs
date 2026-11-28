@@ -39,6 +39,14 @@ public sealed record CustomerTaxYear(
         var opening = TaxLedger.QuantitiesAt(events, from);
         var closing = TaxLedger.QuantitiesAt(events, to);
 
+        // Tax-cost-threshold R4, R5: the tax cost of every Instrument that needs a value, from the first event on.
+        var costed = events.Select(e => e.InstrumentId)
+            .Distinct()
+            .Where(id => NeedsValue((treatments.GetValueOrDefault(id) ?? TaxTreatment.NotClassified()).FifTreatment))
+            .ToHashSet();
+        var walk = TaxCostLedger.Walk(events, costed, rates, decimalPlaces);
+        var steps = walk.Steps.ToDictionary(step => step.Event.Ordinal);
+
         // R23: a tax holding is listed when it is held at the start or has an event in the year.
         var instruments = opening.Select(quantity => quantity.InstrumentId)
             .Concat(ofYear.Select(e => e.InstrumentId))
@@ -64,7 +72,8 @@ public sealed record CustomerTaxYear(
                 yearEvents.Add(Amounts(yearEvents.Count + 1, taxEvent, rates, values, decimalPlaces) with
                 {
                     QuantityAfter = quantity,
-                    ComparableQuantityAfter = comparable?[yearEvents.Count + 1]
+                    ComparableQuantityAfter = comparable?[yearEvents.Count + 1],
+                    Cost = steps.TryGetValue(taxEvent.Ordinal, out var step) ? new TaxEventCost(step.Change, step.CostAfter, step.Fx) : null
                 });
             }
 
@@ -79,14 +88,43 @@ public sealed record CustomerTaxYear(
                 comparable?.Max(),
                 yearEvents,
                 Reasons(treatment, start, end, yearEvents, comparable is not null),
-                Notices(treatment, Of(opening, instrumentId), yearEvents),
-                TaxCost.NotRequired));
+                Notices(treatment, Of(opening, instrumentId), yearEvents, costed.Contains(instrumentId) && CarriedCost(walk, instrumentId, from, to)),
+                costed.Contains(instrumentId) ? CostOf(walk, instrumentId, from, to) : TaxCost.NotRequired));
         }
 
         var incomplete = holdings.Count(holding => !holding.Complete);
-        return new CustomerTaxYear(
-            taxYear, from, to, holdings, incomplete == 0, incomplete,
-            new ThresholdTest(null, 0m, new ThresholdPeak(0m, from, null, null), 0m, ThresholdOutcome.Unknown, [], []));
+        var threshold = ThresholdTest.Compute(taxYear, walk, treatments, earlierTreatments, FifThreshold.For(taxYear), decimalPlaces);
+        return new CustomerTaxYear(taxYear, from, to, holdings, incomplete == 0, incomplete, threshold);
+    }
+
+    /// <summary>
+    /// Tax-cost-threshold R13, R24: the tax cost at the two instants, and the first cause of an unknown cost at the
+    /// opening or after an event of the year.
+    /// </summary>
+    private static TaxCost CostOf(TaxCostWalk walk, int instrumentId, DateTimeOffset from, DateTimeOffset to)
+    {
+        var opening = walk.At(instrumentId, from);
+        var unknown = opening.Cost is null
+            ? opening.Unknown
+            : walk.Steps.FirstOrDefault(step => step.Event.InstrumentId == instrumentId
+                                               && step.Event.BookedAt >= from
+                                               && step.Event.BookedAt < to
+                                               && step.CostAfter is null)?.Unknown;
+        return new TaxCost(unknown is null ? TaxCostStatus.Known : TaxCostStatus.Unknown, opening.Cost, walk.At(instrumentId, to).Cost, unknown);
+    }
+
+    /// <summary>
+    /// Tax-cost-threshold R25: an arrival whose carried cost was added, booked in the year, or before it after the
+    /// quantity last left 0 when the holding is held at the opening.
+    /// </summary>
+    private static bool CarriedCost(TaxCostWalk walk, int instrumentId, DateTimeOffset from, DateTimeOffset to)
+    {
+        var since = walk.HeldSince(instrumentId, from);
+        return walk.Steps.Any(step => step.Event.InstrumentId == instrumentId
+                                      && step.Event.Kind == TaxEventKind.Arrival
+                                      && step.Change is not null
+                                      && step.Event.BookedAt < to
+                                      && (step.Event.BookedAt >= from || (since is { } held && step.Event.BookedAt >= held)));
     }
 
     /// <summary>
@@ -184,9 +222,15 @@ public sealed record CustomerTaxYear(
     }
 
     /// <summary>R28, R29: each notice of the table that applies, once, in the order of the table.</summary>
-    private static List<TaxNotice> Notices(TaxTreatment treatment, IReadOnlyList<TaxQuantity> opening, IReadOnlyList<TaxYearEvent> events)
+    private static List<TaxNotice> Notices(
+        TaxTreatment treatment, IReadOnlyList<TaxQuantity> opening, IReadOnlyList<TaxYearEvent> events, bool carriedCost)
     {
         var notices = new SortedSet<TaxNotice>();
+        if (carriedCost)
+        {
+            notices.Add(TaxNotice.CarriedCost);
+        }
+
         if (opening.Any(q => q.CustodyMode == CustodyMode.External)
             || events.Any(e => e.Event.CustodyMode == CustodyMode.External || e.Event.Changes.Any(c => c.CustodyMode == CustodyMode.External)))
         {
