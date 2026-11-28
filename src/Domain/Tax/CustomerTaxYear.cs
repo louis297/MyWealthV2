@@ -103,7 +103,12 @@ public sealed record CustomerTaxYear(
         // FIF income §5: worked out from the tax holdings, after they are built; it changes no complete.
         var fifIncome = FifIncome.Compute(taxYear, holdings, decimalPlaces);
         var withIncome = holdings.Select((holding, index) => holding with { Income = fifIncome.Holdings[index] }).ToList();
-        return new CustomerTaxYear(taxYear, from, to, withIncome, incomplete == 0, incomplete, threshold, fifIncome, []);
+        // Income-summary R3–R5: the interest items of the year, each figure in NZD on its own.
+        var interestOfYear = (interest ?? [])
+            .Where(item => item.BookedAt >= from && item.BookedAt < to)
+            .Select((item, index) => InterestAmounts(index + 1, item, rates, decimalPlaces))
+            .ToList();
+        return new CustomerTaxYear(taxYear, from, to, withIncome, incomplete == 0, incomplete, threshold, fifIncome, interestOfYear);
     }
 
     /// <summary>
@@ -363,6 +368,15 @@ public sealed record CustomerTaxYear(
             default:
                 return none;
         }
+    }
+
+    /// <summary>Income-summary R5: the NZD figures of one interest item, by the rule of R18 and R21.</summary>
+    private static TaxYearInterest InterestAmounts(
+        int sequence, TaxInterest item, IReadOnlyDictionary<(string Currency, DateOnly Date), StoredRate> rates, int decimalPlaces)
+    {
+        var (status, rate) = TaxFx.RateOf(item.Currency, LedgerDay.Of(item.BookedAt), rates);
+        decimal? Nzd(decimal amount) => TaxFx.Nzd(amount, status, rate, decimalPlaces);
+        return new TaxYearInterest(sequence, item, Nzd(item.Gross), status, rate, Nzd(item.Rwt), Nzd(item.Nrwt), Nzd(item.ForeignTax));
     }
 
     /// <summary>R14: the value of the line of an arrival or a departure, or the status of a line that has none.</summary>
