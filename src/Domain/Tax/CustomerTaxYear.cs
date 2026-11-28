@@ -14,7 +14,8 @@ public sealed record CustomerTaxYear(
     IReadOnlyList<TaxHolding> Holdings,
     bool Complete,
     int IncompleteCount,
-    ThresholdTest Threshold)
+    ThresholdTest Threshold,
+    FifIncome? FifIncome = null)
 {
     /// <summary>
     /// R18, R21–R29 over the events of <see cref="TaxLedger.Build"/>. <paramref name="treatments"/> holds the treatment
@@ -415,7 +416,8 @@ public sealed record TaxHolding(
     IReadOnlyList<TaxYearEvent> Events,
     IReadOnlyList<TaxIncompleteReason> Incomplete,
     IReadOnlyList<TaxNotice> Notices,
-    TaxCost Cost)
+    TaxCost Cost,
+    TaxHoldingIncome? Income = null)
 {
     /// <summary>R27: complete if and only if no reason is listed.</summary>
     public bool Complete => Incomplete.Count == 0;
