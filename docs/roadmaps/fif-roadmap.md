@@ -12,6 +12,7 @@ related:
   - ../features/instruments.md
   - ../features/instrument-tax-attributes.md
   - ../features/tax-year-events.md
+  - ../features/tax-cost-threshold.md
   - ../features/holdings.md
   - ../features/posting.md
   - ../features/buy-sell.md
@@ -111,7 +112,7 @@ A planning summary of the rules for an individual. Sources are in §11; the code
 | Foreign tax credit | Foreign tax withheld on a dividend from a FIF may be a credit. The credit is limited to the New Zealand tax on that segment of foreign income, which is the FIF income, not the dividend. No credit when the segment has a loss. An unused credit is lost | S1 p.20 |
 | RWT and imputation | Resident withholding tax taken from a dividend offsets tax payable and the excess is refunded, even when the FIF income is zero. A New Zealand imputation credit on an Australian dividend is limited by the FIF income of that interest | S1 p.20 |
 | Return and disclosure | FIF income goes in the IR3 return, with an overseas income summary (IR1261) by country. An individual who holds less than 10 % of a company in a treaty country and uses FDR or CV usually files no separate FIF disclosure | S1 p.21, S2 ¶10–11 |
-| Recent and proposed changes | From 1 April 2025 the revenue account method exists for some new migrants and unlisted shares. A 2026 Bill is reported to raise the threshold to NZ$100,000 from the 2026–27 income year. The Bill was not read from a primary source on 2026-11-27, and the April 2026 edition of the guide still says $50,000 | S1 p.17, S10 |
+| Recent and proposed changes | From 1 April 2025 the revenue account method exists for some new migrants and unlisted shares. A 2026 Bill raises the threshold to NZ$100,000 "for the 2026–27 and later income years". Its commentary was read from Inland Revenue on 2026-11-28 (tax-cost-threshold §14, S5); the Bill was at select committee on 12 October 2026 and was not law in any source read. The April 2026 edition of the guide says $50,000 | S1 p.17, S10 |
 
 ---
 
@@ -228,6 +229,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 - **Also decide:** that a holding with no cost in the ledger, or an arrival with no rate for its date, makes the test incomplete and not passed; whether the option of half the 1 April 2007 market value for interests bought before 2000 is offered (recommended: no); whether the test counts a day's highest point or its end (recommended: after every event).
 - **Does not change:** the `Holdings` projection, its average cost in the quote currency, or any write.
 - **Worked example:** the example of S2 (a person who goes above $50,000 once, sells half and stays in the rules for that year, then leaves them the next), and a second case that crosses the threshold through a foreign-currency purchase.
+- **Spec:** [tax-cost-threshold](../features/tax-cost-threshold.md) (`review`, 2026-11-28). It calls the figure the tax cost: one per tax holding, in NZD, from the Customer's first event on, with one average over all Accounts. The cost and the test are fields of the tax year read, not a route of their own. An arrival with a cost of 0 is read as "not stated". The test has its own `complete`, apart from the tax year's, and an incomplete test still says `Above` when the known costs alone are above. The threshold is NZ$50,000 for tax years 2009 to 2026 and has no value from 2027 until the Bill is law. A treatment that changed while the shares were held makes the test incomplete. Its points 1 to 18 answer "Also decide" and wait for confirmation. Section CQ 5 of the Act could not be read; the spec says which rules rest on the guides alone.
 
 ### TR4. FIF income: FDR, the quick sale adjustment and CV
 
@@ -312,7 +314,7 @@ Each step depends only on earlier steps.
 | --- | --- | --- | --- | --- |
 | 1 | TR1 tax attributes of an Instrument | "No ISIN / Exchange / Kind" stays; the country and the FIF treatment are new | [instrument-tax-attributes](../features/instrument-tax-attributes.md) | accepted and landed (2026-11-27) |
 | 2 | TR2 tax year events in NZD | The ordering key of Transactions, for a later ledger replay; the open point on brokerage and the cost base (trade-fees §11) | [tax-year-events](../features/tax-year-events.md) | accepted and landed (2026-11-28) |
-| 3 | TR3 cost in NZD and the threshold test | "Tax lots and a cost in NZD" of custodial-roadmap §10, as far as this step needs it | — | not started |
+| 3 | TR3 cost in NZD and the threshold test | "Tax lots and a cost in NZD" of custodial-roadmap §10, as far as this step needs it | [tax-cost-threshold](../features/tax-cost-threshold.md) | spec in review (2026-11-28) |
 | 4 | TR4 FIF income: FDR, quick sale, CV | — | — | not started |
 | 5 | TR5 the FIF report | "A tax statement for the Customer" (interest-run §11 point 19; dividends and external-income Out), for FIF income | — | not started |
 | 6 | TR6 tax year income summary | The same, for dividends and interest | — | optional; not started |
@@ -356,7 +358,7 @@ Read on 2026-11-27. A spec that writes a rule reads the source again and cites i
 | S7 | Inland Revenue Tax Technical, "Technical amendments to the offshore portfolio share investment rules" | When the ASX listing is tested; average cost in the quick sale rule |
 | S8 | Inland Revenue Tax Technical, "New tax rules for offshore portfolio investment in shares" (commentary on the 2006 Act). Its later part was read through a summary, so its examples must be read again before they become tests | The closing price of the previous year as opening value; FDR and CV worked examples |
 | S9 | Inland Revenue Tax Technical, "Fair dividend rate method: quick sale gain amount" (2011 remedial amendment) | The two amounts of the quick sale adjustment; share reorganisations |
-| S10 | Press and adviser summaries of Budget 2026 and of the 2026 annual rates Bill | The proposed NZ$100,000 threshold. Secondary sources only |
+| S10 | Press and adviser summaries of Budget 2026 and of the 2026 annual rates Bill | The proposed NZ$100,000 threshold. Secondary sources only on 2026-11-27. Inland Revenue's commentary on the Bill was read on 2026-11-28: tax-cost-threshold §14, S5 |
 | S11 | Help pages of Hatch, Sharesies and Sharesight on their FIF reports | How platforms lay out a FIF report, treat brokerage and transfers, and match quick sales. Layout and cross-checks only, not rules |
 
 Not read: the Income Tax Act 2007 itself (sections CQ 5, EX 31, EX 51, EX 52, EX 54, EX 57). `legislation.govt.nz` refused automated reads on the day. Q9, Q10 and Q11 each name the section their spec must read.
