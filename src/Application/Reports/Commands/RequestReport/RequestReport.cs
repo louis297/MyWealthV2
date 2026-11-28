@@ -79,6 +79,19 @@ public class RequestReportCommandHandler(
             await EnsureCustomerInScopeAsync(binding.CustomerId, tenantId, role, cancellationToken);
             snapshotJson = binding.SnapshotJson;
         }
+        else if (report.Code == CustomerFifBinder.Code)
+        {
+            var binding = CustomerFifBinder.Bind(request.Parameters, LedgerDay.Of(time.GetUtcNow()));
+            var customer = await EnsureCustomerInScopeAsync(binding.CustomerId, tenantId, role, cancellationToken);
+            if (await CustomerFifBinder.ResidencyAsync(db, tenantId, customer.Id, cancellationToken) != TaxResidency.NewZealand)
+            {
+                throw new ValidationException([
+                    new ValidationFailure("customerId", CustomerFifBinder.OverseasMessage)
+                ]);
+            }
+
+            snapshotJson = binding.SnapshotJson;
+        }
         else if (report.Code == BankReconciliationBinder.Code)
         {
             var binding = BankReconciliationBinder.Bind(request.Parameters);
@@ -115,7 +128,7 @@ public class RequestReportCommandHandler(
         return execution.PublicId;
     }
 
-    private async Task EnsureCustomerInScopeAsync(
+    private async Task<User> EnsureCustomerInScopeAsync(
         Guid customerId,
         int tenantId,
         UserRole role,
@@ -130,5 +143,6 @@ public class RequestReportCommandHandler(
                        ?? throw new NotFoundException("Customer", customerId);
 
         CustomerReportScope.Ensure(customer, role, currentUser);
+        return customer;
     }
 }

@@ -8,7 +8,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 public class ReportsSchemaTests
 {
     [Test]
-    public async Task Apply_SeedsThreeReportsAndNoTenantGrants()
+    public async Task Apply_SeedsFourReportsAndNoTenantGrants()
     {
         var rows = await QueryReports();
 
@@ -30,6 +30,14 @@ public class ReportsSchemaTests
                 """["manual","scheduled"]""",
                 true),
             (
+                Guid.Parse("7d2f6b48-1a9c-4e35-a7d0-5c8e3b1f9a44"),
+                "customer-fif",
+                "FIF Report",
+                "Foreign investment fund (FIF) figures of one customer for one New Zealand tax year: the threshold test, and FIF income under the fair dividend rate and the comparative value methods.",
+                "Customer",
+                """["manual"]""",
+                true),
+            (
                 Guid.Parse("8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11"),
                 "customer-transactions",
                 "Customer Transactions Report",
@@ -40,6 +48,19 @@ public class ReportsSchemaTests
         ]);
 
         SchemaDatabaseSetup.TenantReportsAfterApply.ShouldBe(0);
+    }
+
+    // Fif-report R1: script 0062 inserts the row only when no row has the code.
+    [Test]
+    public async Task FifReportScript_RunAgain_LeavesOneRow()
+    {
+        var path = Path.Combine(ScratchSchemaDatabase.SchemaDirectory(), "0062_fif_report.sql");
+        File.Exists(path).ShouldBeTrue();
+        await using var db = OpenDb();
+
+        await db.Database.ExecuteSqlRawAsync(await File.ReadAllTextAsync(path));
+
+        (await db.Reports.CountAsync(row => row.Code == "customer-fif")).ShouldBe(1);
     }
 
     [Test]

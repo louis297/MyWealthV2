@@ -1064,3 +1064,174 @@ describe("CustomerDetailPage", () => {
     expect(polls).toBe(0);
   });
 });
+
+describe("CustomerDetailPage FIF report (D114)", () => {
+  const fifReport = {
+    id: "7d2f6b48-1a9c-4e35-a7d0-5c8e3b1f9a44",
+    code: "customer-fif",
+    name: "FIF Report",
+    function: "Foreign investment fund (FIF) figures of one customer for one New Zealand tax year.",
+    scope: "Customer",
+    allowedTriggers: ["manual"],
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  function at(instant: string) {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(instant));
+  }
+
+  async function openFif(fetchImpl: (url: string, method: string) => Response | Promise<Response>) {
+    const rendered = renderDetail(user(), (url, method) => {
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      if (url.includes("/api/accounts") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.includes("/api/reports") && method === "GET" && !url.includes("/executions") && !url.includes("/schedules")) {
+        return json([customerTransactions, fifReport]);
+      }
+      return fetchImpl(url, method);
+    });
+    await chooseOption("Report", "FIF Report");
+    return rendered;
+  }
+
+  async function taxYearOptions() {
+    await openSelect("Tax year");
+    return screen.getAllByRole("option").map((option) => option.textContent);
+  }
+
+  it("offers on 1 April every tax year up to the one before, the latest first", async () => {
+    at("2026-04-01T12:00:00Z");
+    await openFif(() => new Response("", { status: 404 }));
+
+    const options = await taxYearOptions();
+    expect(options[0]).toBe("2025 (1 April 2024 to 31 March 2025)");
+    expect(options).not.toContain("2026 (1 April 2025 to 31 March 2026)");
+    expect(options[options.length - 1]).toBe("2009 (1 April 2008 to 31 March 2009)");
+    expect(options).toHaveLength(17);
+  });
+
+  it("offers on 2 April the tax year that has just ended, selected", async () => {
+    at("2026-04-02T00:30:00Z");
+    await openFif(() => new Response("", { status: 404 }));
+
+    expect(screen.getByLabelText("Tax year")).toHaveTextContent("2026 (1 April 2025 to 31 March 2026)");
+    const options = await taxYearOptions();
+    expect(options[0]).toBe("2026 (1 April 2025 to 31 March 2026)");
+    expect(options).toHaveLength(18);
+  });
+
+  it("queues the report with the page's customer and the tax year as a number, and has no schedule form", async () => {
+    at("2026-11-28T03:12:45Z");
+    const { fetchMock } = await openFif((url, method) => {
+      if (url.includes("/reports/request") && method === "POST") {
+        return json({ id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" }, 202);
+      }
+      if (url.includes("/reports/executions") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByLabelText("Tax year")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Frequency")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create schedule" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("From")).not.toBeInTheDocument();
+    fireEvent.click(within(generateForm()).getByRole("button", { name: "Generate now" }));
+
+    expect(await screen.findByText("Report queued")).toBeInTheDocument();
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.url.includes("/reports/request"));
+    expect(JSON.parse(await request!.clone().text())).toEqual({
+      reportId: fifReport.id,
+      parameters: { customerId, taxYear: 2026 },
+    });
+  });
+
+  it("sends the tax year chosen", async () => {
+    at("2026-11-28T03:12:45Z");
+    const { fetchMock } = await openFif((url, method) => {
+      if (url.includes("/reports/request") && method === "POST") {
+        return json({ id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" }, 202);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    await chooseOption("Tax year", "2024 (1 April 2023 to 31 March 2024)");
+    fireEvent.click(within(generateForm()).getByRole("button", { name: "Generate now" }));
+
+    expect(await screen.findByText("Report queued")).toBeInTheDocument();
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.url.includes("/reports/request"));
+    expect(JSON.parse(await request!.clone().text())).toEqual({
+      reportId: fifReport.id,
+      parameters: { customerId, taxYear: 2024 },
+    });
+  });
+
+  it("shows a 400 at the form with the server's message", async () => {
+    at("2026-11-28T03:12:45Z");
+    await openFif((url, method) => {
+      if (url.includes("/reports/request") && method === "POST") {
+        return json({ errors: { customerId: ["A FIF report is made for a customer whose tax residency is New Zealand."] } }, 400);
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByLabelText("Tax year")).toBeInTheDocument();
+    fireEvent.click(within(generateForm()).getByRole("button", { name: "Generate now" }));
+
+    expect(
+      await within(generateForm()).findByText("A FIF report is made for a customer whose tax residency is New Zealand."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Report queued")).not.toBeInTheDocument();
+  });
+
+  it("shows Tax year in the History summary", async () => {
+    renderDetail(user(), (url, method) => {
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      if (url.includes("/api/reports") && method === "GET" && !url.includes("/executions") && !url.includes("/schedules")) {
+        return json([fifReport]);
+      }
+      if (url.includes("/reports/executions") && method === "GET") {
+        return json({
+          items: [
+            {
+              id: "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+              reportId: fifReport.id,
+              status: "Succeeded",
+              triggerKind: "Manual",
+              created: "2026-11-28T03:12:40Z",
+              parameters: { customerId, taxYear: 2026 },
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          totalCount: 1,
+        });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByText("Tax year 2026")).toBeInTheDocument();
+  });
+
+  function generateForm() {
+    return screen.getByRole("button", { name: "Generate now" }).closest("form") as HTMLElement;
+  }
+});

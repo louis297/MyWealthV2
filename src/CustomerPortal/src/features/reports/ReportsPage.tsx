@@ -9,8 +9,19 @@ import {
   useGetReportsQuery,
   useRequestReportMutation,
 } from "@/features/reports/reportsApi";
+import { reportableTaxYears, taxYearLabel } from "@/shared/time/taxYears";
 
 const customerTransactions = "customer-transactions";
+const customerFif = "customer-fif";
+
+/** The messages of a 400 problem body, or none. */
+function problemMessages(error: unknown): string[] {
+  if (typeof error !== "object" || error === null || !("data" in error)) {
+    return [];
+  }
+  const data = (error as { data?: { errors?: Record<string, string[]> } }).data;
+  return data?.errors ? Object.values(data.errors).flat() : [];
+}
 
 export function ReportsPage() {
   const me = useAppSelector((state) => state.session.currentUser);
@@ -19,6 +30,8 @@ export function ReportsPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [includeClosedAccounts, setIncludeClosedAccounts] = useState(false);
+  const [taxYears] = useState(() => reportableTaxYears());
+  const [taxYear, setTaxYear] = useState(taxYears.length > 0 ? String(taxYears[0]) : "");
   const [messages, setMessages] = useState<string[]>([]);
   const [queuedId, setQueuedId] = useState<string | null>(null);
   const [historyReportId, setHistoryReportId] = useState("");
@@ -28,7 +41,9 @@ export function ReportsPage() {
   const polled = useGetExecutionQuery(queuedId ?? "", { skip: !queuedId });
 
   const selected = reports.data?.find((item) => item.id === selectedId);
-  const known = selected?.code === customerTransactions;
+  const transactions = selected?.code === customerTransactions;
+  const fif = selected?.code === customerFif;
+  const known = transactions || fif;
   const attempts = useRef(0);
   const refetchExecution = polled.refetch;
 
@@ -55,19 +70,21 @@ export function ReportsPage() {
     if (!me || !selected) {
       return;
     }
-    if (to < from) {
+    if (transactions && to < from) {
       setMessages(["To must be on or after from."]);
       return;
     }
     try {
       const created = await requestReport({
         reportId: selected.id,
-        parameters: {
-          customerId: me.id,
-          from,
-          to,
-          includeClosedAccounts,
-        },
+        parameters: fif
+          ? { customerId: me.id, taxYear: Number(taxYear) }
+          : {
+              customerId: me.id,
+              from,
+              to,
+              includeClosedAccounts,
+            },
       }).unwrap();
       setMessages([]);
       setQueuedId(created.id);
@@ -75,7 +92,8 @@ export function ReportsPage() {
       const status = typeof error === "object" && error !== null && "status" in error
         ? (error as { status?: number }).status
         : undefined;
-      setMessages([status === 404 ? "Not found" : "Report is not available."]);
+      const problems = status === 400 ? problemMessages(error) : [];
+      setMessages(problems.length > 0 ? problems : [status === 404 ? "Not found" : "Report is not available."]);
     }
   }
 
@@ -119,28 +137,45 @@ export function ReportsPage() {
       {selected && known ? (
         <form className="flex w-full max-w-sm flex-col gap-3" onSubmit={(event) => void onGenerate(event)}>
           <Messages messages={messages} />
-          <TextField
-            id="report-from"
-            label="From"
-            type="date"
-            required
-            value={from}
-            onChange={(event) => setFrom(event.target.value)}
-          />
-          <TextField
-            id="report-to"
-            label="To"
-            type="date"
-            required
-            value={to}
-            onChange={(event) => setTo(event.target.value)}
-          />
-          <CheckField
-            checked={includeClosedAccounts}
-            onChange={(event) => setIncludeClosedAccounts(event.target.checked)}
-          >
-            Include closed accounts
-          </CheckField>
+          {fif ? (
+            <SelectField
+              id="report-tax-year"
+              label="Tax year"
+              required
+              value={taxYear}
+              onChange={(event) => setTaxYear(event.target.value)}
+            >
+              {taxYears.map((year) => (
+                <SelectItem key={year} value={String(year)}>{taxYearLabel(year)}</SelectItem>
+              ))}
+            </SelectField>
+          ) : null}
+          {transactions ? (
+            <>
+              <TextField
+                id="report-from"
+                label="From"
+                type="date"
+                required
+                value={from}
+                onChange={(event) => setFrom(event.target.value)}
+              />
+              <TextField
+                id="report-to"
+                label="To"
+                type="date"
+                required
+                value={to}
+                onChange={(event) => setTo(event.target.value)}
+              />
+              <CheckField
+                checked={includeClosedAccounts}
+                onChange={(event) => setIncludeClosedAccounts(event.target.checked)}
+              >
+                Include closed accounts
+              </CheckField>
+            </>
+          ) : null}
           <Button type="submit" disabled={requestState.isLoading}>Generate</Button>
         </form>
       ) : null}

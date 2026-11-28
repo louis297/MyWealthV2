@@ -14,6 +14,9 @@ import { Pager } from "@/shared/components/Pager";
 import { formatInstant } from "@/shared/time/instant";
 
 function summary(parameters: ReportParameters): string | null {
+  if (typeof parameters.taxYear === "number") {
+    return `Tax year ${parameters.taxYear}`;
+  }
   if (typeof parameters.date === "string") {
     return `At the end of ${parameters.date}`;
   }

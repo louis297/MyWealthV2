@@ -628,6 +628,8 @@ Grouping by custody mode (accepted, [features/custody-mode-grouping.md](features
 
 Bank reconciliation (accepted, [features/bank-reconciliation.md](features/bank-reconciliation.md) R22–R25) adds a third scope, `Tenant`, with policies `reports.tenant.read` and `reports.tenant.create` for TenantAdmin only, and the report `bank-reconciliation`. "By scope" in the table below includes it; Adviser and Customer get 403 on a Tenant-scoped report. The routes do not change.
 
+The FIF report (accepted, [features/fif-report.md](features/fif-report.md)) adds the report `customer-fif`, scope `Customer`, manual only. Parameters `{ customerId, taxYear }`, both required, `taxYear` a JSON whole number. 400 at `customerId` or `taxYear` when missing; at `parameters` for a `taxYear` that is not a whole number or an unknown field; at `taxYear` below 2009 or for a year that cannot be reported yet ("Tax year {Y} can be reported from 2 April {Y}."); at `customerId` for a Customer whose tax residency is `Overseas`, after the scope check. A schedule that names it → 404. The execution has no `asOf`. The routes do not change.
+
 | Method | Route | Policy | Success |
 | --- | --- | --- | --- |
 | GET | `/reports/catalog` | `tenants.manage` | 200 every catalog row, including inactive, ordered by code. No `granted` |
@@ -911,3 +913,4 @@ One row per change. The text of each change is in git (`git log -p -- docs/api-d
 | 2026-11-28 | Tax year events in NZD (§6, §7.4): `GET /users/customers/{customerId}/tax-years/{taxYear}` under `accounts.read`. No permission or problem code |
 | 2026-11-28 | Cost in NZD and the threshold test (§6, §7.4): `threshold`, `holdings[].cost` and `holdings[].events[].cost` on the tax year item. No route, permission or problem code |
 | 2026-11-28 | FIF income (§6, §7.4): `fifIncome` and `holdings[].fifIncome` on the tax year item. No route, permission or problem code |
+| 2026-11-28 | FIF report (§7.8): the report `customer-fif`, its parameters `{ customerId, taxYear }` and its 400 cases; manual only. No route, permission or problem code |

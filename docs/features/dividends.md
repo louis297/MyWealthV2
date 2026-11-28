@@ -733,7 +733,7 @@ Still open, not this slice:
 
 - Taxable bonus issues, bonus issues in lieu and other non-cash dividends; the future of the `Scrip` name (future-plans §4)
 - Treaty rates and the 15 % rate of NRWT, RWT-exempt holders, holders that are not individuals, listed PIE dividends, trans-Tasman imputation, the maximum imputation ratio as a check
-- The FIF rules and the refund of RWT on a FIF distribution; a foreign tax credit in NZD (future-plans §1 step 6)
+- The FIF rules and the refund of RWT on a FIF distribution; a foreign tax credit in NZD (future-plans §1 step 6). The tax taken from the dividends of attributing holdings is listed, as booked, in the FIF report ([fif-report.md](fif-report.md) R22); a dividend report under the ordinary rules stays out (fif-roadmap TR6)
 - Paying withheld tax to Inland Revenue, the investment income report, dividend statements and tax certificates
 - A plan price set after the ex-date; an election per Instrument; an election by the Customer
 - A fill made before the ex-date and posted after it; entitlement at the record date; market claims; dividends on shares in transit
@@ -762,3 +762,4 @@ What changed in this file after it landed. The text of each change is in git (`g
 | 2026-11-27 | [instrument-tax-attributes.md](instrument-tax-attributes.md) | R3: the tax source is not checked against the Instrument's issuer country |
 | 2026-11-28 | [tax-year-events.md](tax-year-events.md) | R3: the tax year read marks a disagreement with the issuer country. R37: a dividend is in the tax year of its `bookedAt` |
 | 2026-11-28 | [fif-income.md](fif-income.md) | R37: a dividend is a CV gain at its gross plus the imputation credit, and adds nothing under FDR |
+| 2026-11-28 | [fif-report.md](fif-report.md) | §2 Out: the tax taken from the dividends of attributing holdings is listed in the FIF report; a dividend report under the ordinary rules stays out |

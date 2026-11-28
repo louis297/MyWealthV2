@@ -389,6 +389,7 @@ Beyond PK / unique constraints already listed:
 0059_stored_valuations.sql                  -- ValuationRuns, StoredValuations, StoredValuationLines; Accounts.ValuedThrough
 0060_external_income.sql                    -- TransactionDividendDetails.AmountPerShare and ExDate nullable; CK_TransactionDividendDetails_AmountPerShare allows NULL
 0061_instrument_tax_attributes.sql          -- Instruments.IssuerCountry char(2) NULL + CHECK; InstrumentFifTreatments (tenant composite FK to Instruments)
+0062_fif_report.sql                         -- report customer-fif (one Reports row, manual only); no table, column or index
 ```
 
 Do **not** back-fill `0002_currencies.sql`. identity-auth stopped at `0007`. Currencies scripts are forward-only `0008` / `0009`.
@@ -776,6 +777,7 @@ One row per change. §9 lists what each script did. The text of each change is i
 | 2026-11-26 | `0059` | Stored valuations and valuation runs (§11.22); `Accounts.ValuedThrough` (§11.3) |
 | 2026-11-27 | `0060` | Income on External accounts: `TransactionDividendDetails.AmountPerShare` and `ExDate` nullable |
 | 2026-11-27 | `0061` | Tax attributes of an Instrument (§11.1): `Instruments.IssuerCountry`, `InstrumentFifTreatments` |
+| 2026-11-28 | `0062` | FIF report (§14): the catalog row `customer-fif` ([features/fif-report.md](features/fif-report.md) §6) |
 
 ---
 
@@ -785,8 +787,8 @@ Script `0019_reports.sql`. Field rules: [features/reports.md](features/reports.m
 
 | Table | Notes |
 | --- | --- |
-| `Reports` | Platform catalog. No TenantId and no audit. `PublicId` unique, `Code` nvarchar(64) unique, `Name` nvarchar(200), `Function` nvarchar(500), `Scope` nvarchar(20) check `Customer` \| `Book` \| `Tenant` (`Tenant` from `0045`), `AllowedTriggers` nvarchar(200) JSON array, `IsActive` bit default 1. Seed `customer-transactions` (`8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11`) and `adviser-balances` (`5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22`), both `["manual","scheduled"]`. |
-| `TenantReports` | `TenantId` + `ReportId` unique. Presence = configured for that tenant. No auto-grant. No audit. Development / TestAppHost `TestSeed` grants both seeded reports to the demo tenant. Idempotent on that pair. |
+| `Reports` | Platform catalog. No TenantId and no audit. `PublicId` unique, `Code` nvarchar(64) unique, `Name` nvarchar(200), `Function` nvarchar(500), `Scope` nvarchar(20) check `Customer` \| `Book` \| `Tenant` (`Tenant` from `0045`), `AllowedTriggers` nvarchar(200) JSON array, `IsActive` bit default 1. Seed `customer-transactions` (`8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11`) and `adviser-balances` (`5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22`), both `["manual","scheduled"]`. `0045` adds `bank-reconciliation` (`3e7b9d14-6c2a-4f58-b0e1-9a4d2c7f8e33`, `Tenant`, `["manual","scheduled"]`) and `0062` adds `customer-fif` (`7d2f6b48-1a9c-4e35-a7d0-5c8e3b1f9a44`, `Customer`, `["manual"]`; [features/fif-report.md](features/fif-report.md) R1), each when no row has the code. |
+| `TenantReports` | `TenantId` + `ReportId` unique. Presence = configured for that tenant. No auto-grant. No audit. Development / TestAppHost `TestSeed` and `webapi --seed-demo` grant the four seeded reports to the demo tenant. Idempotent on that pair. |
 | `ReportSchedules` | `PublicId` unique, `ReportId`, `TenantId`, `ParametersJson` nvarchar(max), `IsActive`, `Cron` nvarchar(100). Index `(TenantId, ReportId)`. RowVersion + audit. |
 | `ReportExecutions` | `PublicId` unique, `ReportId`, `ScheduleId` nullable, `TenantId`, `TriggerKind` nvarchar(20) check `Manual` \| `Scheduled` \| `Event`, `Status` nvarchar(20) check `Queued` \| `Running` \| `Succeeded` \| `Failed`, `ParametersJson` nvarchar(max), `AsOf` nullable, `TriggeredByUserId` nullable, `ResultStorageKey` nvarchar(500) nullable, `ErrorMessage` nvarchar(2000) nullable. Index `(TenantId, ReportId)`. RowVersion + audit. FKs do not cascade. |
 

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAppSelector } from "@/app/hooks";
+import { CustomerFifGenerate } from "@/features/reports/CustomerFifGenerate";
 import { CustomerTransactionsGenerate } from "@/features/reports/CustomerTransactionsGenerate";
 import { ReportCatalog, ReportParametersUnavailable } from "@/features/reports/ReportCatalog";
 import { ReportHistory } from "@/features/reports/ReportHistory";
@@ -24,6 +25,8 @@ export function CustomerReportsSection({ customerId }: { customerId: string }) {
       renderSelected={(item) =>
         item.code === "customer-transactions" ? (
           <CustomerTransactionsGenerate reportId={item.id} customerId={customerId} onQueued={setFocusId} />
+        ) : item.code === "customer-fif" ? (
+          <CustomerFifGenerate reportId={item.id} customerId={customerId} onQueued={setFocusId} />
         ) : (
           <ReportParametersUnavailable />
         )
