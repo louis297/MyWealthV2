@@ -17,8 +17,39 @@ public sealed record FifIncome(
 {
     /// <summary>R3–R25: the income of each tax holding of <paramref name="holdings"/>, in their order, and the totals.
     /// <paramref name="decimalPlaces"/> is NZD's.</summary>
-    public static FifIncome Compute(int taxYear, IReadOnlyList<TaxHolding> holdings, int decimalPlaces) =>
-        new(0m, null, null, null, false, [], []);
+    public static FifIncome Compute(int taxYear, IReadOnlyList<TaxHolding> holdings, int decimalPlaces)
+    {
+        var rate = FairDividendRate.For(taxYear);
+        var incomes = holdings.Select(holding => Income(holding, rate, decimalPlaces)).ToList();
+        return new FifIncome(rate, null, null, null, false, [], incomes);
+    }
+
+    /// <summary>R3, R4: the status of a tax holding; R8: its FDR amount when it is computed.</summary>
+    private static TaxHoldingIncome Income(TaxHolding holding, decimal rate, int decimalPlaces)
+    {
+        TaxHoldingIncome NotComputed(FifIncomeReason reason) => new(holding.InstrumentId, FifIncomeStatus.NotComputed, reason, null, null, null);
+
+        switch (holding.Treatment.FifTreatment)
+        {
+            case FifTreatment.NotClassified:
+                return NotComputed(FifIncomeReason.NotClassified);
+            case FifTreatment.AttributingNoFdr:
+                return NotComputed(FifIncomeReason.FdrNotAllowed);
+            case FifTreatment.Attributing when !holding.Complete:
+                return NotComputed(FifIncomeReason.HoldingIncomplete);
+            case FifTreatment.Attributing:
+                break;
+            default:
+                return new TaxHoldingIncome(holding.InstrumentId, FifIncomeStatus.NotRequired, null, null, null, null);
+        }
+
+        var openingValue = holding.Opening.Value!.Value;
+        var fdr = new FifFdr(openingValue, Round(rate * openingValue, decimalPlaces));
+        return new TaxHoldingIncome(holding.InstrumentId, FifIncomeStatus.Computed, null, fdr, null, null);
+    }
+
+    /// <summary>R24: every figure of a tax holding is rounded to NZD's places, away from zero.</summary>
+    private static decimal Round(decimal amount, int decimalPlaces) => decimal.Round(amount, decimalPlaces, MidpointRounding.AwayFromZero);
 }
 
 /// <summary>R20, R26: the totals of the fair dividend rate method over the computed tax holdings.</summary>
