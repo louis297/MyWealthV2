@@ -15,7 +15,7 @@ public sealed record CustomerTaxYear(
     bool Complete,
     int IncompleteCount,
     ThresholdTest Threshold,
-    FifIncome? FifIncome = null)
+    FifIncome FifIncome)
 {
     /// <summary>
     /// R18, R21–R29 over the events of <see cref="TaxLedger.Build"/>. <paramref name="treatments"/> holds the treatment
@@ -95,7 +95,11 @@ public sealed record CustomerTaxYear(
 
         var incomplete = holdings.Count(holding => !holding.Complete);
         var threshold = ThresholdTest.Compute(taxYear, walk, treatments, earlierTreatments, FifThreshold.For(taxYear), decimalPlaces);
-        return new CustomerTaxYear(taxYear, from, to, holdings, incomplete == 0, incomplete, threshold);
+
+        // FIF income §5: worked out from the tax holdings, after they are built; it changes no complete.
+        var fifIncome = FifIncome.Compute(taxYear, holdings, decimalPlaces);
+        var withIncome = holdings.Select((holding, index) => holding with { Income = fifIncome.Holdings[index] }).ToList();
+        return new CustomerTaxYear(taxYear, from, to, withIncome, incomplete == 0, incomplete, threshold, fifIncome);
     }
 
     /// <summary>
@@ -419,6 +423,7 @@ public sealed record TaxHolding(
     TaxCost Cost,
     TaxHoldingIncome? Income = null)
 {
+    // Income is set by CustomerTaxYear.Compute (fif-income §5); a holding built on its own has none.
     /// <summary>R27: complete if and only if no reason is listed.</summary>
     public bool Complete => Incomplete.Count == 0;
 }

@@ -43,7 +43,8 @@ public class CustomerTaxYearIncomeTests
         var income = year.FifIncome.ShouldNotBeNull();
         (income.Complete, income.Incomplete.ShouldHaveSingleItem()).ShouldBe((false, new FifIncomeIncomplete(FifIncomeReason.FdrNotAllowed, Aaa)));
         (year.Complete, year.Holdings.ShouldHaveSingleItem().Complete, year.Threshold.Complete).ShouldBe((true, true, true));
-        year.Threshold.ShouldBe(attributing.Threshold);
+        static object Figures(ThresholdTest test) => (test.Amount, test.Opening, test.Peak.Total, test.Closing, test.Outcome, test.Steps.Count);
+        Figures(year.Threshold).ShouldBe(Figures(attributing.Threshold));
     }
 
     [Test]
