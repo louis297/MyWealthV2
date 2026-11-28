@@ -236,7 +236,7 @@ What the summary says in other cases:
 - Tax payable, the foreign tax credit allowed, the limit on an imputation credit, a refund of RWT, the IR3 return and the IR1261 overseas income summary, and a filing with Inland Revenue (roadmap §7). The report lists the tax taken from each dividend (R22)
 - The choice of a method, and whether the FIF rules apply to the Customer. Both branches are printed (roadmap Q14, T8)
 - A transitional resident, a change of residence during a tax year, a date on the tax residency, and the choice to apply the rules below the threshold (roadmap §7, Q14)
-- The income summary under the ordinary rules: dividends of exempt and New Zealand holdings, and interest. That is TR6, a report of its own. Such holdings are listed here with their classification and nothing else (R18)
+- The income summary under the ordinary rules: dividends of exempt and New Zealand holdings, and interest. That is [income-summary.md](income-summary.md), a report of its own. Such holdings are listed here with their classification and nothing else (R18)
 - A schedule and an event trigger (R4)
 - A run over every Customer of a Tenant or of an Adviser's book (R5)
 - A data file beside the PDF: CSV, a spreadsheet or the JSON of the read (roadmap Q16; R11)
@@ -627,7 +627,7 @@ Confirmed on 2026-11-28, every one as recommended. Each point states the choice,
 9. **The PDF is the only stored copy, and the execution has no `asOf`** (R11). Recommended: roadmap Q16. The PDF prints everything roadmap T9 lists, so the stored report can be read without the platform. Alternative A: the worker also stores the JSON of the read beside the PDF, with a download, as a record that a program can compare with a later run. Alternative B: the worker writes `ledgerReadAt` to `asOf` of the execution, so that the History panel shows it; that makes `asOf` mean two things, the request time for the Adviser Balances Report and the read time here.
 10. **New Zealand time, by a rule in Domain** (R13). Recommended: the reader is a New Zealand taxpayer and the tax year is cut in New Zealand time, so a UTC time prints the first morning of a tax year as the day before it began. The rule is two sentences, needs no time zone data on the host, and is the same rule tax-year-events R3 rests on, so the PDF cannot disagree with the cut. The cost: a change of New Zealand's daylight time needs an amendment, as it does there. Alternative A: UTC throughout, as the other reports print, with the UTC instants of the tax year in the header. Alternative B: the zone `Pacific/Auckland` from the host, which tax-year-events point 1 chose not to depend on.
 11. **The rates behind the opening tax cost are not listed** (R23). Recommended: the tax cost at the start of the year comes from every purchase since the Customer's first, and listing each rate of each earlier year would make a Customer of ten years a report of mostly old rates. The PDF says that they are not listed. Alternative: `CustomerTaxLedger` gives the rate rows of the whole walk and section 8 lists them all, which is roadmap T9 read to the letter.
-12. **Exempt and New Zealand holdings are listed with their classification only** (R18). Recommended: roadmap §4 point 1 asks which holdings are exempt and under which exemption. Their dividends belong to the income summary (TR6), and no price is read for them (tax-year-events R23). Alternative: a block with their events and dividends too, which is half of TR6.
+12. **Exempt and New Zealand holdings are listed with their classification only** (R18). Recommended: roadmap §4 point 1 asks which holdings are exempt and under which exemption. Their dividends belong to the income summary ([income-summary.md](income-summary.md)), and no price is read for them (tax-year-events R23). Alternative: a block with their events and dividends too, which is half of TR6.
 13. **The tax taken from dividends is per tax holding and per issuer country, as booked, with no credit** (R22). Recommended: roadmap Q17. The country is the issuer country of the Instrument, the one country the platform knows; a dividend's own statement is `NewZealand` or `Foreign`, and a disagreement is a notice. Alternative: per dividend only, with no subtotal by country.
 14. **A tax holding that is not classified is printed in full** (R20 to R22). Recommended: it may be an attributing interest, the read values it, and the person who will classify it needs its figures. Alternative: listed in section 3 only, until it is classified.
 15. **One Customer per request, and no run over a Tenant** (R5). Recommended: the earlier specs asked the question and none needs the answer to be yes. A report is asked for once a year per Customer, and the walk is per Customer. Alternative: a Book-scoped or Tenant-scoped report that makes one PDF per Customer, which needs a queue of executions and a batch read of rates.
@@ -640,7 +640,7 @@ Confirmed on 2026-11-28, every one as recommended. Each point states the choice,
 
 - **The sources were read as pages.** The fetch tool saved the two PDFs, and the pages named in §14 were read from them directly, not through a restatement. The pages on the threshold (S1 p.9, p.10) and on the two methods (p.11 to p.16) were not read again: this slice states no rule on them, and tax-cost-threshold and fif-income cite them.
 - **The sentences of the report are the platform's, not Inland Revenue's.** Statement 2 of R16, the sentences of the threshold test and the note under section 7 summarise the sources of §14. A person who knows the rules should still read them; it was not done when the spec was accepted.
-- **"By country" is not in the pages read.** Roadmap §2 says the overseas income summary (IR1261) is "by country", citing S1 p.21 and S2 ¶10 to ¶11. S1 p.21 says individuals "must file an Overseas income summary – IR1261 form", and S2 ¶10 says it is filed "to declare your overseas income sources and claim foreign tax credits". Neither says "by country". R22 groups by issuer country because roadmap Q17 decided it; the form itself was not read.
+- **"By country" is not in the pages read.** Roadmap §2 says the overseas income summary (IR1261) is "by country", citing S1 p.21 and S2 ¶10 to ¶11. S1 p.21 says individuals "must file an Overseas income summary – IR1261 form", and S2 ¶10 says it is filed "to declare your overseas income sources and claim foreign tax credits". Neither says "by country". R22 groups by issuer country because roadmap Q17 decided it; the form itself was not read. The form and the return guide were read for [income-summary.md](income-summary.md) §14 and say "a separate section for each jurisdiction and for each income type".
 - **The tax profile was written for withholding.** interest-run R2 says tax residency "decides the withholding of R4 and nothing else". With this slice it also decides whether a FIF report is made.
 - **A New Zealand Customer can have NRWT.** A dividend paid while the profile said `Overseas` has an `Nrwt` leg. The report prints the column as booked and says nothing about it.
 - **The tax taken is the same table for both branches.** A person the rules apply to reads section 7 for the tax already paid; a person below the threshold reads it for the dividends of their attributing holdings, which the ordinary rules then tax. The dividends of exempt and New Zealand holdings are not in it.
@@ -654,7 +654,6 @@ Confirmed on 2026-11-28, every one as recommended. Each point states the choice,
 
 Still open, not this slice:
 
-- The income summary under the ordinary rules: TR6
 - A dated tax residency, a transitional resident and the choice to apply the rules below the threshold (roadmap §7)
 - A data file beside the PDF, and a page that shows the tax year on screen
 - A report over every Customer of an Adviser or of a Tenant
@@ -713,3 +712,13 @@ Read on 2026-11-28. S1 and S2 are the codes of [fif-roadmap.md](../roadmaps/fif-
 | — | Inland Revenue, the IR1261 form and its guide | Whether overseas income is entered by country (roadmap §2) | Not read |
 
 What follows: R13 rests on the Government's page, which gives the two clock times and says they have been fixed since 2007, and on the dates it lists, which the tests use. R22 groups by country because roadmap Q17 says so, not because a source read here asks for it. Every other tax statement of this slice is a sentence of the report about itself; the rules behind the figures are those of tax-year-events, tax-cost-threshold and fif-income, with their own sources.
+
+---
+
+## History
+
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/fif-report.md`).
+
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-28 | [income-summary.md](income-summary.md) | §2 Out, point 12 and "Still open": the income summary is that spec, no longer TR6. "Found while writing": the form and the return guide were read there. No rule and no word of the PDF changes |

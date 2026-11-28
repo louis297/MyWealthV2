@@ -138,8 +138,8 @@ A planning summary of the rules for an individual. Sources are in §11; the code
 | FX rates | Daily central bank reference rates from Frankfurter for every pair of active currencies, from the history floor date | ADR 0019, market-data-history |
 | Prices | EODHD daily closes from the history floor date; the free plan serves one year. None for NZX and Tokyo | market-data-history, [known-issues/eodhd-nz-jp-coverage.md](../known-issues/eodhd-nz-jp-coverage.md) |
 | A day | A UTC date everywhere | valuation-roadmap H2 |
-| Reports | A catalog with scopes `Customer`, `Book` and `Tenant`, a generator per report, PDF output, a stored execution per run. The Customer Transactions Report takes a date range. Since TR5 (accepted 2026-11-28) a fourth report, `customer-fif`, prints the FIF figures of one Customer for one tax year | reports §1, R13; fif-report |
-| Tax documents | None. The interest and dividend specs left every tax statement to this step. Since TR5 (accepted 2026-11-28) the FIF report is the first; the income summary under the ordinary rules is TR6 | interest-run §11 point 19, dividends §2 Out, external-income §2 Out |
+| Reports | A catalog with scopes `Customer`, `Book` and `Tenant`, a generator per report, PDF output, a stored execution per run. The Customer Transactions Report takes a date range. Since TR5 (accepted 2026-11-28) a fourth report, `customer-fif`, prints the FIF figures of one Customer for one tax year. Since TR6 (accepted 2026-11-28) a fifth, `customer-income-summary`, prints the dividends and interest of one Customer for one tax year | reports §1, R13; fif-report; income-summary |
+| Tax documents | None. The interest and dividend specs left every tax statement to this step. Since TR5 (accepted 2026-11-28) the FIF report is the first; since TR6 (accepted 2026-11-28) the income summary under the ordinary rules is the second | interest-run §11 point 19, dividends §2 Out, external-income §2 Out |
 
 ---
 
@@ -214,7 +214,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 | A move between two Accounts of the same Customer | One `Move` with no amount, recognised on read (T1; tax-year-events R15) |
 | `Adjustment` with a security leg | Correction, with a notice and no amount. A correction is not a trade (tax-year-events R16) |
 | A Transaction and its `Reversal` | Both left out, wherever they fall. Tax looks at what happened, not at how it was booked. This differs from valuation-roadmap H3, on purpose |
-| Cash-only types, `FxConversion` | Nothing. Cash in a foreign currency is not a FIF. `Interest` is read by TR6 only |
+| Cash-only types, `FxConversion` | Nothing. Cash in a foreign currency is not a FIF. `Interest` is read by TR6 only, as interest items of the income summary ([income-summary](../features/income-summary.md) R3) |
 
 - **Depends on:** TR1 for which Instruments to walk. The read can be built for all Instruments and filtered later.
 - **Also decide:** whether a position is cut at the New Zealand instant while the price is the market's own close of 31 March (Q5); the history floor date, which must be on or before the 31 March that opens the first tax year to be reported, and what the EODHD plan in use can serve; whether the peak holding is read after every Transaction or at the end of each day (recommended: after every Transaction, so that a buy and a sell on one day is a quick sale).
@@ -260,7 +260,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 - **Why:** it is what a Customer below the threshold returns, and what applies to exempt interests such as ASX-listed shares at any size. The interest and dividend specs left it to this step.
 - **Why optional and last:** it is a list of sums with no algorithm, a content-type report in the sense of future-plans §1. No other item waits for it.
 - **Depends on:** TR2 (the tax year, the NZD rule). TR1 for the country.
-- **Spec:** [income-summary](../features/income-summary.md) (`review`, 2026-11-28). A report of its own, `customer-income-summary`, scope `Customer`, manual only, with the parameters `customerId` and `taxYear`, as fif-report point 1 foresaw. Its figures are two fields of the tax year read, worked out in Domain: the interest items of the year, and the sums. Dividends are the `Dividend` events the read already gives, of every tax holding, in four groups by the FIF treatment of the Instrument: New Zealand companies, foreign companies outside the FIF rules, attributing interests and not classified. The dividends of attributing interests are shown whatever the threshold test says, and the report does not say whether they are returned. Interest is every `Interest` Transaction of the Customer's Accounts booked in the tax year, per Account, with no country, and interest charged is listed apart. Amounts become NZD by the rule of tax-year-events R18. The gross dividend, the dividend with its imputation credits, is given beside its parts, and the tax taken is added up by kind. The summary has its own `complete`: it needs no price, and a missing rate or a not classified holding with a dividend makes it incomplete. The report is made for an `Overseas` Customer too. It computes no tax and names no box of a return. Its points 1 to 20 answer what the item left open and wait for confirmation. The sentences the report prints about the return are the platform's summary of Inland Revenue's return guide, read on 2026-11-28; the spec asks a person who knows the rules to read them.
+- **Spec:** [income-summary](../features/income-summary.md) (`accepted`, 2026-11-28). A report of its own, `customer-income-summary`, scope `Customer`, manual only, with the parameters `customerId` and `taxYear`, as fif-report point 1 foresaw. Its figures are two fields of the tax year read, worked out in Domain: the interest items of the year, and the sums. Dividends are the `Dividend` events the read already gives, of every tax holding, in four groups by the FIF treatment of the Instrument: New Zealand companies, foreign companies outside the FIF rules, attributing interests and not classified. The dividends of attributing interests are shown whatever the threshold test says, and the report does not say whether they are returned. Interest is every `Interest` Transaction of the Customer's Accounts booked in the tax year, per Account, with no country, and interest charged is listed apart. Amounts become NZD by the rule of tax-year-events R18. The gross dividend, the dividend with its imputation credits, is given beside its parts, and the tax taken is added up by kind. The summary has its own `complete`: it needs no price, and a missing rate or a not classified holding with a dividend makes it incomplete. The report is made for an `Overseas` Customer too. It computes no tax and names no box of a return. Its points 1 to 20 answer what the item left open and were confirmed as recommended. The sentences the report prints about the return are the platform's summary of Inland Revenue's return guide, read on 2026-11-28; the spec asks a person who knows the rules to read them.
 
 ---
 
@@ -308,7 +308,7 @@ Every question is **decided** (2026-11-27), as recommended, Q3 with its scope st
 | Q15 | What if an External entry is backdated into a year already reported? | Nothing stops it. The stored execution is what was reported; a new run shows the ledger as it is now, with its own instant. Revisit with period close. Written as fif-report R11 and statement 7 of its R16 | TR5 |
 | Q16 | Is a PDF enough? | The PDF is the report. The numbers are also readable as JSON through the TR2 and TR4 reads, which the tests and the portal pages use. No spreadsheet file in the first version. Written as fif-report R11: the PDF is the only stored copy, and no page reads the JSON yet | TR5 |
 | Q17 | How is foreign tax shown? | As paid, per interest and country, next to the FIF income of that interest. The allowed credit is not computed (§7). Written as fif-report R22 | TR5 |
-| Q18 | Is the income summary (TR6) part of step 6? | Yes, as the last and optional item | TR6 |
+| Q18 | Is the income summary (TR6) part of step 6? | Yes, as the last and optional item; written as rules in [income-summary](../features/income-summary.md) | TR6 |
 
 ---
 
@@ -323,7 +323,7 @@ Each step depends only on earlier steps.
 | 3 | TR3 cost in NZD and the threshold test | "Tax lots and a cost in NZD" of custodial-roadmap §10, as far as this step needs it | [tax-cost-threshold](../features/tax-cost-threshold.md) | accepted and landed (2026-11-28) |
 | 4 | TR4 FIF income: FDR, quick sale, CV | — | [fif-income](../features/fif-income.md) | accepted and landed (2026-11-28) |
 | 5 | TR5 the FIF report | "A tax statement for the Customer" (interest-run §11 point 19; dividends and external-income Out), for FIF income | [fif-report](../features/fif-report.md) | accepted and landed (2026-11-28) |
-| 6 | TR6 tax year income summary | The same, for dividends and interest | [income-summary](../features/income-summary.md) | optional; spec in review (2026-11-28) |
+| 6 | TR6 tax year income summary | The same, for dividends and interest | [income-summary](../features/income-summary.md) | optional; accepted (2026-11-28) |
 
 Steps 1 and 2 do not depend on each other and may swap. Step 4 may come before step 3: it needs only TR2.
 

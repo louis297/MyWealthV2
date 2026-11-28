@@ -157,7 +157,7 @@ What the example shows:
 **Out**
 
 - FIF income under either method, and the quick sale adjustment with its own average cost over the purchases of one year: [fif-income.md](fif-income.md) (its R11). That average is not the cost of this slice
-- The report, and what it says to a Customer whose test is `NotAbove`: [fif-report.md](fif-report.md) §4.6. The income summary: TR6
+- The report, and what it says to a Customer whose test is `NotAbove`: [fif-report.md](fif-report.md) §4.6. The income summary: [income-summary.md](income-summary.md)
 - Whether the FIF rules apply to the Customer for another reason: tax residency, a transitional resident, the choice to apply the rules below the threshold and its four-year rule (roadmap Q14, §7). The test says above or not, and nothing else
 - Joint holders, trusts and companies. A Customer is one person (ADR 0020)
 - The option of half the market value on 1 April 2007 for an interest acquired before 1 January 2000 (R23)
@@ -571,3 +571,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | --- | --- | --- |
 | 2026-11-28 | [fif-income.md](fif-income.md) | §2 Out: FIF income and the average cost of the quick sale are that spec's (its R11). "Still open": the TR4 line goes |
 | 2026-11-28 | [fif-report.md](fif-report.md) | §2 Out, R2, R18, §9, point 10 and "Still open": the report prints the highest total in New Zealand time (its R13) and a sentence per outcome (its §4.6); there is no run over every Customer (its R5). The two TR5 lines go |
+| 2026-11-28 | [income-summary.md](income-summary.md) | §2 Out: the income summary is that spec |

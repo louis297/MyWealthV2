@@ -33,6 +33,7 @@ related:
   - ../features/dividends.md
   - ../features/valuation-history.md
   - ../features/fif-report.md
+  - ../features/income-summary.md
 ---
 
 # Customer Portal
@@ -155,7 +156,7 @@ All routes are under `/api`. Policy and self-scope are enforced by the backend.
 
 ## Reports page (field bindings)
 
-Generate uses a hard-coded form for known Customer-scoped reports: Customer Transactions and FIF Report. Selecting a report from the dropdown shows its form and Generate button. History is a separate panel that defaults to all own Customer-scoped executions; an optional report filter adds `reportId`.
+Generate uses a hard-coded form for known Customer-scoped reports: Customer Transactions, and the tax year form, which serves the FIF Report and the Tax Year Income Summary. Selecting a report from the dropdown shows its form and Generate button. History is a separate panel that defaults to all own Customer-scoped executions; an optional report filter adds `reportId`.
 
 Customer Transactions parameters (portal sets `customerId` to self; the field is not editable):
 
@@ -166,7 +167,7 @@ Customer Transactions parameters (portal sets `customerId` to self; the field is
 | `to` | yes | Date. |
 | `includeClosedAccounts` | no | Default false. |
 
-FIF Report parameters ([fif-report](../features/fif-report.md) R6, R28):
+FIF Report and Tax Year Income Summary parameters, the tax year form ([fif-report](../features/fif-report.md) R6, R28; [income-summary](../features/income-summary.md) R18, R35):
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -410,6 +411,14 @@ Field rules: [fif-report](../features/fif-report.md) R6, R7, R8, R28 (report `cu
 | C50 | A Customer, the report granted | Reports page, "FIF Report" selected | The form has one field, "Tax year", a select of every tax year that can be reported today, the latest first and selected, each as "<Y> (1 April <Y − 1> to 31 March <Y>)"; tax year `Y` is offered from 2 April `Y` (UTC), down to 2009. Generate sends `{ reportId, parameters: { customerId: <self>, taxYear: <Y> } }`. No schedule controls. |
 | C51 | A Customer whose tax residency is `Overseas` | Generate the FIF Report | The report is in the list. The server's 400 message ("A FIF report is made for a customer whose tax residency is New Zealand.") is shown at the form, not "Report is not available." |
 
+### Tax Year Income Summary
+
+Field rules: [income-summary](../features/income-summary.md) R18, R19, R35 (report `customer-income-summary`, `4b6e2d91-3f7a-4c18-9d52-8a1e7c0b6f55`, manual only). No new BFF prefix: the existing `/reports` routes.
+
+| ID | Given | When | Then |
+| --- | --- | --- | --- |
+| C52 | A Customer, the report granted, whatever their tax residency | Reports page, "Tax Year Income Summary" selected | The form of C50: one field, "Tax year", the same select. Generate sends `{ reportId, parameters: { customerId: <self>, taxYear: <Y> } }`. No schedule controls. A Customer whose tax residency is `Overseas` gets the report like any other. A 400 is shown at the form with the server's message. |
+
 ## Tests
 
 Portal tests assert routes, role visibility (Customer only), and API-client shapes. Do not re-prove backend isolation or the BFF protocol here.
@@ -422,7 +431,7 @@ Portal tests assert routes, role visibility (Customer only), and API-client shap
 - Report schedules for self.
 - Firm name in the shell (`tenants.read` for Customer).
 - Instrument detail pages.
-- A parameter schema for dynamic forms (the Reports page hard-codes two forms).
+- A parameter schema for dynamic forms (the Reports page hard-codes two forms, the tax year form serving two reports).
 
 ---
 
@@ -451,3 +460,4 @@ What changed in this file after it was accepted. Each row is a section above. Th
 | 2026-11-26 | — | The amendments became the sections above. No behaviour changed |
 | 2026-11-27 | [external-income](../features/external-income.md) | Income on External accounts |
 | 2026-11-28 | [fif-report](../features/fif-report.md) | Reports page (field bindings), FIF Report (C50, C51), Still open |
+| 2026-11-28 | [income-summary](../features/income-summary.md) | Reports page (field bindings): the tax year form serves two reports. Tax Year Income Summary (C52). Still open |

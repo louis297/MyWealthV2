@@ -1,6 +1,6 @@
 ---
 title: "Tax year income summary"
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -44,7 +44,7 @@ It has two parts. The tax year read ([tax-year-events.md](tax-year-events.md)) g
 
 New: fields `interest` and `income` on `GET /users/customers/{customerId}/tax-years/{taxYear}`; Domain types `TaxInterest`, `TaxYearInterest`, `TaxYearIncome`, `IncomeGroup`, `IncomeIncompleteReason` and `IncomeNotice`, and the function `TaxLedger.BuildInterest`; catalog report `customer-income-summary` (script `0063_income_summary_report.sql`, one row); Application types `CustomerIncomeSummaryBinder`, `CustomerIncomeSummaryReport`, `CustomerIncomeSummaryPdf` and `CustomerIncomeSummaryReportGenerator`; a branch in `RequestReport`; the fifth grant of the demo seed and of `TestSeed`; the tax year form of each portal offered for a second report. No route, table, permission, problem code, domain event, `TransactionType`, port, job or setting. No write to the ledger. The FIF report does not change. No simulator change.
 
-**Status is `review` (2026-11-28).** It is not a build contract. The twenty points of §11 wait for confirmation; each states a recommendation, and the rules are written as recommended. The changes to other docs in §12 are a plan until the spec is accepted.
+**Status is `accepted` (2026-11-28).** The twenty points of §11 were confirmed on 2026-11-28, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract. The sentences the report prints about the tax rules were not read by a person who knows the rules when it was accepted; that stays open (§11).
 
 The tax statements in this spec were read from Inland Revenue on 2026-11-28 (§14): the individual return guide and the overseas income summary form for the first time, the FIF guide and the fact sheet again, each from the pages of its PDF. The sentences the report prints about the return are the platform's summary of those pages. Nothing here is tax advice, and the report says the same of itself.
 
@@ -332,7 +332,7 @@ Invariants:
 
 Domain events: none. Nothing is an entity and nothing is stored.
 
-[domain-model.md](../domain-model.md) §8.24 gains these types when this spec is accepted.
+[domain-model.md](../domain-model.md) §8.24 holds these types.
 
 ---
 
@@ -346,7 +346,7 @@ Script: `database/schema/0063_income_summary_report.sql`. It inserts the row whe
 
 The read also uses `Transactions` of type `Interest` with their `TransactionCashLegs`, `TransactionTaxDetails` and `TransactionInterestDetails`, of the Customer's Accounts, within the tax year. The legs' `AccountId` indexes already reach them. Nothing new is stored.
 
-[database-design.md](../database-design.md) §9 and §14 list the script and the row when this spec is accepted. Do not add EF migrations.
+[database-design.md](../database-design.md) §9 and §14 list the script and the row. Do not add EF migrations.
 
 ---
 
@@ -558,9 +558,9 @@ No new ADR.
 | Demo | The fifth grant; the demo catalog unchanged |
 | Routes, tables, permissions, problem codes, events, ports, jobs, settings | None |
 
-### Points to confirm
+### Points confirmed
 
-Each point states the recommendation, written into the rules above, and the alternative.
+Confirmed on 2026-11-28, every one as recommended. Each point states the choice, written into the rules above, and the alternative that was not taken.
 
 1. **A report of its own, not a section of the FIF report** (R15). Recommended: fif-report point 1 already chose it. The summary is what a Customer below the threshold needs, it is made for an `Overseas` Customer too, and it needs no price, so it is complete where a FIF report is not. Alternative: a section of the FIF report, which then cannot be made for an `Overseas` Customer and reopens an accepted spec.
 2. **The name "Tax Year Income Summary" and the code `customer-income-summary`** (R15). Recommended: the roadmap's name, and the word the other specs already use. The cost: Inland Revenue has an "Overseas income summary" (IR1261), and "income" can be read as all of a person's income; statements 3 and 7 say what the report is not. Alternative: "Dividend and Interest Report" with the code `customer-dividends-interest`, which says what is in it and uses no word of Inland Revenue's.
@@ -614,7 +614,7 @@ Still open, not this slice:
 
 ## 12. Changes to other docs
 
-A plan while this spec is in `review`. Each doc is changed in place when it is accepted.
+Each doc was changed in place when this spec was accepted (2026-11-28).
 
 | Doc | Change |
 | --- | --- |

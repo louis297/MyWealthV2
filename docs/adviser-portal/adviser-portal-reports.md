@@ -16,6 +16,7 @@ related:
   - ../features/bank-reconciliation.md
   - ../features/valuation-history.md
   - ../features/fif-report.md
+  - ../features/income-summary.md
 ---
 
 # Adviser Portal — Reports
@@ -32,12 +33,13 @@ Backend prerequisites (landed):
 - Shared pipeline + generators for Customer Transactions and Adviser Balances.
 - Hangfire worker (ADR 0017). PDF via QuestPDF. Shared volume for result files.
 - Policies: `reports.customer.read` / `reports.customer.create` and `reports.book.read` / `reports.book.create`. Customer has the customer read and create policies (create is a request for self only; reports R5). TenantAdmin and Adviser have all four; TenantAdmin also has `reports.tenant.read` / `reports.tenant.create`. SystemAdmin has none of them.
-- TestSeed and `webapi --seed-demo` grant the four seeded reports to the demo tenant.
+- TestSeed and `webapi --seed-demo` grant the five seeded reports to the demo tenant.
 - Seeded PublicIds (stable):
   - Customer Transactions: `8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11` (code `customer-transactions`, scope `Customer`).
   - Adviser Balances: `5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22` (code `adviser-balances`, scope `Book`).
   - Bank reconciliation: `3e7b9d14-6c2a-4f58-b0e1-9a4d2c7f8e33` (code `bank-reconciliation`, scope `Tenant`).
   - FIF Report: `7d2f6b48-1a9c-4e35-a7d0-5c8e3b1f9a44` (code `customer-fif`, scope `Customer`, manual only).
+  - Tax Year Income Summary: `4b6e2d91-3f7a-4c18-9d52-8a1e7c0b6f55` (code `customer-income-summary`, scope `Customer`, manual only).
 
 ---
 
@@ -297,6 +299,14 @@ Field rules: [fif-report](../features/fif-report.md) R6, R7, R27 (report `custom
 | --- | --- |
 | D114 | Customer page, Reports section: when `customer-fif` is selected, the generate form has one field, "Tax year", a select of every tax year that can be reported today, the latest first and selected, each as "<Y> (1 April <Y − 1> to 31 March <Y>)". Tax year `Y` is offered from 2 April `Y` (UTC), down to 2009. Generate sends `{ reportId, parameters: { customerId: <page customer>, taxYear: <Y> } }`, `taxYear` a number. No schedule form, because the report does not allow `scheduled`. A 400 is shown at the form with the server's message (for example the `Overseas` refusal on `customerId`). History shows "Tax year <taxYear>" in the parameters summary when the snapshot has `taxYear`. |
 
+### Tax Year Income Summary
+
+Field rules: [income-summary](../features/income-summary.md) R18, R34 (report `customer-income-summary`, `4b6e2d91-3f7a-4c18-9d52-8a1e7c0b6f55`, scope `Customer`, manual only). Calls: the existing `POST /reports/request`; no new route or BFF prefix. Tests: the tax year form appears for the report's code; the body; no schedule form; "Tax year <taxYear>" in the History summary; a 400 message at the form; the FIF Report's form is unchanged.
+
+| ID | Behaviour |
+| --- | --- |
+| D115 | Customer page, Reports section: when `customer-income-summary` is selected, the generate form is the tax year form of D114: one field, "Tax year", the same select, latest first and selected. Generate sends `{ reportId, parameters: { customerId: <page customer>, taxYear: <Y> } }`. No schedule form, because the report does not allow `scheduled`. A 400 is shown at the form with the server's message (for example a tax year that cannot be reported yet). There is no `Overseas` refusal for this report. History shows "Tax year <taxYear>" as for D114. |
+
 ### Adviser Balances for a past date
 
 Field rules: [valuation-history](../features/valuation-history.md) R16–R20 (the optional `date` of `adviser-balances`). Calls: the existing `POST /reports/request`; no new route or BFF prefix. Tests: the date input, `parameters.date` sent only when set, the disabled checkbox, a 400 on `date` shown at the input, and the History summary.
@@ -320,7 +330,7 @@ Portal tests assert routes, role visibility, that the Customer section calls `sc
 - Timezone display vs UTC cron (help text documents the first-cut limitation).
 - Result retention / purge (no UI for it).
 - Event-triggered executions (no UI).
-- Parameter schema for dynamic forms (hard-coded switch on the selected report; the Customer page has two shapes, Customer Transactions and FIF Report, the Reports tab one per Book or Tenant report).
+- Parameter schema for dynamic forms (hard-coded switch on the selected report; the Customer page has two shapes, Customer Transactions and the tax year form of the FIF Report and the Tax Year Income Summary, the Reports tab one per Book or Tenant report).
 
 ---
 
@@ -335,3 +345,4 @@ What changed in this file after it was accepted. Each row is a section above. Th
 | 2026-11-26 | — | The amendments became the sections above. No behaviour changed |
 | 2026-11-27 | — | Backend prerequisites: the Customer's `reports.customer.create` and the Tenant policies; the demo tenant's three grants. No behaviour changed |
 | 2026-11-28 | [fif-report](../features/fif-report.md) | Backend prerequisites: four seeded reports and the FIF Report PublicId. FIF Report (D114). Still open |
+| 2026-11-28 | [income-summary](../features/income-summary.md) | Backend prerequisites: five seeded reports and the Tax Year Income Summary PublicId. Tax Year Income Summary (D115). Still open |
