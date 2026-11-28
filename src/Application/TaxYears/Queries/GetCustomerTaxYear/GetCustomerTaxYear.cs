@@ -51,7 +51,8 @@ public class GetCustomerTaxYearQueryHandler(
             .ToList();
         return new CustomerTaxYearDto(
             customer.PublicId, year.TaxYear, year.From, year.To, CustomerTaxYear.Nzd, readAt, holdings, year.Complete, year.IncompleteCount,
-            Threshold(year.Threshold, read));
+            Threshold(year.Threshold, read),
+            null!);
     }
 
     /// <summary>Tax-cost-threshold R24: the threshold test with PublicIds.</summary>
@@ -104,7 +105,8 @@ public class GetCustomerTaxYearQueryHandler(
             holding.Complete,
             holding.Incomplete.Select(reason => reason.ToString()).ToList(),
             holding.Notices.Select(notice => notice.ToString()).ToList(),
-            Cost(holding.Cost));
+            Cost(holding.Cost),
+            null!);
     }
 
     private static TaxPointDto Point(TaxPoint point, CustomerTaxLedgerRead read) =>

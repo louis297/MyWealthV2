@@ -107,6 +107,13 @@ public class GetCustomerTaxYearAccessTests : TestBase
             var steps = threshold.GetProperty("steps").EnumerateArray().Select(step => step.GetProperty("transactionId").GetGuid()).ToList();
             steps.ShouldNotBeEmpty();
             steps.ShouldAllBe(id => world.T.Values.Contains(id));
+
+            // FIF income: the totals hold the Customer's own holding, prices and purchases only, once.
+            var income = year.GetProperty("fifIncome");
+            income.ValueKind.ShouldBe(JsonValueKind.Object);
+            (income.GetProperty("fdr").GetProperty("openingValue").GetDecimal(), income.GetProperty("fdr").GetProperty("income").GetDecimal(),
+                    income.GetProperty("cv").GetProperty("amount").GetDecimal(), income.GetProperty("complete").GetBoolean())
+                .ShouldBe((13_108.48m, 655.42m, 1_740.87m, true));
         }
     }
 }
