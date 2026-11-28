@@ -40,7 +40,19 @@ It is a Domain function with no I/O (roadmap T7). It reads no price, no rate and
 
 New: fields on the item of `GET /users/customers/{customerId}/tax-years/{taxYear}` (`fifIncome` on the item and on each tax holding); Domain types `FairDividendRate`, `FifIncome`, `TaxHoldingIncome`, `QuickSale` and their enums; `CustomerTaxYear.Compute` carries them. No route, script, table, permission, problem code, domain event, `TransactionType`, port, job or setting. No write changes. `CustomerTaxLedger` reads nothing more than it does today. No portal page and no simulator change.
 
-**Status is `accepted` (2026-11-28).** The eighteen points of §11 were confirmed on 2026-11-28, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract. Sections EX 51, EX 52 and EX 54 and the calculator were still not checked when it was accepted; they stay open (§11).
+**Status is `accepted` (2026-11-28).** The eighteen points of §11 were confirmed on 2026-11-28, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract. Sections EX 51, EX 52 and EX 54 and the calculator were still not checked when it was accepted; they stay open (§11). Landed 2026-11-28.
+
+Notes from landing:
+
+- §5: `FifIncome.Compute(taxYear, holdings, decimalPlaces)` returns the totals and `Holdings`, the income of each tax holding in the order it was given. `CustomerTaxYear.Compute` puts each on `TaxHolding.Income`; a `TaxHolding` built outside `Compute` has none. The per-holding figures are the records `FifFdr`, `QuickSale` (with `QuickSaleMatch`, `QuickSaleSale`, `QuickSaleDividendShare`) and `FifCv`; the totals `FifFdrTotals` and `FifCvTotals`; a reason of R23 `FifIncomeIncomplete`.
+- R7: `FairDividendRate.For` throws for a tax year before 2009, which cannot be read (tax-year-events R4).
+- R11: the average cost is rounded to 8 places away from zero.
+- R13: a purchase whose comparable change is not above 0 puts nothing on the stack.
+- R14: the proceeds are rounded per sale, and a dividend share per dividend; `dividendShares` lists only shares above 0.
+- R23: `incomplete` follows the order of the tax holdings in Domain (by Instrument), not the order of `holdings` in the answer (by symbol).
+- R26: an NZD figure of 0 is written with NZD's places (`0.00`), as every other NZD figure.
+- §10: in example 3 through the API, the Instruments are quoted in NZD on one NZD External account; the trade prices have up to three places, so that each principal is the figure of §1.1; the dividends go through `POST /transactions/dividend` with 15 % foreign tax; the first purchase of `QQQ` is in tax year 2025. The reversed purchase and the backdated entry each use an Instrument of their own; the backdated entry is in tax year 2025 and changes the FDR amount of 2026. S1 p.14's total of 15,000 is asserted in `FifIncomeTotalsTests`.
+- tax-year-events: the field list of the item in its tests gains `fifIncome`.
 
 The tax statements in this spec were read again from Inland Revenue on 2026-11-28 (§14). The Income Tax Act refused automated reads again, so sections EX 51, EX 52 and EX 54, which roadmap Q11 asked for, were not read; §14 says which rules rest on the guide and the commentaries alone. Nothing here is tax advice.
 
@@ -527,6 +539,11 @@ What the stored history must cover is what the tax year read needs (tax-year-eve
 
 ## 10. Tests
 
+| Project | Where |
+| --- | --- |
+| Domain.UnitTests | `Tax/FairDividendRateTests.cs`, `Tax/FifIncomeFdrTests.cs`, `Tax/QuickSalePeakTests.cs`, `Tax/QuickSaleGainTests.cs`, `Tax/FifIncomeCvTests.cs`, `Tax/FifIncomeTotalsTests.cs`, `Tax/CustomerTaxYearIncomeTests.cs`, with the tax holdings of the examples in `Tax/FifExamples.cs` |
+| Application.FunctionalTests | `TaxYears/GetCustomerTaxYearIncomeTests.cs`; `TaxYears/GetCustomerTaxYearAccessTests.cs` (the totals of two tenants); `TaxYears/GetCustomerTaxYearTests.cs` (the field list of the item) |
+
 | Project | Assert |
 | --- | --- |
 | Domain.UnitTests (`Tax/FairDividendRateTests`) | 0.05 for 2009, 2026 and 2027 |
@@ -643,16 +660,7 @@ Each doc was changed in place when this spec was accepted (2026-11-28).
 
 ## 13. Suggested commits
 
-Removed when the slice lands. The repository builds after each commit. Each line is one behaviour; an agent splits it into red then green.
-
-1. `FairDividendRate.For`: 0.05 for tax year 2009 and every later one.
-2. `FifIncome.Compute`: which tax holdings are computed, with the status and the reason of each, and the FDR amount. S1 p.14 and S2 Example 1.
-3. The peak holding method amount of a tax holding: the differential on comparable quantities, the average cost over the purchases of the year. S1 p.15, S8 Examples 4 and 5, example 2.
-4. The quick sale gain amount of a tax holding: the matching, the matched proceeds, the dividend shares and the cost at the average. The same examples.
-5. The CV amount of a tax holding: sales, dividends at the gross plus the imputation credit, purchases. S1 p.14, S2 Example 1, S8 Examples 1 to 4, example 1.
-6. The totals: the quick sale adjustment as the lesser of two totals, the FDR income, the CV income not below zero, `lower`, the reasons and when no total is given. Example 3.
-7. `CustomerTaxYear.Compute` carries the income, and `GET /users/customers/{customerId}/tax-years/{taxYear}` answers the fields of R26, with the tenant isolation.
-8. Landing: the docs of §12, with the landing notes.
+Removed when the slice landed (2026-11-28). The commits are in git.
 
 ---
 
