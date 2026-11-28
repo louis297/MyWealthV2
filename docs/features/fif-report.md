@@ -43,7 +43,25 @@ The report is a reader. It computes no tax figure of its own: every number it pr
 
 New: catalog report `customer-fif` (script `0062_fif_report.sql`, one row); its parameters `{ customerId, taxYear }`; Application types `CustomerFifBinder`, `CustomerFifReport`, `CustomerFifPdf` and `CustomerFifReportGenerator`; the Domain rule `NewZealandTime`; a branch in `RequestReport`; the fourth grant of the demo seed and of `TestSeed`; a parameter form on the Customer page of the Adviser Portal and on the Reports page of the Customer Portal. No route, table, permission, problem code, domain event, `TransactionType`, port, job or setting. No write to the ledger. `CustomerTaxLedger` and the tax year read do not change. No simulator change.
 
-**Status is `accepted` (2026-11-28).** The nineteen points of §11 were confirmed on 2026-11-28, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract. The sentences the report prints about the tax rules were not read by a person who knows the rules when it was accepted; that stays open (§11).
+**Status is `accepted` (2026-11-28).** The nineteen points of §11 were confirmed on 2026-11-28, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract. The sentences the report prints about the tax rules were not read by a person who knows the rules when it was accepted; that stays open (§11). Landed 2026-11-28.
+
+Notes from landing:
+
+- §7: `CustomerFifReport.Build(read, names, residency, generatedAt, ledgerReadAt)` takes `CustomerTaxLedgerRead` and a `CustomerFifNames` (the Tenant's and the Customer's names, the account names by internal id, the decimal places of each currency) and gives a `CustomerFifContent`: the header lines, the sections, each a list of `CustomerFifText` (a line, or a heading) and `CustomerFifTable` (column titles and rows of cells), and what the footer says. `CustomerFifPdf.Render` lays that out and chooses no word. The tax residency is read by `CustomerFifBinder.ResidencyAsync`, which both the request and the generator call, and the refusal is `CustomerFifBinder.OverseasMessage` in both places.
+- R6: the binder reads numbers strictly, because the web defaults of `System.Text.Json` read a number from a string; `"2026"` is then 400 `errors.parameters`.
+- R9: the generator takes the platform time when the job starts as the generation time, and again just before the one call of `CustomerTaxLedger.ReadAsync` as `ledgerReadAt`. The account names come from `Accounts`, and the decimal places from the currency catalog.
+- R14: a quantity or a rate is rounded to 8 places away from zero before its trailing zeros are dropped.
+- R15: the count of holdings affected is over every tax holding of the year; a reason with no holding (`NoThreshold`) makes the report incomplete with "0 of {m} holdings are affected".
+- R18: the table of a group has the columns Symbol, Name, Issuer country, Treatment, Classified from, Note, Opening, Closing and FIF income. The note of `ExemptOther` is in its label, not again in the Note column. The two sentences under the second and the third group are printed also when the group is "None.".
+- R19: the table of the holdings that count lists the `Attributing` and `AttributingNoFdr` tax holdings, "not known: {cause} since {time}" for an unknown cost; with none, "No attributing interest in this tax year.". The sentence of the outcome is in section 4 only when a threshold is set; without one, the first line of the section says so.
+- R20: a row of a holding that is not computed has its symbol and its status, and empty cells.
+- R21: sections 5 to 9 take the tax holdings in the order of section 3, by group, then as the read sorts them. The block is headed "{symbol} {name}", then the issuer country, the label and the tax year of the row on one line. The rate cell of a line with no conversion reads "no conversion". An event whose amount is missing for a reason of §4.6 reads "not available ({label})"; a share reorganisation and a correction, which have no amount, leave the cell empty. A cost change of 0 is left empty; a cost that is not known reads "not known". The quick sale prints every match, and the sales and dividend shares that have shares matched. A holding that is `HoldingIncomplete` reads "Its FIF income is not computed: a figure it needs is missing. See section 9.".
+- R22: two tables, one per tax holding and one per country with the row "Total". A holding not computed reads "not computed" in the FDR and CV columns.
+- R23: a rate row's pair is read from what it converted: the currency of the price of a line or of an arrival, of the trade or the dividend of an event, or of the carried cost; otherwise the Instrument's quote currency. Prices are listed in the order of the holdings, then by date; rates by pair, then by date. With none, "None.".
+- R24: "What is missing" lists the reasons of every tax holding, also one of the second group, so that an incomplete report always says why; "What these figures rest on" lists the notices of the first and the third group only. `NoThreshold` is the first line.
+- §4.4: a column of a table is as wide as its longest cell, between 3 and 50 characters, so that an amount such as a move keeps to one line. The footer reads "{customer}  FIF Report, tax year {Y}  Page {n} of {m}" and then "Incomplete".
+- §10: the content tests build the tax year with `TaxWorkedExample` of Domain.UnitTests, linked into Application.UnitTests, and change it with `with`. The functional catalog seed (`FunctionalTestSetup`) gains the row, and the tests that list the catalog or the grants (`GetReportCatalogTests`, `GetTenantReportsTests`, `RevokeTenantReportTests`, `DevelopmentSeedSecondFirmTests`) count four reports.
+- §9: each portal has `reportableTaxYears` and `taxYearLabel` in `src/shared/time/taxYears.ts`. The Customer Portal's Reports page now shows the messages of a 400 at the form for both of its forms, and keeps "Report is not available." for any other failure.
 
 The tax statements the report makes about itself were read again from Inland Revenue on 2026-11-28 (§14), this time from the pages of the two PDFs themselves. The slice states no rule of the Income Tax Act that an earlier spec did not state, so no section of the Act was asked for. Nothing here is tax advice, and the report says the same of itself.
 
@@ -567,6 +585,8 @@ So the first complete report of a holding of the demo catalog that was held over
 | Infrastructure.IntegrationTests (`AppliedSchema/ReportsSchemaTests`, `AppliedSchema/TestSeedReportsTests`, the demo seed tests) | The catalog row of R1 after the scripts ran, once after a second run; `TestSeed` and the demo seed grant four reports; a demo tenant with three grants gets the fourth and keeps the three |
 | Adviser Portal and Customer Portal tests | The form appears for the report's code; the tax years offered on 1 April and on 2 April of a year; the body of §8.1; no schedule form; "Tax year {Y}" in the History summary; a 400 message at the form |
 
+Also: `Reports/CustomerFifReportDetailTests` (sections 6 to 9) and `Reports/FifReportFixture` in Application.UnitTests; `shared/time/taxYears.test.ts` and `features/customers/CustomerDetailPage.test.tsx` in the Adviser Portal; `shared/time/taxYears.test.ts` and `portal.test.tsx` in the Customer Portal.
+
 The schema change touches `database/schema/`, so the whole of Infrastructure.IntegrationTests runs before its commit.
 
 ---
@@ -676,19 +696,7 @@ Each doc was changed in place when this spec was accepted (2026-11-28).
 
 ## 13. Suggested commits
 
-Removed when the slice lands. The repository builds after each commit. Each line is one behaviour; an agent splits it into red then green.
-
-1. `NewZealandTime`: the offset and the local time of an instant, and midnight on 1 April at the start of every tax year.
-2. Script `0062`: the catalog row `customer-fif`, with the demo seed and `TestSeed` granting four reports.
-3. `CustomerFifBinder`: the two parameters, the unknown field, and which tax years can be reported.
-4. `POST /reports/request` for the report: the scope, the 404 cases, the tax residency, the snapshot; a schedule is 404. With the tenant isolation.
-5. `CustomerFifReport.Build`, the header and sections 1 to 5: complete, the statements, the summary and its sentences, the classification, the threshold test and the totals.
-6. `CustomerFifReport.Build`, sections 6 to 9: the block of a tax holding, the tax taken from dividends, the prices and rates used, and the sentences of every reason and notice.
-7. `CustomerFifPdf.Render`: the pages, the footer and the text of §1.1.
-8. `CustomerFifReportGenerator`: the worked example through the API and the job, a stored report that does not change, an incomplete report, and a residency changed before the job.
-9. Adviser Portal: the form on the Customer page (D114).
-10. Customer Portal: the form on the Reports page (C50, C51).
-11. Landing: the docs of §12, with the landing notes.
+Removed when the slice landed (2026-11-28). The commits are in git.
 
 ---
 
