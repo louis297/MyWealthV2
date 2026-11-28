@@ -32,6 +32,7 @@
     <ItemGroup>
         <!-- The worked example of tax-year-events §1.1, shared with the FIF report tests (fif-report §1.1). -->
         <Compile Include="..\Domain.UnitTests\Tax\TaxWorkedExample.cs" Link="Reports\TaxWorkedExample.cs" />
+        <Compile Include="..\Domain.UnitTests\Tax\IncomeWorkedExample.cs" Link="Reports\IncomeWorkedExample.cs" />
     </ItemGroup>
 
 </Project>

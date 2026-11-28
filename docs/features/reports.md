@@ -22,6 +22,7 @@ related:
   - interest-run.md
   - dividends.md
   - fif-report.md
+  - income-summary.md
 ---
 
 # Reports
@@ -35,7 +36,7 @@ First phase ships two reports and both UI entry points:
 
 Both support manual trigger and editable recurring schedules in the first phase. Event plumbing is present; concrete events are not locked.
 
-Later slices add a third and a fourth report: the **Bank Reconciliation Report** (`Tenant` scope, [bank-reconciliation.md](bank-reconciliation.md)) and the **FIF Report** (`Customer` scope, manual only, [fif-report.md](fif-report.md)), the FIF figures of one Customer for one New Zealand tax year, surfaced on the Customer page and on the Customer Portal's Reports page.
+Later slices add a third and a fourth report: the **Bank Reconciliation Report** (`Tenant` scope, [bank-reconciliation.md](bank-reconciliation.md)) and the **FIF Report** (`Customer` scope, manual only, [fif-report.md](fif-report.md)), the FIF figures of one Customer for one New Zealand tax year, surfaced on the Customer page and on the Customer Portal's Reports page. A fifth, the **Tax Year Income Summary** (`Customer` scope, manual only, [income-summary.md](income-summary.md)), lists the dividends and interest of one Customer for one tax year, in NZD, with the tax taken, through the same two entry points.
 
 **Status is `accepted`.** Implementation follows this file.
 
@@ -175,7 +176,7 @@ Script: `database/schema/0019_reports.sql`.
 
 Hangfire tables in schema `Hangfire`.
 
-Seed the two first-phase reports (by Code) in `0019_reports.sql`; `0045` adds `bank-reconciliation` and `0062` adds `customer-fif`. The demo tenant's grants are in §6.1. New tenants are **not** auto-granted.
+Seed the two first-phase reports (by Code) in `0019_reports.sql`; `0045` adds `bank-reconciliation`, `0062` adds `customer-fif` and `0063` adds `customer-income-summary`. The demo tenant's grants are in §6.1. New tenants are **not** auto-granted.
 
 ### 6.1 Scope and AllowedTriggers columns
 
@@ -183,8 +184,8 @@ These are ordinary `nvarchar` columns on `Reports`, not extra tables and not int
 
 - `Scope`: `"Customer"`, `"Book"` or `"Tenant"` (`CK_Reports_Scope`; `Tenant` from script `0045`). Selects which policy pair applies (`reports.customer.*`, `reports.book.*` or `reports.tenant.*`) and which parameter set the generator expects. A `Tenant` report runs across the whole Tenant.
 - `AllowedTriggers`: which of manual / scheduled / event this report accepts. Stored as a JSON array, for example `["manual","scheduled"]`. The pipeline rejects a trigger the report does not allow.
-- Seeded codes: `customer-transactions` (PublicId `8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11`, scope `Customer`), `adviser-balances` (PublicId `5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22`, scope `Book`) `bank-reconciliation` (PublicId `3e7b9d14-6c2a-4f58-b0e1-9a4d2c7f8e33`, scope `Tenant`) and `customer-fif` (PublicId `7d2f6b48-1a9c-4e35-a7d0-5c8e3b1f9a44`, scope `Customer`, script `0062`). The first three allow `manual` and `scheduled`; `customer-fif` allows `manual` only ([fif-report.md](fif-report.md) R4).
-- Grants: `webapi --seed-demo` and `TestSeed` grant the four reports to the demo tenant; `--seed-demo` does it in any environment, does not grant a platform-inactive report, and is idempotent on `(TenantId, ReportId)` ([demo-tenant-seed.md](demo-tenant-seed.md)). Other tenants are not auto-granted.
+- Seeded codes: `customer-transactions` (PublicId `8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11`, scope `Customer`), `adviser-balances` (PublicId `5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22`, scope `Book`) `bank-reconciliation` (PublicId `3e7b9d14-6c2a-4f58-b0e1-9a4d2c7f8e33`, scope `Tenant`), `customer-fif` (PublicId `7d2f6b48-1a9c-4e35-a7d0-5c8e3b1f9a44`, scope `Customer`, script `0062`) and `customer-income-summary` (PublicId `4b6e2d91-3f7a-4c18-9d52-8a1e7c0b6f55`, scope `Customer`, script `0063`). The first three allow `manual` and `scheduled`; `customer-fif` and `customer-income-summary` allow `manual` only ([fif-report.md](fif-report.md) R4, [income-summary.md](income-summary.md) R17).
+- Grants: `webapi --seed-demo` and `TestSeed` grant the five reports to the demo tenant; `--seed-demo` does it in any environment, does not grant a platform-inactive report, and is idempotent on `(TenantId, ReportId)` ([demo-tenant-seed.md](demo-tenant-seed.md)). Other tenants are not auto-granted.
 
 No separate lookup table in this phase.
 
@@ -257,6 +258,7 @@ Manual request and schedule create both use:
 - Adviser Balances Report: `{ "adviserId": "uuid", "includeClosedAccounts": false }` (Adviser may omit `adviserId`), or with `"date": "2026-03-11"` for the end of a past day on a manual request ([valuation-history.md](valuation-history.md) R16). The snapshot keeps `date` only when it was sent
 - Bank Reconciliation Report: `{ "clientMoneyAccountId": "uuid", "reconciliationId": "uuid" }` (`reconciliationId` optional; [bank-reconciliation.md](bank-reconciliation.md) R22–R25)
 - FIF Report: `{ "customerId": "uuid", "taxYear": 2026 }`, both required; `taxYear` a JSON whole number of a tax year that can be reported ([fif-report.md](fif-report.md) R6, R7). No `asOf`
+- Tax Year Income Summary: `{ "customerId": "uuid", "taxYear": 2026 }`, with the checks of the FIF Report ([income-summary.md](income-summary.md) R18). No `asOf`
 
 Schedule create adds `cron` and `isActive` beside `parameters`, not inside it.
 
@@ -463,6 +465,10 @@ Scope: `Tenant`. Parameters `{ clientMoneyAccountId, reconciliationId? }`. It re
 
 Scope: `Customer`, manual only. Parameters `{ customerId, taxYear }`. It prints the tax year read of one Customer for one tax year that has ended, in New Zealand time, A4 landscape, with a footer on every page. An `Overseas` Customer is refused (400). Field rules, sections and words: [fif-report.md](fif-report.md) §4.
 
+### 9.2c Tax Year Income Summary
+
+Scope: `Customer`, manual only. Parameters `{ customerId, taxYear }`. It prints the `interest` and `income` fields of the tax year read of one Customer for one tax year that has ended: the dividends in four groups by the FIF treatment of the Instrument, the interest per Account, the tax taken and the imputation credits, every payment and every rate used, in New Zealand time, A4 landscape, with a footer on every page. An `Overseas` Customer is not refused. Field rules, sections and words: [income-summary.md](income-summary.md) §4.
+
 ### 9.3 PDF
 
 - Format: PDF only.
@@ -482,7 +488,7 @@ Adviser Portal only in this phase.
 - Generate section with a report dropdown (Customer-scoped granted active reports). Selecting a report shows its hard-coded parameter form.
 - Schedules panel and History panel are separate. History defaults to all Customer-scoped executions; a report filter adds `reportId`.
 - Implicit customerId = the page’s Customer.
-- Two hard-coded forms: Customer Transactions (from, to, include closed) and FIF Report (a tax year; [fif-report.md](fif-report.md) R27).
+- Two hard-coded forms: Customer Transactions (from, to, include closed) and the tax year form (a tax year; [fif-report.md](fif-report.md) R27), which serves the FIF Report and the Tax Year Income Summary ([income-summary.md](income-summary.md) R34).
 - Schedule create is offered only when the selected report’s `allowedTriggers` includes `"scheduled"`.
 
 **Reports page (`/reports`)**
@@ -524,14 +530,14 @@ No new ADR beyond [0017](../adr/0017-background-worker.md).
 | Generator | Registry: ReportId → IReportGenerator. Hangfire entry point is fixed (`Execute(executionId)`) |
 | Policies | `reports.customer.read/create`, `reports.book.read/create`, `reports.tenant.read/create` |
 | Roles | Customer: `reports.customer.read` and `reports.customer.create` (request for self only, R5). TenantAdmin: all six. Adviser: the Customer and Book four. SystemAdmin: none; catalog list, grant, and revoke use `tenants.manage` |
-| First reports | Customer Transactions Report + Adviser Balances Report. Later: Bank Reconciliation Report ([bank-reconciliation.md](bank-reconciliation.md)), FIF Report ([fif-report.md](fif-report.md)) |
+| First reports | Customer Transactions Report + Adviser Balances Report. Later: Bank Reconciliation Report ([bank-reconciliation.md](bank-reconciliation.md)), FIF Report ([fif-report.md](fif-report.md)), Tax Year Income Summary ([income-summary.md](income-summary.md)) |
 | PDF | QuestPDF. No MD→PDF. No template files |
 | Result storage | Aspire-mounted volume shared by worker and webapi. `ResultStorageKey` stores relative key including file name: `{tenantPublicId}/{executionPublicId}.pdf` |
 | Parameters | JSON, max 8 KB, known fields only |
 | asOf | Server-set on Adviser Balances when the execution is created. Not a client parameter |
 | Schedules | Multiple active schedules allowed. Disable only (no hard delete). Recurring job id = Schedule.PublicId |
 | Errors | Bad parameters 400. Unknown report / not granted / out of scope 404. Policy fail 403 |
-| Triggers in phase | Manual + scheduled for the first three; manual only for the FIF Report; event plumbing only |
+| Triggers in phase | Manual + scheduled for the first three; manual only for the FIF Report and the Tax Year Income Summary; event plumbing only |
 | UI | Customer page section + Reports tab |
 
 Still open:
@@ -565,3 +571,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-27 | — | §8: the status codes and shape of `GET /reports/executions/{id}` written out next to the list. The route was in the §8 table but not built; it is now. No rule changed |
 | 2026-11-27 | [external-income.md](external-income.md) | §9.1: a hand-entered dividend and a hand `Interest` with tax show the net and the Tax column |
 | 2026-11-28 | [fif-report.md](fif-report.md) | Intro, §6, §6.1, §7.1, §9.2b, §10, §12: a fourth report `customer-fif`, scope `Customer`, manual only, script `0062`, four demo grants |
+| 2026-11-28 | [income-summary.md](income-summary.md) | Intro, §6, §6.1, §7.1, §9.2c, §10, §12: a fifth report `customer-income-summary`, scope `Customer`, manual only, script `0063`, five demo grants; the tax year form serves two reports |

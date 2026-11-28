@@ -14,7 +14,103 @@ public sealed record CustomerTaxYearDto(
     bool Complete,
     int IncompleteCount,
     ThresholdDto Threshold,
-    FifIncomeDto FifIncome);
+    FifIncomeDto FifIncome,
+    IReadOnlyList<TaxInterestItemDto> Interest,
+    IncomeSummaryDto Income);
+
+/// <summary>Income-summary R3, R13: an interest item of the tax year. <c>amount</c> is the gross in NZD, signed; the
+/// figures in NZD are <c>null</c> when they could not be worked out; <c>ledger</c> holds them in the Account's
+/// currency; <c>period</c> is <c>null</c> on a hand-entered <c>Interest</c>.</summary>
+public sealed record TaxInterestItemDto(
+    int Sequence,
+    DateTimeOffset BookedAt,
+    Guid TransactionId,
+    Guid AccountId,
+    string CustodyMode,
+    decimal? Amount,
+    string Status,
+    TaxInterestLedgerDto Ledger,
+    AccountValuationFxDto? Fx,
+    decimal? Rwt,
+    decimal? Nrwt,
+    decimal? ForeignTax,
+    TaxInterestPeriodDto? Period);
+
+public sealed record TaxInterestLedgerDto(string Currency, decimal Gross, decimal Rwt, decimal Nrwt, decimal ForeignTax);
+
+public sealed record TaxInterestPeriodDto(DateOnly From, DateOnly To, int Days);
+
+/// <summary>Income-summary R13: the income summary. Every figure is in NZD, and <c>null</c> when a payment it counts has
+/// a missing figure (R10).</summary>
+public sealed record IncomeSummaryDto(
+    IncomeDividendsDto Dividends,
+    IncomeInterestDto Interest,
+    IncomeTaxWithheldDto TaxWithheld,
+    decimal? ImputationCredit,
+    bool Complete,
+    IReadOnlyList<IncomeIncompleteDto> Incomplete,
+    IReadOnlyList<IncomeNoticeDto> Notices);
+
+public sealed record IncomeDividendsDto(IReadOnlyList<IncomeGroupDto> Groups, IncomeDividendSumDto Total);
+
+public sealed record IncomeGroupDto(
+    string Group,
+    IReadOnlyList<IncomeHoldingRowDto> Holdings,
+    IReadOnlyList<IncomeCountryRowDto> Countries,
+    IncomeDividendSumDto Total);
+
+public sealed record IncomeHoldingRowDto(
+    Guid InstrumentId,
+    string? IssuerCountry,
+    int Count,
+    decimal? Gross,
+    decimal? ImputationCredit,
+    decimal? GrossWithImputation,
+    decimal? ForeignTax,
+    decimal? Rwt,
+    decimal? Nrwt);
+
+public sealed record IncomeCountryRowDto(
+    string? IssuerCountry,
+    int Count,
+    decimal? Gross,
+    decimal? ImputationCredit,
+    decimal? GrossWithImputation,
+    decimal? ForeignTax,
+    decimal? Rwt,
+    decimal? Nrwt);
+
+public sealed record IncomeDividendSumDto(
+    int Count,
+    decimal? Gross,
+    decimal? ImputationCredit,
+    decimal? GrossWithImputation,
+    decimal? ForeignTax,
+    decimal? Rwt,
+    decimal? Nrwt);
+
+public sealed record IncomeInterestDto(IReadOnlyList<IncomeAccountRowDto> Accounts, IncomeInterestSumDto Total);
+
+public sealed record IncomeAccountRowDto(
+    Guid AccountId,
+    string CustodyMode,
+    string Currency,
+    int Count,
+    decimal? Received,
+    decimal? Charged,
+    decimal? Rwt,
+    decimal? Nrwt,
+    decimal? ForeignTax);
+
+public sealed record IncomeInterestSumDto(int Count, decimal? Received, decimal? Charged, decimal? Rwt, decimal? Nrwt, decimal? ForeignTax);
+
+public sealed record IncomeTaxWithheldDto(decimal? Rwt, decimal? Nrwt, decimal? ForeignTax);
+
+/// <summary>R11: a reason, of a tax holding (<c>instrumentId</c>) or of an Account (<c>accountId</c>).</summary>
+public sealed record IncomeIncompleteDto(string Reason, Guid? InstrumentId, Guid? AccountId);
+
+/// <summary>R12: a notice, of a tax holding (<c>instrumentId</c>) or of an Account (<c>accountId</c>).</summary>
+public sealed record IncomeNoticeDto(string Notice, Guid? InstrumentId, Guid? AccountId);
 
 /// <summary>FIF income R26: the totals of both methods over the computed tax holdings, or <c>null</c> when a tax holding
 /// that belongs in them is missing (R23). Every amount is in NZD.</summary>

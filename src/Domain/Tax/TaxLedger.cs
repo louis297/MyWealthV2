@@ -25,6 +25,42 @@ public static class TaxLedger
     }
 
     /// <summary>
+    /// Income-summary R3: one item per <c>Interest</c> of <paramref name="facts"/>, in the order of R8. A reversed
+    /// Transaction and every Reversal give none. <see cref="Build"/> gives no event for an <c>Interest</c> (R17).
+    /// </summary>
+    public static IReadOnlyList<TaxInterest> BuildInterest(IEnumerable<LedgerFact> facts)
+    {
+        var items = new List<TaxInterest>();
+        foreach (var fact in facts
+                     .Where(fact => fact.Type == TransactionType.Interest && !fact.Reversed)
+                     .OrderBy(fact => fact.BookedAt.UtcDateTime)
+                     .ThenBy(fact => fact.TransactionId))
+        {
+            if (fact.CashLegs.FirstOrDefault(leg => leg.Role == CashLegRole.Principal) is not { } principal)
+            {
+                continue;
+            }
+
+            var legs = fact.CashLegs.Where(leg => leg.AccountId == principal.AccountId).ToList();
+            items.Add(new TaxInterest(
+                items.Count,
+                fact.TransactionId,
+                fact.TransactionPublicId,
+                fact.BookedAt,
+                principal.AccountId,
+                principal.CustodyMode,
+                CurrencyOf(legs),
+                legs.Where(leg => leg.Role == CashLegRole.Principal).Sum(leg => leg.Amount),
+                Tax(legs, TaxKind.Rwt),
+                Tax(legs, TaxKind.Nrwt),
+                Tax(legs, TaxKind.ForeignWithholding),
+                fact.Interest));
+        }
+
+        return items;
+    }
+
+    /// <summary>
     /// R22: each Account's quantity of each Instrument before <paramref name="instant"/>, from the events booked before
     /// it; a move counts from its later leg. A quantity of 0 is left out.
     /// </summary>

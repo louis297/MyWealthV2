@@ -92,6 +92,13 @@ public class RequestReportCommandHandler(
 
             snapshotJson = binding.SnapshotJson;
         }
+        else if (report.Code == CustomerIncomeSummaryBinder.Code)
+        {
+            // Income-summary R16, R19: the scope of a Customer report; the tax residency is not read.
+            var binding = CustomerIncomeSummaryBinder.Bind(request.Parameters, LedgerDay.Of(time.GetUtcNow()));
+            await EnsureCustomerInScopeAsync(binding.CustomerId, tenantId, role, cancellationToken);
+            snapshotJson = binding.SnapshotJson;
+        }
         else if (report.Code == BankReconciliationBinder.Code)
         {
             var binding = BankReconciliationBinder.Bind(request.Parameters);

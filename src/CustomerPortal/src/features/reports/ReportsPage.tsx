@@ -12,7 +12,8 @@ import {
 import { reportableTaxYears, taxYearLabel } from "@/shared/time/taxYears";
 
 const customerTransactions = "customer-transactions";
-const customerFif = "customer-fif";
+/** The reports whose form is one tax year: the FIF Report (C50) and the Tax Year Income Summary (C52). */
+const taxYearReports = ["customer-fif", "customer-income-summary"];
 
 /** The messages of a 400 problem body, or none. */
 function problemMessages(error: unknown): string[] {
@@ -42,8 +43,8 @@ export function ReportsPage() {
 
   const selected = reports.data?.find((item) => item.id === selectedId);
   const transactions = selected?.code === customerTransactions;
-  const fif = selected?.code === customerFif;
-  const known = transactions || fif;
+  const taxYearForm = selected !== undefined && taxYearReports.includes(selected.code);
+  const known = transactions || taxYearForm;
   const attempts = useRef(0);
   const refetchExecution = polled.refetch;
 
@@ -77,7 +78,7 @@ export function ReportsPage() {
     try {
       const created = await requestReport({
         reportId: selected.id,
-        parameters: fif
+        parameters: taxYearForm
           ? { customerId: me.id, taxYear: Number(taxYear) }
           : {
               customerId: me.id,
@@ -137,7 +138,7 @@ export function ReportsPage() {
       {selected && known ? (
         <form className="flex w-full max-w-sm flex-col gap-3" onSubmit={(event) => void onGenerate(event)}>
           <Messages messages={messages} />
-          {fif ? (
+          {taxYearForm ? (
             <SelectField
               id="report-tax-year"
               label="Tax year"

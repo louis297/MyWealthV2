@@ -155,7 +155,7 @@ What the rows mean for other tax years (R10, R11):
 | --- | --- |
 | R1 | **Access.** No new permission. `PUT /instruments/{id}/tax-attributes` takes `instruments.manage`, with the rules of `PUT /instruments/{id}` (instruments R1, R2, R4, R4a): missing / dead Bearer → 401, never 302; Adviser and Customer → 403; a disabled current tenant → 403; another tenant's or a missing id → 404 for a TenantAdmin; a SystemAdmin may write any tenant's Instrument by its PublicId. The two fields are read with `instruments.read` by everyone who can read the Instrument. `GET /countries` is for any authenticated caller, as `GET /currencies`: it has no policy of its own, and a missing / dead Bearer → 401. |
 | R2 | **Who classifies (roadmap Q6).** A person with `instruments.manage`, by hand, per Tenant, because the catalog is the Tenant's. Two Tenants may hold the same symbol and classify it differently. The platform calls no Inland Revenue tool and no other outside source, and it never sets, suggests or changes a tax attribute outside the seeds of §4.7. |
-| R3 | **Nothing reads it yet.** In this slice no write, valuation, report, job or portal page reads the tax attributes. An Instrument with no country and no treatment is created, traded, valued and reported exactly as today. |
+| R3 | **Nothing reads it yet.** In this slice no write, valuation, report, job or portal page reads the tax attributes. An Instrument with no country and no treatment is created, traded, valued and reported exactly as today. The later readers are listed under "Still open": the income summary reads the treatment of the year to group dividends and prints the issuer country ([income-summary.md](income-summary.md) R6, R27). |
 
 ### 4.2 Issuer country
 
@@ -519,7 +519,7 @@ Each point states the recommendation, written into the rules above, and the alte
 Still open, not this slice:
 
 - Running Inland Revenue's tool again for BHP, CBA and WOW once it answers for tax year 2027, and replacing the assumed rows of the demo catalog in each tenant that has them (§5.1)
-- Everything that reads the attributes: roadmap TR6. TR5 prints them in the FIF report ([fif-report.md](fif-report.md) R18). TR2 reads them in [tax-year-events.md](tax-year-events.md), which marks a dividend whose tax source disagrees with the issuer country with a notice (its R29). TR3 reads the treatment of the year and of the earlier years a holding was held in ([tax-cost-threshold.md](tax-cost-threshold.md) R16, R22). TR4 reads the treatment of the year to decide which tax holdings it computes ([fif-income.md](fif-income.md) R3)
+- Everything that reads the attributes: TR6 groups the dividends of a tax year by the treatment of the year and prints the issuer country in the income summary ([income-summary.md](income-summary.md) R6, R27). TR5 prints them in the FIF report ([fif-report.md](fif-report.md) R18). TR2 reads them in [tax-year-events.md](tax-year-events.md), which marks a dividend whose tax source disagrees with the issuer country with a notice (its R29). TR3 reads the treatment of the year and of the earlier years a holding was held in ([tax-cost-threshold.md](tax-cost-threshold.md) R16, R22). TR4 reads the treatment of the year to decide which tax holdings it computes ([fif-income.md](fif-income.md) R3)
 - An Instruments page in the Adviser Portal, with the tax attributes, for the TenantAdmin
 - A list of the Instruments not classified for a tax year, and a way to confirm last year's exemptions for the next year in one step
 - An issuer that changes its country of tax residence (point 2)

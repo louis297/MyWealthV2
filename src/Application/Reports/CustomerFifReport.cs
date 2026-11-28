@@ -4,6 +4,7 @@ using MyWealthV2.Application.Valuations;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Tax;
 using MyWealthV2.Domain.Valuations;
+using static MyWealthV2.Application.Reports.TaxReportFormat;
 
 namespace MyWealthV2.Application.Reports;
 
@@ -15,8 +16,6 @@ namespace MyWealthV2.Application.Reports;
 public static partial class CustomerFifReport
 {
     public const string Title = "FIF Report";
-
-    private const string NotAvailable = "not available";
 
     public static CustomerFifContent Build(
         CustomerTaxLedgerRead read,
@@ -426,45 +425,6 @@ public static partial class CustomerFifReport
         private static CustomerFifText Text(string text) => new(text);
     }
 
-    /// <summary>R14: a quantity or a rate as the read gives it, with up to 8 decimal places and no trailing zeros.</summary>
-    internal static string Number(decimal value) =>
-        Math.Round(value, 8, MidpointRounding.AwayFromZero).ToString("0.########", CultureInfo.InvariantCulture);
-
-    internal static string Signed(decimal value) => value > 0m ? "+" + Number(value) : Number(value);
-
-    /// <summary>R13: an instant in New Zealand time, or in UTC with "UTC" after it before the rule of 2007.</summary>
-    internal static string Time(DateTimeOffset instant) =>
-        NewZealandTime.Local(instant) is { } local
-            ? local.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
-            : UtcMinute(instant) + " UTC";
-
-    /// <summary>R15: "{New Zealand time} New Zealand time ({UTC} UTC)".</summary>
-    private static string Instant(DateTimeOffset instant) =>
-        $"{Time(instant)} New Zealand time ({instant.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)} UTC)";
-
-    private static string UtcMinute(DateTimeOffset instant) =>
-        instant.UtcDateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
-
-    internal static string Date(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-
-    private static string ResidencyLabel(TaxResidency residency) =>
-        residency == TaxResidency.NewZealand ? "New Zealand" : "Overseas";
-
-    /// <summary>R18: the issuer country by its name in the list of instrument-tax-attributes R6.</summary>
-    private static string? CountryName(string? code) =>
-        code is null ? null : Domain.Instruments.Countries.All.FirstOrDefault(country => country.Code == code)?.Name ?? code;
-
-    /// <summary>§4.6: the label of a treatment.</summary>
-    private static string TreatmentLabel(TaxTreatment treatment) => treatment.FifTreatment switch
-    {
-        FifTreatment.Attributing => "Attributing interest",
-        FifTreatment.AttributingNoFdr => "Attributing interest, fair dividend rate not allowed",
-        FifTreatment.ExemptAsxListed => "Exempt: ASX-listed Australian share",
-        FifTreatment.ExemptOther => $"Exempt: {treatment.Note}",
-        FifTreatment.NotForeign => "Not foreign (New Zealand)",
-        _ => "Not classified"
-    };
-
     /// <summary>§4.6: the label of a tax event.</summary>
     internal static string KindLabel(TaxEventKind kind) => kind switch
     {
@@ -486,27 +446,5 @@ public static partial class CustomerFifReport
         TaxCostUnknownCause.StaleRate => "the exchange rate stored for the day of a purchase is too old",
         TaxCostUnknownCause.NegativeQuantity => "more was sold or transferred out than was held",
         _ => "a correction left a cost below 0"
-    };
-
-    /// <summary>§4.6: the label of a status that leaves a figure missing.</summary>
-    internal static string StatusLabel(ValuationLineStatus status) => status switch
-    {
-        ValuationLineStatus.NoRate => "No exchange rate",
-        ValuationLineStatus.StaleRate => "Exchange rate too old",
-        ValuationLineStatus.NoPrice => "No price",
-        ValuationLineStatus.StalePrice => "Price too old",
-        ValuationLineStatus.PriceBeforeCorporateAction => "Price from before a corporate action",
-        ValuationLineStatus.NegativeQuantity => "Quantity below 0",
-        _ => ""
-    };
-
-    /// <summary>§4.6: the label of the status of an event's amount, when it is missing.</summary>
-    internal static string StatusLabel(TaxAmountStatus status) => status switch
-    {
-        TaxAmountStatus.NoRate => "No exchange rate",
-        TaxAmountStatus.StaleRate => "Exchange rate too old",
-        TaxAmountStatus.NoPrice => "No price",
-        TaxAmountStatus.StalePrice => "Price too old",
-        _ => ""
     };
 }

@@ -15,7 +15,9 @@ public sealed record CustomerTaxYear(
     bool Complete,
     int IncompleteCount,
     ThresholdTest Threshold,
-    FifIncome FifIncome)
+    FifIncome FifIncome,
+    IReadOnlyList<TaxYearInterest> Interest,
+    TaxYearIncome Income)
 {
     /// <summary>
     /// R18, R21–R29 over the events of <see cref="TaxLedger.Build"/>. <paramref name="treatments"/> holds the treatment
@@ -24,6 +26,8 @@ public sealed record CustomerTaxYear(
     /// of the opening, the closing and each arrival or departure of the year; <paramref name="decimalPlaces"/> NZD's.
     /// Tax-cost-threshold §5: <paramref name="rates"/> also holds the rows of <see cref="TaxCostLedger.RateKeys"/>, and
     /// <paramref name="earlierTreatments"/> the treatment of an Instrument for an earlier tax year (none: not classified).
+    /// Income-summary §5: <paramref name="interest"/> holds the interest of the Customer from
+    /// <see cref="TaxLedger.BuildInterest"/>, and <paramref name="rates"/> the rows its UTC dates need.
     /// </summary>
     public static CustomerTaxYear Compute(
         int taxYear,
@@ -32,7 +36,8 @@ public sealed record CustomerTaxYear(
         IReadOnlyDictionary<(string Currency, DateOnly Date), StoredRate> rates,
         TaxYearValues values,
         int decimalPlaces,
-        IReadOnlyDictionary<(int InstrumentId, int TaxYear), FifTreatment>? earlierTreatments = null)
+        IReadOnlyDictionary<(int InstrumentId, int TaxYear), FifTreatment>? earlierTreatments = null,
+        IReadOnlyList<TaxInterest>? interest = null)
     {
         var from = Tax.TaxYear.Start(taxYear);
         var to = Tax.TaxYear.End(taxYear);
@@ -99,7 +104,15 @@ public sealed record CustomerTaxYear(
         // FIF income §5: worked out from the tax holdings, after they are built; it changes no complete.
         var fifIncome = FifIncome.Compute(taxYear, holdings, decimalPlaces);
         var withIncome = holdings.Select((holding, index) => holding with { Income = fifIncome.Holdings[index] }).ToList();
-        return new CustomerTaxYear(taxYear, from, to, withIncome, incomplete == 0, incomplete, threshold, fifIncome);
+        // Income-summary R3–R5: the interest items of the year, each figure in NZD on its own.
+        var interestOfYear = (interest ?? [])
+            .Where(item => item.BookedAt >= from && item.BookedAt < to)
+            .Select((item, index) => InterestAmounts(index + 1, item, rates, decimalPlaces))
+            .ToList();
+        // Income-summary R6–R12: the income summary, from the tax holdings and the interest items; it changes no complete.
+        var income = TaxYearIncome.Compute(withIncome, interestOfYear, decimalPlaces);
+        return new CustomerTaxYear(
+            taxYear, from, to, withIncome, incomplete == 0, incomplete, threshold, fifIncome, interestOfYear, income);
     }
 
     /// <summary>
@@ -361,6 +374,15 @@ public sealed record CustomerTaxYear(
         }
     }
 
+    /// <summary>Income-summary R5: the NZD figures of one interest item, by the rule of R18 and R21.</summary>
+    private static TaxYearInterest InterestAmounts(
+        int sequence, TaxInterest item, IReadOnlyDictionary<(string Currency, DateOnly Date), StoredRate> rates, int decimalPlaces)
+    {
+        var (status, rate) = TaxFx.RateOf(item.Currency, LedgerDay.Of(item.BookedAt), rates);
+        decimal? Nzd(decimal amount) => TaxFx.Nzd(amount, status, rate, decimalPlaces);
+        return new TaxYearInterest(sequence, item, Nzd(item.Gross), status, rate, Nzd(item.Rwt), Nzd(item.Nrwt), Nzd(item.ForeignTax));
+    }
+
     /// <summary>R14: the value of the line of an arrival or a departure, or the status of a line that has none.</summary>
     private static TaxYearEvent MarketValue(TaxYearEvent none, ValuationLine? line)
     {
@@ -463,3 +485,18 @@ public sealed record TaxDividendAmounts(
     decimal? Rwt,
     decimal? Nrwt,
     decimal? ImputationCredit);
+
+/// <summary>
+/// An interest item of the tax year (docs/features/income-summary.md R3, R5, R13): its <c>sequence</c>, the item as
+/// booked, its NZD figures, each <c>null</c> when it could not be worked out, their status and the rate row used.
+/// <see cref="Amount"/> is the gross in NZD, signed.
+/// </summary>
+public sealed record TaxYearInterest(
+    int Sequence,
+    TaxInterest Item,
+    decimal? Amount,
+    TaxAmountStatus Status,
+    StoredRate? Fx,
+    decimal? Rwt,
+    decimal? Nrwt,
+    decimal? ForeignTax);

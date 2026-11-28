@@ -144,7 +144,7 @@ A currency appears in a block when the block has a line in it; a cash line count
 | ID | Rule |
 | --- | --- |
 | R14 | **Custody on each row.** Every row carries its account row's custody mode. The PDF table has a "Custody" column after "Account". The cell uses the Customer Portal labels: `Custodial` → "Held on platform", `External` → "Held elsewhere". |
-| R15 | **Note.** When at least one row is on an External account, one line under the table: "Held elsewhere: recorded by your adviser from outside statements. The platform has not checked these figures." No External row → no note. An empty range has no rows and no note. The FIF report prints the same sentence, word for word, when a tax holding has figures of an External account ([fif-report.md](fif-report.md) R16, statement 4). |
+| R15 | **Note.** When at least one row is on an External account, one line under the table: "Held elsewhere: recorded by your adviser from outside statements. The platform has not checked these figures." No External row → no note. An empty range has no rows and no note. The FIF report prints the same sentence, word for word, when a tax holding has figures of an External account ([fif-report.md](fif-report.md) R16, statement 4), and so does the income summary when a payment is on an External account ([income-summary.md](income-summary.md) R25, statement 4). |
 | R16 | **Unchanged.** Parameters, the `bookedAt` filter, the order and the reversal placement, the per-account rows of leg-accounts R20, the Fee column (trade-fees R22), the closed-account filter. |
 
 The note sentence of R15 is the one the Customer Portal shows (§9). Keep the two the same.

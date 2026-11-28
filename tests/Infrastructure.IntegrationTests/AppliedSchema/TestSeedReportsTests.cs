@@ -11,7 +11,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 public class TestSeedReportsTests
 {
     [Test]
-    public async Task Seed_GrantsFourReportsToDemoTenantAndIsIdempotent()
+    public async Task Seed_GrantsFiveReportsToDemoTenantAndIsIdempotent()
     {
         await using var db = OpenDb();
         await EnsureDemoTenantAsync(db);
@@ -21,7 +21,7 @@ public class TestSeedReportsTests
         await TestSeed.SeedAsync(db, CancellationToken.None);
         var second = await LoadGrantsAsync(db, DevelopmentIdentitySeeder.DemoTenantCode);
 
-        first.Select(row => row.Code).ShouldBe(["adviser-balances", "bank-reconciliation", "customer-fif", "customer-transactions"]);
+        first.Select(row => row.Code).ShouldBe(["adviser-balances", "bank-reconciliation", "customer-fif", "customer-income-summary", "customer-transactions"]);
         second.Select(row => row.Id).ShouldBe(first.Select(row => row.Id));
         (await LoadGrantsAsync(db, "reports-other")).ShouldBeEmpty();
     }

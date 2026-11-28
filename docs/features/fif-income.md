@@ -209,7 +209,7 @@ What the example shows:
 - Foreign income tax the Customer pays in another country on their own, a fee rebate, interest on money borrowed to buy shares, and any other figure that is not in the ledger (R18)
 - The deemed sale and purchase at market value when a treatment or the Customer's residence changes (roadmap §7), and when a person changes method from one year to the next
 - The anti-avoidance rules for purchases and sales that are not at market value (S1 p.22 note 7)
-- The report, its PDF and what it prints for each case: [fif-report.md](fif-report.md). The income summary for dividends and interest under the ordinary rules: TR6
+- The report, its PDF and what it prints for each case: [fif-report.md](fif-report.md). The income summary for dividends and interest under the ordinary rules: [income-summary.md](income-summary.md)
 - Any stored result, any write, ledger replay and period close (roadmap §1.2)
 - Tax lots. The matching of R13 is within one tax year and keeps nothing
 - Any portal page
@@ -626,7 +626,6 @@ Confirmed on 2026-11-28, every one as recommended. Each point states the choice,
 
 Still open, not this slice:
 
-- The income summary under the ordinary rules: TR6
 - The CV income of a non-ordinary share, and the deemed rate of return (roadmap Q12, §7)
 - Sections EX 51, EX 52 and EX 54 of the Act, and the calculator as a second check
 - A dividend's ex-date in the quick sale gain
@@ -688,3 +687,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | Date | With | Change here |
 | --- | --- | --- |
 | 2026-11-28 | [fif-report.md](fif-report.md) | §2 Out, R2, §9 and "Still open": what the report prints for an incomplete result and for a holding where FDR is not allowed is its R17, R20 and §4.7; the foreign tax beside the income is its R22; there is no run over every Customer (its R5). The two TR5 lines go |
+| 2026-11-28 | [income-summary.md](income-summary.md) | §2 Out and "Still open": the income summary is that spec; the TR6 line goes |

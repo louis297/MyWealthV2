@@ -60,6 +60,7 @@ const netWorth = {
 
 const reportId = "8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11";
 const fifReportId = "7d2f6b48-1a9c-4e35-a7d0-5c8e3b1f9a44";
+const incomeSummaryReportId = "4b6e2d91-3f7a-4c18-9d52-8a1e7c0b6f55";
 
 function callOf(input: RequestInfo | URL, init?: RequestInit) {
   const request = input instanceof Request ? input : null;
@@ -181,6 +182,7 @@ function renderAt(
         { id: reportId, code: "customer-transactions", name: "Customer Transactions" },
         { id: "unknown-report", code: "mystery", name: "Mystery" },
         { id: fifReportId, code: "customer-fif", name: "FIF Report" },
+        { id: incomeSummaryReportId, code: "customer-income-summary", name: "Tax Year Income Summary" },
       ]);
     }
     if (url.endsWith("/reports/request") && method === "POST") {
@@ -615,6 +617,37 @@ describe("Customer Portal", () => {
     fireEvent.submit(screen.getByRole("button", { name: "Generate" }).closest("form")!);
 
     expect(await screen.findByText("A FIF report is made for a customer whose tax residency is New Zealand.")).toBeInTheDocument();
+    expect(screen.queryByText("Report is not available.")).not.toBeInTheDocument();
+  });
+
+  it("C52: the Tax Year Income Summary has the tax year form and sends the caller's id and the year", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-28T03:12:45Z"));
+    const { fetchMock } = renderAt("/reports");
+    await chooseOption("Report", "Tax Year Income Summary");
+
+    expect(screen.queryByText(/parameters not available/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("From")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /schedule/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Tax year")).toHaveTextContent("2026 (1 April 2025 to 31 March 2026)");
+    fireEvent.submit(screen.getByRole("button", { name: "Generate" }).closest("form")!);
+
+    expect(await requestBody(fetchMock)).toEqual({
+      reportId: incomeSummaryReportId,
+      parameters: { customerId: me.id, taxYear: 2026 },
+    });
+  });
+
+  it("C52: a 400 is shown at the form with the server's message", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-28T03:12:45Z"));
+    renderAt("/reports", me, [], "External", {
+      requestReport: () => json({ errors: { taxYear: ["Tax year 2027 can be reported from 2 April 2027."] } }, 400),
+    });
+    await chooseOption("Report", "Tax Year Income Summary");
+    fireEvent.submit(screen.getByRole("button", { name: "Generate" }).closest("form")!);
+
+    expect(await screen.findByText("Tax year 2027 can be reported from 2 April 2027.")).toBeInTheDocument();
     expect(screen.queryByText("Report is not available.")).not.toBeInTheDocument();
   });
 
