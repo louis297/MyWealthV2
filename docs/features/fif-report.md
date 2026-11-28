@@ -85,26 +85,40 @@ was at most 12355.70, at the start of the tax year. The threshold for tax year 2
 FIF income, fair dividend rate method: 655.42
 FIF income, comparative value method: 1740.87
 Lower: fair dividend rate
+These figures apply if the FIF rules apply to you. The threshold test above is one part of that question.
 Holdings: 1 attributing interest, 0 exempt or not foreign, 0 not classified.
 
 3. Holdings and classification
-AAA  Alpha Inc  United States of America  Attributing interest  (classified from tax year 2025)
+Attributing interests
+AAA  Alpha Inc  United States of America  Attributing interest  classified from tax year 2025
      opening 140  closing 240.8  FIF income: computed
+Exempt or not foreign
+None.
+These holdings are not in the FIF calculation. ...
+Not classified
+None.
+A holding that is not classified may be an attributing interest. ...
 
 4. Threshold test
 Threshold for tax year 2026: 50000.00
 Total cost at the start: 12355.70    Highest: 12355.70, at the start of the tax year    At the end: 10792.33
+Not above the threshold. The total cost of your attributing interests was at most 12355.70, ...
+A person at or below the threshold does not apply the FIF rules unless they choose to. ...
+AAA  tax cost at the start 12355.70  at the end 10792.33
 2025-04-01 09:15  AAA  Sale      -2647.65   9708.05
 2025-09-15 14:30  AAA  Purchase    +37.63   9745.68
 2026-02-03 10:40  AAA  Purchase  +1046.65  10792.33
 
 5. FIF income
 Fair dividend rate method (rate 0.05)
-  Opening value 13108.48    0.05 x opening value 655.42
-  Peak holding method amounts 0.00    Quick sale gain amounts 0.00    Quick sale adjustment 0.00
-  FIF income 655.42
+Opening value 13108.48    0.05 x opening value 655.42
+Peak holding method amounts 0.00    Quick sale gain amounts 0.00    Quick sale adjustment 0.00
+FIF income 655.42
 Comparative value method
-  Total 1740.87    FIF income 1740.87
+Total 1740.87    FIF income 1740.87
+AAA  computed  opening value 13108.48  FDR amount 655.42  peak holding method amount 0.00
+     quick sale gain amount 0.00  CV amount 1740.87
+The quick sale adjustment is the lesser of the two totals over all holdings, not a sum per holding.
 
 6. AAA Alpha Inc
 Opening, valued as of 2025-03-31
