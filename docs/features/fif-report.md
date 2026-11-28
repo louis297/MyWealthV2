@@ -637,7 +637,7 @@ A plan while this spec is in `review`. Each doc is changed in place when it is a
 | [domain-model.md](../domain-model.md) | §8.24: `NewZealandTime` and its invariant. §11: a fourth catalog row is data, not a type. Change log |
 | [database-design.md](../database-design.md) | §9: `0062_fif_report.sql`. §14: the catalog row. Change log |
 | [function-plan.md](../function-plan.md) | §6: the FIF Report beside the first-phase reports |
-| [glossary.md](../glossary.md) | "FIF report" and "New Zealand time" become accepted. "Demo seed": four report grants. "Tax year", "Threshold test" and "FIF income" point here where they say TR5 |
+| [glossary.md](../glossary.md) | "FIF report" and "New Zealand time" become accepted. "Demo seed": four report grants. "Tax year": the FIF report prints its instants in New Zealand time |
 | [fif-roadmap.md](../roadmaps/fif-roadmap.md) | §6 TR5: the spec line. §8: Q13 to Q17 written as rules here. §9 row 5: accepted. §3 "Reports" and "Tax documents": what exists now. §2 "Return and disclosure": the pages read do not say "by country" |
 | [features/README.md](README.md), [future-plans.md](../future-plans.md) §1 step 6 | Status: TR5 accepted |
 
