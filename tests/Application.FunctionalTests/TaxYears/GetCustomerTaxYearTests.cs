@@ -200,7 +200,10 @@ public class GetCustomerTaxYearTests : TestBase
         var cost = first.GetProperty("carriedCost");
         (cost.GetProperty("amount").GetDecimal(), cost.GetProperty("currency").GetString()).ShouldBe((700.00m, "USD"));
         cost.GetProperty("acquiredOn").ValueKind.ShouldBe(JsonValueKind.Null);
-        Strings(holding.GetProperty("notices")).ShouldBe(["ExternalFigures", "ArrivalAtMarketValue", "DepartureAtMarketValue"]);
+        // Tax-cost-threshold R9, R25: the carried cost at the rate of the day it was booked, and its notice.
+        (first.GetProperty("cost").GetProperty("change").GetDecimal(), first.GetProperty("cost").GetProperty("fx").GetProperty("rate").GetDecimal())
+            .ShouldBe((1_176.00m, 1.68m));
+        Strings(holding.GetProperty("notices")).ShouldBe(["ExternalFigures", "ArrivalAtMarketValue", "DepartureAtMarketValue", "CarriedCost"]);
         // No price for 31 March 2026 is stored: the closing is not valued and the holding is incomplete.
         Strings(holding.GetProperty("incomplete")).ShouldBe(["ClosingNotValued"]);
     }
