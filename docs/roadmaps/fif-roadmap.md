@@ -15,6 +15,7 @@ related:
   - ../features/tax-cost-threshold.md
   - ../features/fif-income.md
   - ../features/fif-report.md
+  - ../features/income-summary.md
   - ../features/holdings.md
   - ../features/posting.md
   - ../features/buy-sell.md
@@ -113,7 +114,7 @@ A planning summary of the rules for an individual. Sources are in §11; the code
 | Currency conversion | One way, used for all attributing interests: the actual rate of the day for each amount and each market value, or the rolling 12-month average rate. Inland Revenue accepts its mid-month rate as the actual rate of any day in that month, and the 31 March end-of-month rate as the rate of 1 April. A person who starts using the rolling average must keep using it every year. Rates from the Reserve Bank or another central bank may be used, from one source consistently | S1 p.13, S4 |
 | Foreign tax credit | Foreign tax withheld on a dividend from a FIF may be a credit. The credit is limited to the New Zealand tax on that segment of foreign income, which is the FIF income, not the dividend. No credit when the segment has a loss. An unused credit is lost | S1 p.20 |
 | RWT and imputation | Resident withholding tax taken from a dividend offsets tax payable and the excess is refunded, even when the FIF income is zero. A New Zealand imputation credit on an Australian dividend is limited by the FIF income of that interest | S1 p.20 |
-| Return and disclosure | FIF income goes in the IR3 return, with an overseas income summary (IR1261) by country (the pages of S1 p.21 and S2 ¶10 read for [fif-report.md](../features/fif-report.md) do not say "by country"; the form itself was not read). An individual who holds less than 10 % of a company in a treaty country and uses FDR or CV usually files no separate FIF disclosure | S1 p.21, S2 ¶10–11 |
+| Return and disclosure | FIF income goes in the IR3 return, with an overseas income summary (IR1261) by country (the pages of S1 p.21 and S2 ¶10 read for [fif-report.md](../features/fif-report.md) do not say "by country"; the form and the return guide, read on 2026-11-28 for [income-summary.md](../features/income-summary.md) §14, say "a separate section for each jurisdiction and for each income type"). An individual who holds less than 10 % of a company in a treaty country and uses FDR or CV usually files no separate FIF disclosure | S1 p.21, S2 ¶10–11 |
 | Recent and proposed changes | From 1 April 2025 the revenue account method exists for some new migrants and unlisted shares. A 2026 Bill raises the threshold to NZ$100,000 "for the 2026–27 and later income years". Its commentary was read from Inland Revenue on 2026-11-28 (tax-cost-threshold §14, S5); the Bill was at select committee on 12 October 2026 and was not law in any source read. The April 2026 edition of the guide says $50,000 | S1 p.17, S10 |
 
 ---
@@ -259,6 +260,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 - **Why:** it is what a Customer below the threshold returns, and what applies to exempt interests such as ASX-listed shares at any size. The interest and dividend specs left it to this step.
 - **Why optional and last:** it is a list of sums with no algorithm, a content-type report in the sense of future-plans §1. No other item waits for it.
 - **Depends on:** TR2 (the tax year, the NZD rule). TR1 for the country.
+- **Spec:** [income-summary](../features/income-summary.md) (`review`, 2026-11-28). A report of its own, `customer-income-summary`, scope `Customer`, manual only, with the parameters `customerId` and `taxYear`, as fif-report point 1 foresaw. Its figures are two fields of the tax year read, worked out in Domain: the interest items of the year, and the sums. Dividends are the `Dividend` events the read already gives, of every tax holding, in four groups by the FIF treatment of the Instrument: New Zealand companies, foreign companies outside the FIF rules, attributing interests and not classified. The dividends of attributing interests are shown whatever the threshold test says, and the report does not say whether they are returned. Interest is every `Interest` Transaction of the Customer's Accounts booked in the tax year, per Account, with no country, and interest charged is listed apart. Amounts become NZD by the rule of tax-year-events R18. The gross dividend, the dividend with its imputation credits, is given beside its parts, and the tax taken is added up by kind. The summary has its own `complete`: it needs no price, and a missing rate or a not classified holding with a dividend makes it incomplete. The report is made for an `Overseas` Customer too. It computes no tax and names no box of a return. Its points 1 to 20 answer what the item left open and wait for confirmation. The sentences the report prints about the return are the platform's summary of Inland Revenue's return guide, read on 2026-11-28; the spec asks a person who knows the rules to read them.
 
 ---
 
@@ -321,7 +323,7 @@ Each step depends only on earlier steps.
 | 3 | TR3 cost in NZD and the threshold test | "Tax lots and a cost in NZD" of custodial-roadmap §10, as far as this step needs it | [tax-cost-threshold](../features/tax-cost-threshold.md) | accepted and landed (2026-11-28) |
 | 4 | TR4 FIF income: FDR, quick sale, CV | — | [fif-income](../features/fif-income.md) | accepted and landed (2026-11-28) |
 | 5 | TR5 the FIF report | "A tax statement for the Customer" (interest-run §11 point 19; dividends and external-income Out), for FIF income | [fif-report](../features/fif-report.md) | accepted and landed (2026-11-28) |
-| 6 | TR6 tax year income summary | The same, for dividends and interest | — | optional; not started |
+| 6 | TR6 tax year income summary | The same, for dividends and interest | [income-summary](../features/income-summary.md) | optional; spec in review (2026-11-28) |
 
 Steps 1 and 2 do not depend on each other and may swap. Step 4 may come before step 3: it needs only TR2.
 
