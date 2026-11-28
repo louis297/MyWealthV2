@@ -43,7 +43,21 @@ It is the one input of the FIF report that is path-dependent, and the only one t
 
 New: fields on the item of `GET /users/customers/{customerId}/tax-years/{taxYear}` (`threshold`, a `cost` on each tax holding and on each event); Domain types `FifThreshold`, `TaxCostLedger`, `TaxCost`, `ThresholdTest` and their enums; `CustomerTaxYear.Compute` and the service `CustomerTaxLedger` carry them. No route, script, table, permission, problem code, domain event, `TransactionType`, port, job or setting. No write changes: the `Holdings` projection and its average cost in the quote currency stay as they are. No portal page and no simulator change.
 
-**Status is `accepted` (2026-11-28).** The eighteen points of §11 were confirmed on 2026-11-28, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract.
+**Status is `accepted` (2026-11-28).** The eighteen points of §11 were confirmed on 2026-11-28, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract. Landed 2026-11-28.
+
+Notes from landing:
+
+- R22, R25: the window is the instant the quantity last left 0 before the opening, for a tax holding held at the opening (`TaxCostWalk.HeldSince`), as clarified when the spec was accepted. A tax year missing from the earlier treatments is `NotClassified` and skipped.
+- R11, R14: a correction whose `costChange` is 0 needs no rate: there is no figure to convert. `TaxCostLedger.RateKeys` asks for no row for a figure of 0 or in NZD. An arrival with a carried cost of 0 is `NoCarriedCost` before any rate is looked at.
+- R13: when one event has several causes, the first that applies is kept, in this order: a rate (`NoRate`, `StaleRate`) or `NoCarriedCost`, then `NegativeQuantity`, then `NegativeCost`. A disposal or a departure of more than is held is `NegativeQuantity`, as its quantity after is below 0.
+- R24: an event of a tax holding whose cost is unknown has `cost` `{ change: null, after: null }`. An event that brings the quantity back to 0 from an unknown cost has `after` 0.00 and `change` `null`. A step that made a cost unknown has `change` `null`, and its `total` leaves that tax holding out (R17).
+- R24: `cost.fx` on an arrival or a correction is the row that was read, also when it is stale; `null` for a carried cost in NZD and on a correction of the quantity only.
+- R24: a zero is written with NZD's places (`0.00`), as every other NZD figure.
+- R25: an arrival whose carried cost was not added (the cost was already unknown, or it carried 0) gives no notice `CarriedCost`.
+- §5: `ThresholdTest.Compute` also takes NZD's decimal places. `CustomerTaxYear.Compute` takes the earlier treatments as an optional last parameter, keyed by Instrument and tax year. The rate rule of tax-year-events R18 and R21 moved to the internal `TaxFx`, which the tax year read and the walk share.
+- §7: `CustomerTaxLedger` reads the earlier treatments from the tax year of each costed Instrument's first event. The rate keys of the year and of the walk are read once each.
+- §10: in example 3 through the API, B1 is opened as an External account so that its trades can be dated, and is made Custodial after them; U3 is written with `Transaction.PostTransferIn` and its `acquiredOn`. In example 2 the Instruments are quoted in NZD, so that the NZD figures of the guide need no caller's rate, and `CCC` is classified for 2024 and 2025, because an exemption stands for its own tax year.
+- tax-year-events: the case of an arrival and a departure at market value now also lists the notice `CarriedCost`, and its `item` and event field lists gain `threshold` and `cost`.
 
 The tax statements in this spec were read again from Inland Revenue on 2026-11-28 (§14). The Income Tax Act refused automated reads again; §14 says which rules rest on the guide alone. Nothing here is tax advice.
 
@@ -422,6 +436,11 @@ What the stored history must cover is wider than for the tax year read (tax-year
 
 ## 10. Tests
 
+| Project | Where |
+| --- | --- |
+| Domain.UnitTests | `Tax/FifThresholdTests.cs`, `Tax/TaxCostLedgerTests.cs` (trades, example 1), `Tax/TaxCostLedgerOtherTests.cs` (arrivals, departures, corrections, the unknown causes, the rate keys), `Tax/ThresholdTestTests.cs` (examples 2 and 3), `Tax/ThresholdTestReasonTests.cs`, `Tax/CustomerTaxYearCostTests.cs`, with examples 2 and 3 in `Tax/ThresholdExamples.cs` |
+| Application.FunctionalTests | `TaxYears/GetCustomerTaxYearThresholdTests.cs`; `TaxYears/GetCustomerTaxYearAccessTests.cs` (the totals of two tenants); `TaxYears/GetCustomerTaxYearTests.cs` (the new fields and the notice) |
+
 | Project | Assert |
 | --- | --- |
 | Domain.UnitTests (`Tax/FifThresholdTests`) | 50,000 for 2009, 2025 and 2026; no value for 2027 |
@@ -526,16 +545,7 @@ Each doc was changed in place when this spec was accepted (2026-11-28).
 
 ## 13. Suggested commits
 
-Removed when the slice lands. The repository builds after each commit. Each line is one behaviour; an agent splits it into red then green.
-
-1. `FifThreshold.For`: NZ$50,000 for tax years 2009 to 2026 and no value after.
-2. `TaxCostLedger.Walk` for trades: an acquisition adds principal and fee in NZD, a disposal removes the average, a reorganisation, a dividend and a move change nothing, nothing held costs 0.00. Example 1.
-3. `TaxCostLedger.Walk` for the rest: an arrival's carried cost and its rate, a departure, a correction, and the causes of an unknown cost.
-4. `ThresholdTest.Compute`: which tax holdings count, the totals, the peak, the outcome and the steps. Examples 2 and 3.
-5. `ThresholdTest.Compute`: the four reasons, the floor, and a treatment that changed while held.
-6. `CustomerTaxYear.Compute` carries the tax cost on each tax holding and event, the test and the notice `CarriedCost`.
-7. `CustomerTaxLedger` reads the rates of the walk and the earlier treatments, and `GET /users/customers/{customerId}/tax-years/{taxYear}` answers the fields of R24, with the tenant isolation.
-8. Landing: the docs of §12, with the landing notes.
+Removed when the slice landed (2026-11-28). The commits are in git.
 
 ---
 
