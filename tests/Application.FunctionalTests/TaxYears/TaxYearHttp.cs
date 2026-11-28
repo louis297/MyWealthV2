@@ -133,6 +133,29 @@ internal static class TaxYearHttp
         return posting.PublicId;
     }
 
+    /// <summary>
+    /// An interest run's posting (interest-run R23), written with the Domain factory, because the run posts only for
+    /// today and a tax year that can be read has ended: the gross of <paramref name="accrued"/>, RWT at
+    /// <paramref name="rwtPercent"/> and the interest detail of the period.
+    /// </summary>
+    public static async Task<Guid> PostInterestAsync(
+        Guid accountId, decimal accrued, decimal rwtPercent, DateOnly from, DateOnly to, DateTimeOffset bookedAt)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var account = await db.Accounts.IgnoreQueryFilters().SingleAsync(row => row.PublicId == accountId);
+        var posting = Transaction.PostInterest(
+            account.TenantId, account.Id, account.Currency, 2, accrued,
+            new Domain.Interest.InterestPeriod(from, to, to.DayNumber - from.DayNumber + 1),
+            new Domain.Interest.Withholding(TaxKind.Rwt, rwtPercent, WithholdingBasis.Elected),
+            bookedAt, TransactionSource.InterestRun(Guid.NewGuid()));
+        posting.CreatedBy = "test";
+        posting.CashLegs.ForEach(leg => leg.CreatedBy = "test");
+        db.Transactions.Add(posting);
+        await db.SaveChangesAsync();
+        return posting.PublicId;
+    }
+
     public static async Task CloseAccountAsync(Guid accountId)
     {
         using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();

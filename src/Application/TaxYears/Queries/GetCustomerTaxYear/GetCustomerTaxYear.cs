@@ -52,7 +52,16 @@ public class GetCustomerTaxYearQueryHandler(
         return new CustomerTaxYearDto(
             customer.PublicId, year.TaxYear, year.From, year.To, CustomerTaxYear.Nzd, readAt, holdings, year.Complete, year.IncompleteCount,
             Threshold(year.Threshold, read),
-            Income(year.FifIncome, read));
+            Income(year.FifIncome, read),
+            [],
+            new IncomeSummaryDto(
+                new IncomeDividendsDto([], new IncomeDividendSumDto(0, 0m, 0m, 0m, 0m, 0m, 0m)),
+                new IncomeInterestDto([], new IncomeInterestSumDto(0, 0m, 0m, 0m, 0m, 0m)),
+                new IncomeTaxWithheldDto(0m, 0m, 0m),
+                0m,
+                false,
+                [],
+                []));
     }
 
     /// <summary>Tax-cost-threshold R24: the threshold test with PublicIds.</summary>
