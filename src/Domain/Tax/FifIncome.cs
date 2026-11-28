@@ -66,6 +66,14 @@ public sealed record FifIncome(
 
         // R12: multiplied first and divided after.
         var peakHoldingAmount = hasAverage ? Math.Max(0m, Round(rate * differential * purchaseCost / purchased, decimalPlaces)) : Zero(decimalPlaces);
+
+        var (matches, sales) = Match(Shares(holding), decimalPlaces);
+        var dividendShares = DividendShares(holding, matches, decimalPlaces);
+        var matched = matches.Sum(match => match.Quantity);
+        var proceeds = sales.Sum(sale => sale.Proceeds) + Zero(decimalPlaces);
+        var dividends = dividendShares.Sum(share => share.Share) + Zero(decimalPlaces);
+        // R14: the matched shares at the average cost of the year, not at what they cost themselves.
+        var cost = hasAverage ? Round(matched * purchaseCost / purchased, decimalPlaces) : Zero(decimalPlaces);
         return new QuickSale(
             opening,
             peak,
@@ -75,15 +83,98 @@ public sealed record FifIncome(
             purchaseCost,
             hasAverage ? decimal.Round(purchaseCost / purchased, 8, MidpointRounding.AwayFromZero) : null,
             peakHoldingAmount,
-            0m,
-            Zero(decimalPlaces),
-            Zero(decimalPlaces),
-            Zero(decimalPlaces),
-            Zero(decimalPlaces),
-            [],
-            [],
-            []);
+            matched,
+            proceeds,
+            dividends,
+            cost,
+            proceeds + dividends - cost,
+            matches,
+            sales,
+            dividendShares);
     }
+
+    /// <summary>
+    /// R13, R14: the events walked in order. A purchase puts its shares on top of those bought in the year so far; a sale
+    /// takes them from the top down, the most recently bought first, until it has its quantity or none is left. Each run
+    /// of shares one sale takes from one purchase is a match. A sale's proceeds are its amount pro rata to the shares of
+    /// it that were matched.
+    /// </summary>
+    private static (List<QuickSaleMatch> Matches, List<QuickSaleSale> Sales) Match(
+        IReadOnlyList<(TaxYearEvent Event, decimal Shares)> events, int decimalPlaces)
+    {
+        var bought = new List<(int Sequence, decimal Remaining)>();
+        var matches = new List<QuickSaleMatch>();
+        var sales = new List<QuickSaleSale>();
+        foreach (var (yearEvent, shares) in events)
+        {
+            var kind = yearEvent.Event.Kind;
+            if (IsPurchase(kind) && shares > 0m)
+            {
+                bought.Add((yearEvent.Sequence, shares));
+            }
+            else if (IsSale(kind))
+            {
+                var sold = -shares;
+                var wanted = sold;
+                while (wanted > 0m && bought.Count > 0)
+                {
+                    var (sequence, remaining) = bought[^1];
+                    var taken = Math.Min(wanted, remaining);
+                    matches.Add(new QuickSaleMatch(sequence, yearEvent.Sequence, taken));
+                    wanted -= taken;
+                    if (taken == remaining)
+                    {
+                        bought.RemoveAt(bought.Count - 1);
+                    }
+                    else
+                    {
+                        bought[^1] = (sequence, remaining - taken);
+                    }
+                }
+
+                var matchedOfSale = sold - wanted;
+                var amount = yearEvent.Amount!.Value;
+                var saleProceeds = sold > 0m ? Round(amount * matchedOfSale / sold, decimalPlaces) : Zero(decimalPlaces);
+                sales.Add(new QuickSaleSale(yearEvent.Sequence, sold, matchedOfSale, amount, saleProceeds));
+            }
+        }
+
+        return (matches, sales);
+    }
+
+    /// <summary>
+    /// R14, R17: the share of each dividend that belongs to the matched shares held when it was booked: those of the
+    /// matches whose purchase is before it and whose sale is after it, over the comparable quantity held at it. A
+    /// dividend booked while nothing is held, or with no matched share held, gives none.
+    /// </summary>
+    private static List<QuickSaleDividendShare> DividendShares(TaxHolding holding, IReadOnlyList<QuickSaleMatch> matches, int decimalPlaces)
+    {
+        var shares = new List<QuickSaleDividendShare>();
+        foreach (var dividend in holding.Events.Where(e => e.Event.Kind == TaxEventKind.Dividend).OrderBy(e => e.Sequence))
+        {
+            var held = dividend.ComparableQuantityAfter!.Value;
+            var matchedHeld = matches
+                .Where(match => match.PurchaseSequence < dividend.Sequence && match.SaleSequence > dividend.Sequence)
+                .Sum(match => match.Quantity);
+            if (held <= 0m || matchedHeld <= 0m)
+            {
+                continue;
+            }
+
+            var figure = DividendFigure(dividend);
+            var share = Round(figure * matchedHeld / held, decimalPlaces);
+            if (share > 0m)
+            {
+                shares.Add(new QuickSaleDividendShare(dividend.Sequence, figure, held, matchedHeld, share));
+            }
+        }
+
+        return shares;
+    }
+
+    /// <summary>R17: a dividend counts at its gross plus the imputation credit, in NZD.</summary>
+    private static decimal DividendFigure(TaxYearEvent dividend) =>
+        dividend.Dividend!.Gross!.Value + dividend.Dividend.ImputationCredit!.Value;
 
     /// <summary>R9: the shares of each event, the change of the comparable quantity at it, in the order of the year.</summary>
     private static List<(TaxYearEvent Event, decimal Shares)> Shares(TaxHolding holding)
