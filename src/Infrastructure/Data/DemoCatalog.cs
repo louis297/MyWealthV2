@@ -22,8 +22,10 @@ public static class DemoCatalog
 
     public const string CustomerFifReportCode = "customer-fif";
 
+    public const string CustomerIncomeSummaryReportCode = "customer-income-summary";
+
     public static IReadOnlyList<string> ReportCodes { get; } =
-        [CustomerTransactionsReportCode, AdviserBalancesReportCode, BankReconciliationReportCode, CustomerFifReportCode];
+        [CustomerTransactionsReportCode, AdviserBalancesReportCode, BankReconciliationReportCode, CustomerFifReportCode, CustomerIncomeSummaryReportCode];
 
     /// <summary>Instrument-tax-attributes §5.1: the tax year of every row the seeds write.</summary>
     public const int TaxYear = 2027;
