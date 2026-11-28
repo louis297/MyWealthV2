@@ -70,8 +70,85 @@ public sealed record ThresholdTest(
             }
         }
 
-        var incomplete = new List<ThresholdIncomplete>();
+        var incomplete = Reasons(taxYear, walk, treatments, earlierTreatments, threshold, counted.Keys.ToHashSet());
         return new ThresholdTest(threshold, opening, peak, Total(), OutcomeOf(peak.Total, threshold, incomplete.Count == 0), incomplete, steps);
+    }
+
+    /// <summary>R20, R22: every reason of the table that applies, in the order of the table, then by Instrument.</summary>
+    private static List<ThresholdIncomplete> Reasons(
+        int taxYear,
+        TaxCostWalk walk,
+        IReadOnlyDictionary<int, TaxTreatment> treatments,
+        IReadOnlyDictionary<(int InstrumentId, int TaxYear), FifTreatment>? earlierTreatments,
+        decimal? threshold,
+        IReadOnlySet<int> counted)
+    {
+        var from = TaxYear.Start(taxYear);
+        var to = TaxYear.End(taxYear);
+        var instruments = walk.Steps.Select(step => step.Event.InstrumentId).Distinct().Order().ToList();
+        List<TaxCostStep> OfYear(int id) =>
+            walk.Steps.Where(step => step.Event.InstrumentId == id && step.Event.BookedAt >= from && step.Event.BookedAt < to).ToList();
+
+        var reasons = new List<ThresholdIncomplete>();
+
+        // A tax holding of the year (tax-year-events R23) that is not classified may be an attributing interest.
+        reasons.AddRange(instruments
+            .Where(id => TreatmentOf(treatments, id).FifTreatment == FifTreatment.NotClassified
+                         && (walk.At(id, from).Quantity != 0m || OfYear(id).Count > 0))
+            .Select(id => new ThresholdIncomplete(ThresholdIncompleteReason.NotClassified, id)));
+
+        // R13: a cost that counts and is unknown at the opening or after an event of the year.
+        reasons.AddRange(instruments
+            .Where(id => counted.Contains(id) && (walk.At(id, from).Cost is null || OfYear(id).Any(step => step.CostAfter is null)))
+            .Select(id => new ThresholdIncomplete(ThresholdIncompleteReason.CostUnknown, id)));
+
+        reasons.AddRange(instruments
+            .Where(id => counted.Contains(id) && TreatmentChanged(id, taxYear, walk, earlierTreatments))
+            .Select(id => new ThresholdIncomplete(ThresholdIncompleteReason.TreatmentChanged, id)));
+
+        if (threshold is null)
+        {
+            reasons.Add(new ThresholdIncomplete(ThresholdIncompleteReason.NoThreshold, null));
+        }
+
+        return reasons;
+    }
+
+    /// <summary>
+    /// R22: a tax holding held at the opening, whose Instrument is <c>NotForeign</c> or exempt for a tax year from the
+    /// one in which its quantity last left 0 before the opening to the year before. A year not classified is skipped. A
+    /// tax holding not held at the opening has no earlier year to check.
+    /// </summary>
+    private static bool TreatmentChanged(
+        int instrumentId, int taxYear, TaxCostWalk walk, IReadOnlyDictionary<(int InstrumentId, int TaxYear), FifTreatment>? earlierTreatments)
+    {
+        var from = TaxYear.Start(taxYear);
+        if (earlierTreatments is null || walk.At(instrumentId, from).Quantity == 0m)
+        {
+            return false;
+        }
+
+        DateTimeOffset? leftZero = null;
+        var quantity = 0m;
+        foreach (var step in walk.Steps.Where(step => step.Event.InstrumentId == instrumentId && step.Event.BookedAt < from))
+        {
+            if (quantity == 0m && step.QuantityAfter != 0m)
+            {
+                leftZero = step.Event.BookedAt;
+            }
+
+            quantity = step.QuantityAfter;
+        }
+
+        for (var year = TaxYear.Of(leftZero!.Value); year < taxYear; year++)
+        {
+            if (earlierTreatments.GetValueOrDefault((instrumentId, year)) is FifTreatment.NotForeign or FifTreatment.ExemptAsxListed or FifTreatment.ExemptOther)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>R16: an attributing interest counts.</summary>
