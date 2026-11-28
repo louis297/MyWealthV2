@@ -14,6 +14,7 @@ related:
   - ../features/tax-year-events.md
   - ../features/tax-cost-threshold.md
   - ../features/fif-income.md
+  - ../features/fif-report.md
   - ../features/holdings.md
   - ../features/posting.md
   - ../features/buy-sell.md
@@ -250,6 +251,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 - **Also decide:** manual only or also scheduled (recommended: manual only); which tax years may be asked for (Q13); who may ask (recommended: as the Customer Transactions Report, the Customer for themselves); what the report shows for an `Overseas` Customer (Q14); whether the numbers are also offered as a data file, since the catalog is PDF only (Q16); how the foreign tax is shown (Q17).
 - **Amends:** reports, the two portal page contracts, demo-tenant-seed.
 - **Worked example:** the TR2 example, printed.
+- **Spec:** [fif-report](../features/fif-report.md) (`review`, 2026-11-28). A fourth catalog report, `customer-fif`, scope `Customer`, manual only, with the parameters `customerId` and `taxYear`. It prints the tax year read and computes no tax figure of its own. The PDF is the only stored copy and prints what it used; there is no data file. An `Overseas` Customer is refused at the request, by the tax residency on file, which has no date. An incomplete report is still made and says on every page that it is incomplete. The threshold test and both methods are shown whatever the test says. Times are printed in New Zealand time by a rule in Domain. Exempt and New Zealand holdings are listed with their classification only. The tax taken from dividends is listed per tax holding and issuer country, with no credit computed. There is no run over every Customer of a Tenant, and no page that shows the tax year on screen. The demo seed grants the report and leaves the tax attributes of the demo catalog as they are, so no demo report can be complete before 2 April 2027. Its points 1 to 19 answer "Also decide" and wait for confirmation. The sentences the report prints about the tax rules are the platform's summary of Inland Revenue's guide and fact sheet: the spec asks a person who knows the rules to read them before it is accepted.
 
 ### TR6. Tax year income summary (optional)
 
@@ -318,7 +320,7 @@ Each step depends only on earlier steps.
 | 2 | TR2 tax year events in NZD | The ordering key of Transactions, for a later ledger replay; the open point on brokerage and the cost base (trade-fees §11) | [tax-year-events](../features/tax-year-events.md) | accepted and landed (2026-11-28) |
 | 3 | TR3 cost in NZD and the threshold test | "Tax lots and a cost in NZD" of custodial-roadmap §10, as far as this step needs it | [tax-cost-threshold](../features/tax-cost-threshold.md) | accepted and landed (2026-11-28) |
 | 4 | TR4 FIF income: FDR, quick sale, CV | — | [fif-income](../features/fif-income.md) | accepted and landed (2026-11-28) |
-| 5 | TR5 the FIF report | "A tax statement for the Customer" (interest-run §11 point 19; dividends and external-income Out), for FIF income | — | not started |
+| 5 | TR5 the FIF report | "A tax statement for the Customer" (interest-run §11 point 19; dividends and external-income Out), for FIF income | [fif-report](../features/fif-report.md) | spec in review (2026-11-28) |
 | 6 | TR6 tax year income summary | The same, for dividends and interest | — | optional; not started |
 
 Steps 1 and 2 do not depend on each other and may swap. Step 4 may come before step 3: it needs only TR2.
