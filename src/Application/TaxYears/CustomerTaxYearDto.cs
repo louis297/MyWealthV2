@@ -12,7 +12,37 @@ public sealed record CustomerTaxYearDto(
     DateTimeOffset LedgerReadAt,
     IReadOnlyList<TaxHoldingDto> Holdings,
     bool Complete,
-    int IncompleteCount);
+    int IncompleteCount,
+    ThresholdDto Threshold);
+
+/// <summary>Tax-cost-threshold R24: the threshold test of the year. Every figure is in NZD.</summary>
+public sealed record ThresholdDto(
+    decimal? Amount,
+    decimal Opening,
+    ThresholdPeakDto Peak,
+    decimal Closing,
+    string Outcome,
+    bool Complete,
+    IReadOnlyList<ThresholdIncompleteDto> Incomplete,
+    IReadOnlyList<ThresholdStepDto> Steps);
+
+/// <summary>R18: the highest total; the Instrument and the Transaction are <c>null</c> when it is the opening.</summary>
+public sealed record ThresholdPeakDto(decimal Total, DateTimeOffset At, Guid? InstrumentId, Guid? TransactionId);
+
+/// <summary>R20: a reason the test is incomplete; <c>NoThreshold</c> names no Instrument.</summary>
+public sealed record ThresholdIncompleteDto(string Reason, Guid? InstrumentId);
+
+/// <summary>R24: an event of the year that changed the total or made a cost unknown.</summary>
+public sealed record ThresholdStepDto(
+    DateTimeOffset At, Guid InstrumentId, int EventSequence, Guid TransactionId, string Kind, decimal? Change, decimal Total);
+
+/// <summary>R24: the tax cost of a tax holding; <c>unknown</c> is the first point it could not be worked out.</summary>
+public sealed record TaxCostDto(string Status, decimal? Opening, decimal? Closing, TaxCostUnknownDto? Unknown);
+
+public sealed record TaxCostUnknownDto(string Cause, DateTimeOffset At, Guid TransactionId);
+
+/// <summary>R24: the tax cost of an event; <c>fx</c> is the rate row of a carried cost or a correction.</summary>
+public sealed record TaxEventCostDto(decimal? Change, decimal? After, AccountValuationFxDto? Fx);
 
 /// <summary>One tax holding: an Instrument over all the Customer's Accounts in the year.</summary>
 public sealed record TaxHoldingDto(
@@ -24,7 +54,8 @@ public sealed record TaxHoldingDto(
     IReadOnlyList<TaxEventDto> Events,
     bool Complete,
     IReadOnlyList<string> Incomplete,
-    IReadOnlyList<string> Notices);
+    IReadOnlyList<string> Notices,
+    TaxCostDto Cost);
 
 public sealed record TaxInstrumentDto(Guid Id, string Symbol, string Name, string QuoteCurrency);
 
@@ -73,7 +104,8 @@ public sealed record TaxEventDto(
     decimal? Fee,
     TaxDividendDto? Dividend,
     TaxCarriedCostDto? CarriedCost,
-    TaxMoveDto? Move);
+    TaxMoveDto? Move,
+    TaxEventCostDto? Cost);
 
 /// <summary>The figures of a trade in the Account's currency.</summary>
 public sealed record TaxTradeLedgerDto(string Currency, decimal Principal, decimal Fee);

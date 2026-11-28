@@ -50,7 +50,8 @@ public class GetCustomerTaxYearQueryHandler(
             .ThenBy(holding => holding.Instrument.Id)
             .ToList();
         return new CustomerTaxYearDto(
-            customer.PublicId, year.TaxYear, year.From, year.To, CustomerTaxYear.Nzd, readAt, holdings, year.Complete, year.IncompleteCount);
+            customer.PublicId, year.TaxYear, year.From, year.To, CustomerTaxYear.Nzd, readAt, holdings, year.Complete, year.IncompleteCount,
+            new ThresholdDto(0m, 0m, new ThresholdPeakDto(0m, year.From, null, null), 0m, "Unknown", false, [], []));
     }
 
     private static TaxHoldingDto Holding(TaxHolding holding, CustomerTaxLedgerRead read)
@@ -66,7 +67,8 @@ public class GetCustomerTaxYearQueryHandler(
             holding.Events.Select(e => Event(e, read)).ToList(),
             holding.Complete,
             holding.Incomplete.Select(reason => reason.ToString()).ToList(),
-            holding.Notices.Select(notice => notice.ToString()).ToList());
+            holding.Notices.Select(notice => notice.ToString()).ToList(),
+            new TaxCostDto("NotRequired", null, null, null));
     }
 
     private static TaxPointDto Point(TaxPoint point, CustomerTaxLedgerRead read) =>
@@ -132,7 +134,8 @@ public class GetCustomerTaxYearQueryHandler(
             yearEvent.Fee,
             dividendAmounts,
             taxEvent.CarriedCost is { } cost ? new TaxCarriedCostDto(cost.Amount, cost.Currency, cost.AcquiredOn) : null,
-            move);
+            move,
+            null);
     }
 
     private static AccountValuationPriceDto? Price(StoredPrice? price) =>
