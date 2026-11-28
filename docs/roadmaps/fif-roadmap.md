@@ -13,6 +13,7 @@ related:
   - ../features/instrument-tax-attributes.md
   - ../features/tax-year-events.md
   - ../features/tax-cost-threshold.md
+  - ../features/fif-income.md
   - ../features/holdings.md
   - ../features/posting.md
   - ../features/buy-sell.md
@@ -239,6 +240,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 - **Also decide:** how a disposal is matched to the purchases of the same year, and at which cost (Q11); whether an interest with FDR not allowed is computed under CV alone or left out (Q12); rounding, once at the end or per interest; whether foreign tax withheld is added to CV gains, as S1 p.11 words it; one spec or two (recommended: one, the two methods share every input).
 - **Tests from published examples:** S1 p.14 (three companies: FDR $15,000, CV reduced to 0); S1 p.15 (quick sale: peak holding amount $2,200, actual gain $12,000, FIF income $12,200); S2 example (FDR $2,750, CV $4,125); S8 examples 4 and 5 (a quick sale with a dividend; a negative total gain limited to zero), once read again from the source.
 - **Second check:** Inland Revenue's online FIF calculator (S3) with the worked example's numbers typed in.
+- **Spec:** [fif-income](../features/fif-income.md) (`review`, 2026-11-28). One spec for both methods. The income is a field of the tax year read, computed from that read's own figures and whatever the threshold test says. The quick sale is worked out on comparable quantities: a sale is matched to the purchases of the same tax year, last bought first sold; the gain is on the matched shares, at the average cost of every purchase of the year, with a share of the dividends pro rata to the matched shares held. The adjustment is the lesser of the two totals over all tax holdings. A dividend is a CV gain at its gross plus the imputation credit, so the foreign tax withheld is in it once. Fees are in the cost and off the proceeds. Figures are rounded per tax holding and a total is their sum. A tax holding that is incomplete or not classified is not computed and the totals are then not given; one where FDR is not allowed is listed and not computed (Q12), and the totals stay. Its points 1 to 18 answer "Also decide" and wait for confirmation. Sections EX 51, EX 52 and EX 54 of the Act could not be read, and the calculator was not used: the spec asks a person to do both before it is accepted.
 
 ### TR5. The FIF report
 
@@ -315,7 +317,7 @@ Each step depends only on earlier steps.
 | 1 | TR1 tax attributes of an Instrument | "No ISIN / Exchange / Kind" stays; the country and the FIF treatment are new | [instrument-tax-attributes](../features/instrument-tax-attributes.md) | accepted and landed (2026-11-27) |
 | 2 | TR2 tax year events in NZD | The ordering key of Transactions, for a later ledger replay; the open point on brokerage and the cost base (trade-fees §11) | [tax-year-events](../features/tax-year-events.md) | accepted and landed (2026-11-28) |
 | 3 | TR3 cost in NZD and the threshold test | "Tax lots and a cost in NZD" of custodial-roadmap §10, as far as this step needs it | [tax-cost-threshold](../features/tax-cost-threshold.md) | accepted and landed (2026-11-28) |
-| 4 | TR4 FIF income: FDR, quick sale, CV | — | — | not started |
+| 4 | TR4 FIF income: FDR, quick sale, CV | — | [fif-income](../features/fif-income.md) | spec in review (2026-11-28) |
 | 5 | TR5 the FIF report | "A tax statement for the Customer" (interest-run §11 point 19; dividends and external-income Out), for FIF income | — | not started |
 | 6 | TR6 tax year income summary | The same, for dividends and interest | — | optional; not started |
 
@@ -356,7 +358,7 @@ Read on 2026-11-27. A spec that writes a rule reads the source again and cites i
 | S5 | Inland Revenue, "Foreign investment fund Australian listed share exemption tool" (`ird.govt.nz/fif-australia-tool`, last updated 5 October 2026) | The lookup per ASX code and year |
 | S6 | Inland Revenue Tax Technical, "Exemption for natural persons with less than $50,000 of FIF interests" and "Choice of FIF calculation method" (commentary on the 2012 Act) | Opting in and its four-year rule; switching between FDR and CV |
 | S7 | Inland Revenue Tax Technical, "Technical amendments to the offshore portfolio share investment rules" | When the ASX listing is tested; average cost in the quick sale rule |
-| S8 | Inland Revenue Tax Technical, "New tax rules for offshore portfolio investment in shares" (commentary on the 2006 Act). Its later part was read through a summary, so its examples must be read again before they become tests | The closing price of the previous year as opening value; FDR and CV worked examples |
+| S8 | Inland Revenue Tax Technical, "New tax rules for offshore portfolio investment in shares" (commentary on the 2006 Act). Its later part was read through a summary, so its examples must be read again before they become tests. Examples 1 to 5 were read again on 2026-11-28: fif-income §14 | The closing price of the previous year as opening value; FDR and CV worked examples |
 | S9 | Inland Revenue Tax Technical, "Fair dividend rate method: quick sale gain amount" (2011 remedial amendment) | The two amounts of the quick sale adjustment; share reorganisations |
 | S10 | Press and adviser summaries of Budget 2026 and of the 2026 annual rates Bill | The proposed NZ$100,000 threshold. Secondary sources only on 2026-11-27. Inland Revenue's commentary on the Bill was read on 2026-11-28: tax-cost-threshold §14, S5 |
 | S11 | Help pages of Hatch, Sharesies and Sharesight on their FIF reports | How platforms lay out a FIF report, treat brokerage and transfers, and match quick sales. Layout and cross-checks only, not rules |
