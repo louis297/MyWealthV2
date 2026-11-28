@@ -162,7 +162,7 @@ Working rules the plan assumes. Each is open to change in the spec that first ne
 
 | Item | Where it goes |
 | --- | --- |
-| Cost and unrealised gain on a past day, tax lots, cost in NZD | Ledger replay ([custodial-roadmap.md](custodial-roadmap.md) X2), which opens when a step needs a write in the past. Step 6 does not: the cost in NZD its threshold test needs is a read ([fif-roadmap.md](fif-roadmap.md) §1.2, TR3) |
+| Cost and unrealised gain on a past day, tax lots, cost in NZD | Ledger replay ([custodial-roadmap.md](custodial-roadmap.md) X2), which opens when a step needs a write in the past. Step 6 does not: the cost in NZD its threshold test needs is a read ([fif-roadmap.md](fif-roadmap.md) §1.2, TR3, [tax-cost-threshold.md](../features/tax-cost-threshold.md)). Tax lots stay out |
 | Period close | Custodial-roadmap X3, after replay. It is what would let External accounts get stored valuations |
 | Changing a stored valuation after a late or corrected price | Not planned. Decide with step 4, which has to say what happens to a fee when its base changes |
 | Which movements are external flows, and gross or net of fees | Step 5 |

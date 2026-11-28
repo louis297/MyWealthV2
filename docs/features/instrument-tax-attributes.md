@@ -190,6 +190,8 @@ The values of R7 and what each states (R13):
 | `AttributingNoFdr` | As `Attributing`, but the holding is of a kind the fair dividend rate method cannot be used for: a fixed-rate foreign equity, a non-participating redeemable share, or another kind of the list in S1 p.16 | Yes. Roadmap Q12 says what the calculation does with it |
 | `NotClassified` (not stored) | Nobody has said. No row stands for the tax year | The result is incomplete (roadmap T5) |
 
+The threshold test counts a holding by its treatment for the tax year tested, whatever it was when the shares were bought; a holding that was exempt or `NotForeign` in an earlier year while it was held makes the test incomplete, because the cost should start again from a market value the platform does not work out ([tax-cost-threshold.md](tax-cost-threshold.md) R16, R22).
+
 ### 4.4 The write
 
 | ID | Rule |
@@ -517,7 +519,7 @@ Each point states the recommendation, written into the rules above, and the alte
 Still open, not this slice:
 
 - Running Inland Revenue's tool again for BHP, CBA and WOW once it answers for tax year 2027, and replacing the assumed rows of the demo catalog in each tenant that has them (§5.1)
-- Everything that reads the attributes: roadmap TR3 to TR6. TR2 reads them in [tax-year-events.md](tax-year-events.md), which marks a dividend whose tax source disagrees with the issuer country with a notice (its R29)
+- Everything that reads the attributes: roadmap TR4 to TR6. TR2 reads them in [tax-year-events.md](tax-year-events.md), which marks a dividend whose tax source disagrees with the issuer country with a notice (its R29). TR3 reads the treatment of the year and of the earlier years a holding was held in ([tax-cost-threshold.md](tax-cost-threshold.md) R16, R22)
 - An Instruments page in the Adviser Portal, with the tax attributes, for the TenantAdmin
 - A list of the Instruments not classified for a tax year, and a way to confirm last year's exemptions for the next year in one step
 - An issuer that changes its country of tax residence (point 2)

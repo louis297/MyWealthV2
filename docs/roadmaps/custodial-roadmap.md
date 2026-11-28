@@ -393,7 +393,7 @@ A Custodial `FxConversion` priced by an FX provider with a spread, instead of th
 | X3 | Period close | A date per Tenant before which nothing may be written. After X2. |
 | X4 | Third-party payments | See D14. |
 
-Not in this plan: replay, tax lots and NZD cost, the FIF report, multi-currency cash in one account (future-plans §5), a valuation-only record for property and loans, the legal structure of the holder (individual, joint, trust, company), real bank or broker connections, and the advisory fee (future-plans §1 step 4), which can use Custodial accounts as its base once B and O exist.
+Not in this plan: replay, tax lots and NZD cost, the FIF report (the cost in NZD exists as a read for the threshold test, [tax-cost-threshold.md](../features/tax-cost-threshold.md); tax lots stay out), multi-currency cash in one account (future-plans §5), a valuation-only record for property and loans, the legal structure of the holder (individual, joint, trust, company), real bank or broker connections, and the advisory fee (future-plans §1 step 4), which can use Custodial accounts as its base once B and O exist.
 
 ---
 

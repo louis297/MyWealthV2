@@ -1,6 +1,6 @@
 ---
 title: Cost in NZD and the threshold test
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -43,7 +43,7 @@ It is the one input of the FIF report that is path-dependent, and the only one t
 
 New: fields on the item of `GET /users/customers/{customerId}/tax-years/{taxYear}` (`threshold`, a `cost` on each tax holding and on each event); Domain types `FifThreshold`, `TaxCostLedger`, `TaxCost`, `ThresholdTest` and their enums; `CustomerTaxYear.Compute` and the service `CustomerTaxLedger` carry them. No route, script, table, permission, problem code, domain event, `TransactionType`, port, job or setting. No write changes: the `Holdings` projection and its average cost in the quote currency stay as they are. No portal page and no simulator change.
 
-**Status is `review` (2026-11-28).** It is not a build contract. The eighteen points of §11 wait for confirmation; each states a recommendation, and the rules are written as recommended. The changes to other docs in §12 are a plan until the spec is accepted.
+**Status is `accepted` (2026-11-28).** The eighteen points of §11 were confirmed on 2026-11-28, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract.
 
 The tax statements in this spec were read again from Inland Revenue on 2026-11-28 (§14). The Income Tax Act refused automated reads again; §14 says which rules rest on the guide alone. Nothing here is tax advice.
 
@@ -205,7 +205,7 @@ What the example shows:
 | R19 | **Outcome.** `Above` when the highest total is more than the threshold; `NotAbove` when it is equal to it or less (S1 p.10, "equal to or less than $50,000 at all times in the year") and the test is complete; `Unknown` otherwise. Above the threshold at one point, every attributing tax holding is in the rules for the whole tax year, and the first $50,000 is not exempt (S1 p.9). The outcome says nothing about tax residency or about a choice to apply the rules (R23). |
 | R20 | **Incomplete (roadmap T5).** The test is incomplete when a reason of the table below applies, and it lists every one with its tax holding. An incomplete test is never `NotAbove`. It does not make a tax holding incomplete (tax-year-events R27), and it does not change `complete` of the tax year: FIF income can be worked out for a holding whose cost is unknown. The answer is 200. |
 | R21 | **A floor.** A tax cost is never below 0, so a total of the known costs is never more than the true total. An incomplete test whose highest total is above the threshold is therefore `Above`: the missing figures can only add to it. Its `peak` is then "at least" this figure, and `complete` `false` says so. |
-| R22 | **A treatment that changed while held.** When an Instrument becomes or stops being exempt, the tax rules treat the holder as selling and buying at market value (S1 p.22 note 8), and the cost for the threshold starts again from that value. The platform does not work this out (roadmap §7). For a tax holding that counts in `Y`: take the instant its quantity last left 0, and each tax year from that instant's to `Y − 1`. If the Instrument's treatment for one of those years is `NotForeign`, `ExemptAsxListed` or `ExemptOther`, the test is incomplete with the reason `TreatmentChanged`. The tax cost of the walk is still shown and still counts as a floor. A year for which the Instrument is `NotClassified` says nothing and is skipped. |
+| R22 | **A treatment that changed while held.** When an Instrument becomes or stops being exempt, the tax rules treat the holder as selling and buying at market value (S1 p.22 note 8), and the cost for the threshold starts again from that value. The platform does not work this out (roadmap §7). For a tax holding that counts in `Y` and is held at the opening: take the instant its quantity last left 0 before the opening, and each tax year from that instant's to `Y − 1`. A tax holding not held at the opening has no earlier year to check: the shares it holds in `Y` were all bought in `Y`. If the Instrument's treatment for one of those years is `NotForeign`, `ExemptAsxListed` or `ExemptOther`, the test is incomplete with the reason `TreatmentChanged`. The tax cost of the walk is still shown and still counts as a floor. A year for which the Instrument is `NotClassified` says nothing and is skipped. |
 | R23 | **What the test does not do.** It does not offer half the market value on 1 April 2007 for an interest acquired before 1 January 2000 (S1 p.23): the walk uses the actual cost, or says that it has none. It does not add a share of a joint holding. It does not say whether the Customer chose to apply the rules in this or an earlier year. |
 
 Reasons of R20:
@@ -222,7 +222,7 @@ Reasons of R20:
 | ID | Rule |
 | --- | --- |
 | R24 | **Fields.** The item gains `threshold`: `{ amount, opening, peak, closing, outcome, complete, incomplete, steps }`. `amount` is the threshold of the year or `null`; `opening` and `closing` are the totals of R17; `peak` is `{ total, at, instrumentId, transactionId }`, the last two `null` when the peak is the opening; `incomplete` is a list of `{ reason, instrumentId }`; `steps` lists each event of the year that changed the total or made a cost unknown, in order, as `{ at, instrumentId, eventSequence, transactionId, kind, change, total }`, so that the peak can be checked from the figures shown. A tax holding gains `cost`: `{ status, opening, closing, unknown }` with `status` `Known`, `Unknown` or `NotRequired`, and `unknown` `{ cause, at, transactionId }` or `null`. An event gains `cost`: `{ change, after, fx }`, where `fx` is the rate row of a carried cost or a correction (`null` otherwise: an acquisition's rate is the event's own `fx`); the whole object is `null` when the status of the tax holding is `NotRequired`. Every figure is in NZD with NZD's decimal places. §8.1 shows each shape. Every caller who may read the Customer sees every field. |
-| R25 | **Notice.** `CarriedCost` joins the notices of tax-year-events R28: an arrival that R9 costed is in the walk of the tax holding, in this tax year or an earlier one, since its quantity last left 0. It does not make anything incomplete. |
+| R25 | **Notice.** `CarriedCost` joins the notices of tax-year-events R28: an arrival that R9 costed is in the walk of the tax holding in this tax year, or in an earlier one after the instant its quantity last left 0 before the opening when it is held at the opening (the window of R22). It does not make anything incomplete. |
 | R26 | **Still a ledger read.** tax-year-events R32 holds, and reaches further here: an entry backdated on an External account into any earlier tax year changes the tax cost of every later one (roadmap Q15), and so does a rate row inserted later for the date of an old purchase. |
 
 Policies: none added.
@@ -454,9 +454,9 @@ No new ADR.
 | Where | Fields of `GET /users/customers/{customerId}/tax-years/{taxYear}` |
 | Routes, scripts, permissions, problem codes, events, ports, jobs, settings | None |
 
-### Points to confirm
+### Points confirmed
 
-Each point states the recommendation, written into the rules above, and the alternative.
+Confirmed on 2026-11-28, every one as recommended. Each point states the choice, written into the rules above, and the alternative that was not taken.
 
 1. **The cost and the test are fields of the tax year read** (R1, R24). Recommended: they are worked out from the same events, in one read of the ledger with one `ledgerReadAt`, and roadmap TR3 allows "in the result of the TR2 read or beside it". Alternative: a route of its own (`…/tax-years/{taxYear}/threshold`), which reads the ledger a second time and may show another state of it.
 2. **One tax cost per tax holding, over all Accounts** (R3, R7). Recommended: roadmap T1 and Q9 ("the average cost in NZD of that interest"); a move then needs no rule. Alternative: an average per Account, as the ledger keeps it, which makes the cost a sale removes depend on which Account sold.
@@ -503,7 +503,7 @@ Still open, not this slice:
 
 ## 12. Changes to other docs
 
-A plan while this spec is in `review`. Each doc is changed in place when it is accepted.
+Each doc was changed in place when this spec was accepted (2026-11-28).
 
 | Doc | Change |
 | --- | --- |
