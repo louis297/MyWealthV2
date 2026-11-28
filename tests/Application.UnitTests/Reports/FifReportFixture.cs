@@ -66,6 +66,14 @@ internal static class FifReportFixture
     public static List<CustomerFifTable> Tables(this CustomerFifSection section) =>
         section.Blocks.OfType<CustomerFifTable>().ToList();
 
+    /// <summary>The table at <paramref name="index"/> of a section, as an assertion.</summary>
+    public static CustomerFifTable Table(this CustomerFifSection section, int index)
+    {
+        var tables = section.Tables();
+        tables.Count.ShouldBeGreaterThan(index);
+        return tables[index];
+    }
+
     /// <summary>Every line of text and every table row of the whole report, a row as its cells joined by " | ".</summary>
     public static List<string> AllLines(this CustomerFifContent content) =>
         content.Header
