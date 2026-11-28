@@ -14,7 +14,8 @@ public sealed record LedgerFact(
     IReadOnlyList<LedgerCashLeg> CashLegs,
     IReadOnlyList<LedgerSecurityLeg> SecurityLegs,
     LedgerDividend? Dividend = null,
-    LedgerInKindTransfer? InKindTransfer = null);
+    LedgerInKindTransfer? InKindTransfer = null,
+    LedgerInterest? Interest = null);
 
 /// <summary>A cash leg in the currency of its Account, signed as booked, with the kind of a <c>Tax</c> leg.</summary>
 public sealed record LedgerCashLeg(
@@ -42,3 +43,7 @@ public sealed record LedgerDividend(int InstrumentId, decimal Shares, DividendTa
 
 /// <summary>The in-kind transfer detail: whether the beneficial owner changes, and the stated acquisition date.</summary>
 public sealed record LedgerInKindTransfer(bool ChangesBeneficialOwner, DateOnly? AcquiredOn);
+
+/// <summary>The interest detail of an interest run's posting: the period it was paid for (interest-run R26;
+/// docs/features/income-summary.md §5). A hand-entered <c>Interest</c> has none.</summary>
+public sealed record LedgerInterest(DateOnly PeriodFrom, DateOnly PeriodTo, int Days);

@@ -25,6 +25,12 @@ public static class TaxLedger
     }
 
     /// <summary>
+    /// Income-summary R3: one item per <c>Interest</c> of <paramref name="facts"/>, in the order of R8. A reversed
+    /// Transaction and every Reversal give none. <see cref="Build"/> gives no event for an <c>Interest</c> (R17).
+    /// </summary>
+    public static IReadOnlyList<TaxInterest> BuildInterest(IEnumerable<LedgerFact> facts) => [];
+
+    /// <summary>
     /// R22: each Account's quantity of each Instrument before <paramref name="instant"/>, from the events booked before
     /// it; a move counts from its later leg. A quantity of 0 is left out.
     /// </summary>
