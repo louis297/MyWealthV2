@@ -13,7 +13,7 @@ public class CustomerFifBinderTests
 
     private static readonly DateOnly Today = new(2026, 11, 28);
 
-    private static CustomerFifBinding Bind(string json, DateOnly? today = null)
+    private static CustomerTaxYearBinding Bind(string json, DateOnly? today = null)
     {
         using var document = JsonDocument.Parse(json);
         return CustomerFifBinder.Bind(document.RootElement, today ?? Today);
