@@ -22,7 +22,7 @@ public sealed record CustomerTaxLedgerRead(
 
 /// <summary>
 /// Tax-year-events §7: the Customer's Accounts, the facts of R6, <see cref="TaxLedger.Build"/>, the rate rows the events
-/// of the year need, the values of the opening, the closing and each arrival or departure through
+/// of the year and the tax cost walk need (tax-cost-threshold §7), the treatments of earlier tax years, the values of the opening, the closing and each arrival or departure through
 /// <see cref="IValueAccount.ForPositionAsync"/>, the treatments, then <see cref="CustomerTaxYear.Compute"/>. Reads ignore
 /// the tenant filter and name the Tenant themselves, so that a <c>worker</c> run can call this later.
 /// </summary>
@@ -55,7 +55,15 @@ public class CustomerTaxLedger(
         var treatments = instruments.ToDictionary(instrument => instrument.Id, instrument => Treatment(instrument, taxYear));
 
         var ofYear = events.Where(e => e.BookedAt >= from && e.BookedAt < to).ToList();
-        var rates = await RatesAsync(ofYear, cancellationToken);
+
+        // Tax-cost-threshold R4, R14, R22: the Instruments whose tax cost is walked, the rate rows of that walk from the
+        // Customer's first event on, and their treatment for every earlier tax year they have an event in or after.
+        var costed = events.Select(e => e.InstrumentId)
+            .Distinct()
+            .Where(id => CustomerTaxYear.NeedsValue(treatments.GetValueOrDefault(id)?.FifTreatment ?? FifTreatment.NotClassified))
+            .ToHashSet();
+        var rates = await RatesAsync(YearKeys(ofYear).Union(TaxCostLedger.RateKeys(events, costed)), cancellationToken);
+        var earlierTreatments = EarlierTreatments(events, instruments.Where(instrument => costed.Contains(instrument.Id)), taxYear);
 
         var basisChanges = new Dictionary<int, IReadOnlyList<BasisChange>>();
         var valued = treatments.Where(row => CustomerTaxYear.NeedsValue(row.Value.FifTreatment)).Select(row => row.Key).ToHashSet();
@@ -64,7 +72,7 @@ public class CustomerTaxLedger(
             await LinesAtAsync(events, to, TaxYear.ClosingDay(taxYear), valued, byId, basisChanges, cancellationToken),
             await MarketValuesAsync(ofYear, byId, cancellationToken));
 
-        var year = CustomerTaxYear.Compute(taxYear, events, treatments, rates, values, Places(CustomerTaxYear.Nzd));
+        var year = CustomerTaxYear.Compute(taxYear, events, treatments, rates, values, Places(CustomerTaxYear.Nzd), earlierTreatments);
         return new CustomerTaxLedgerRead(
             year,
             accounts.ToDictionary(account => account.Id, account => account.PublicId),
@@ -158,25 +166,48 @@ public class CustomerTaxLedger(
             ? new TaxTreatment(row.Treatment, row.TaxYear, row.Note, instrument.IssuerCountry)
             : TaxTreatment.NotClassified(instrument.IssuerCountry);
 
-    /// <summary>
-    /// R18, R21: for each currency other than NZD and each UTC date of a <c>bookedAt</c>, the stored row of the pair into
-    /// NZD with the latest date on or before it. A missing pair is passed on as none, never as a number (fx-rates R7).
-    /// </summary>
-    private async Task<Dictionary<(string Currency, DateOnly Date), StoredRate>> RatesAsync(
-        IEnumerable<TaxEvent> events, CancellationToken cancellationToken)
-    {
-        var rates = new Dictionary<(string Currency, DateOnly Date), StoredRate>();
-        var keys = events
+    /// <summary>R18: each currency other than NZD and each UTC date of a <c>bookedAt</c> of the events of the year.</summary>
+    private static IEnumerable<(string Currency, DateOnly Date)> YearKeys(IEnumerable<TaxEvent> events) =>
+        events
             .Select(e => (Currency: e.Trade?.Currency ?? e.Dividend?.Currency, Date: LedgerDay.Of(e.BookedAt)))
             .Where(key => key.Currency is { Length: > 0 } && key.Currency != CustomerTaxYear.Nzd)
-            .Distinct();
-        foreach (var (currency, date) in keys)
+            .Select(key => (key.Currency!, key.Date));
+
+    /// <summary>
+    /// Tax-cost-threshold R22: the treatment of each Instrument for every tax year from the year of its first event to
+    /// the year before <paramref name="taxYear"/> (instrument-tax-attributes R11).
+    /// </summary>
+    private static Dictionary<(int InstrumentId, int TaxYear), FifTreatment> EarlierTreatments(
+        IReadOnlyList<TaxEvent> events, IEnumerable<Instrument> instruments, int taxYear)
+    {
+        var treatments = new Dictionary<(int InstrumentId, int TaxYear), FifTreatment>();
+        foreach (var instrument in instruments)
+        {
+            var first = TaxYear.Of(events.First(e => e.InstrumentId == instrument.Id).BookedAt);
+            for (var year = first; year < taxYear; year++)
+            {
+                treatments[(instrument.Id, year)] = instrument.FifTreatmentFor(year);
+            }
+        }
+
+        return treatments;
+    }
+
+    /// <summary>
+    /// R18, R21 and tax-cost-threshold R14: for each key, the stored row of the pair into NZD with the latest date on or
+    /// before it. A missing pair is passed on as none, never as a number (fx-rates R7).
+    /// </summary>
+    private async Task<Dictionary<(string Currency, DateOnly Date), StoredRate>> RatesAsync(
+        IEnumerable<(string Currency, DateOnly Date)> keys, CancellationToken cancellationToken)
+    {
+        var rates = new Dictionary<(string Currency, DateOnly Date), StoredRate>();
+        foreach (var (currency, date) in keys.Distinct())
         {
             try
             {
                 var asOf = new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-                var reading = await fxRates.GetRateDetailAsync(currency!, CustomerTaxYear.Nzd, asOf, cancellationToken);
-                rates[(currency!, date)] = new StoredRate(reading.Rate, reading.AsOfDate, reading.Source.Trim());
+                var reading = await fxRates.GetRateDetailAsync(currency, CustomerTaxYear.Nzd, asOf, cancellationToken);
+                rates[(currency, date)] = new StoredRate(reading.Rate, reading.AsOfDate, reading.Source.Trim());
             }
             catch (FxRateNotFoundException)
             {

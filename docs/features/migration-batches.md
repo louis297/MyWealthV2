@@ -117,7 +117,7 @@ The rule that distinguishes this slice: a migration batch posts all of its entri
 - An outside proof of the migrated holdings. The custodian statement and its reconciliation are roadmap T3 and S3; until then the holdings of a batch are checked against the typed control totals only (§11 point 9)
 - Creating Customers, Accounts, Instruments, nominated bank accounts or tax profiles from a batch. Each exists before the batch names it
 - Past Transactions. A batch brings balances as at one date, not the history behind them (the known-issue row "History cannot be entered" stays)
-- Tax lots, acquisition dates and a cost in NZD (roadmap §10). An entry carries one cost per holding (§11 point 17)
+- Tax lots, acquisition dates and a cost in NZD stated on an entry (roadmap §10). An entry carries one cost per holding (§11 point 17). The threshold test converts it at the rate of the day the batch was booked, since an entry states no acquisition date ([tax-cost-threshold.md](tax-cost-threshold.md) R9)
 - Holdings in an instrument quoted in another currency than the Account's (roadmap D20, R9)
 - A migration into an account that already has a Transaction (§11 point 3)
 - A funding line shared by two batches, or one line split between a batch and a Customer's deposit
@@ -600,7 +600,7 @@ Still open, not this slice:
 - The custodian's proof of migrated holdings (roadmap T3)
 - One bulk transfer that funds several batches, or a batch and a Customer's deposit
 - Batches above the limit, posted by a job
-- Tax lots, acquisition dates and a cost in NZD for migrated holdings
+- Tax lots, acquisition dates and a cost in NZD stated for migrated holdings. The tax cost in NZD is read from the carried cost at the rate of the day of booking ([tax-cost-threshold.md](tax-cost-threshold.md) R9)
 - Migrated history: the Transactions behind an opening balance
 - Review of the entries by an Adviser before the batch is submitted
 - A report of a posted batch for the firm's records
@@ -625,3 +625,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-24 | [dividends.md](dividends.md) | R13: three match targets |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
 | 2026-11-28 | [tax-year-events.md](tax-year-events.md) | R33: a migrated `OpeningHoldings` is an arrival, or half of a move, in the tax year read |
+| 2026-11-28 | [tax-cost-threshold.md](tax-cost-threshold.md) | §2 Out, Still open: a migrated holding's cost is converted at the rate of the day it was booked |

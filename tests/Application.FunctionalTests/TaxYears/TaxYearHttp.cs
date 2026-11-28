@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MyWealthV2.Application.FunctionalTests.Accounts;
 using MyWealthV2.Application.FunctionalTests.Instruments;
 using MyWealthV2.Domain.CorporateActions;
+using MyWealthV2.Domain.Custody;
 using MyWealthV2.Domain.Entities;
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.ValueObjects;
@@ -47,6 +48,45 @@ internal static class TaxYearHttp
             rowVersion = json.RootElement.GetProperty("rowVersion").GetString()
         });
         response.StatusCode.ShouldBe(HttpStatusCode.NoContent, await response.Content.ReadAsStringAsync());
+    }
+
+    /// <summary>Sets the issuer country and several FIF treatment rows through <c>PUT /instruments/{id}/tax-attributes</c>.</summary>
+    public static async Task ClassifyAsync(string accessToken, Guid instrumentId, string country, params (int TaxYear, string Treatment)[] rows)
+    {
+        var item = await InstrumentHttp.Send(HttpMethod.Get, $"/instruments/{instrumentId}", accessToken);
+        using var json = JsonDocument.Parse(await item.Content.ReadAsStringAsync());
+        var response = await InstrumentHttp.Send(HttpMethod.Put, $"/instruments/{instrumentId}/tax-attributes", accessToken, new
+        {
+            issuerCountry = country,
+            fifTreatments = rows.Select(row => new { taxYear = row.TaxYear, treatment = row.Treatment, note = (string?)null }).ToArray(),
+            rowVersion = json.RootElement.GetProperty("rowVersion").GetString()
+        });
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent, await response.Content.ReadAsStringAsync());
+    }
+
+    /// <summary>
+    /// The <c>StockIn</c> of an in-kind transfer in with its cost and <c>acquiredOn</c> (in-kind-transfers R37, R38), as
+    /// the platform posts it on a Custodial account. Written with the Domain factory, because the server sets
+    /// <c>bookedAt</c> there.
+    /// </summary>
+    public static async Task<Guid> PostTransferInAsync(
+        Guid accountId, Guid instrumentId, decimal quantity, decimal cost, DateOnly? acquiredOn, DateTimeOffset bookedAt)
+    {
+        using var scope = FunctionalTestSetup.ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var account = await db.Accounts.IgnoreQueryFilters().SingleAsync(row => row.PublicId == accountId);
+        var instrument = await db.Instruments.IgnoreQueryFilters().SingleAsync(row => row.PublicId == instrumentId);
+        var transferId = Guid.NewGuid();
+        var origin = new InKindTransferOrigin(
+            transferId, "Other Broker", "12345678", false, acquiredOn, LedgerDay.Of(bookedAt), "REF-" + transferId.ToString("N")[..8]);
+        var posting = Transaction.PostTransferIn(
+            account.TenantId, account.Id, account.Type, instrument.Id, quantity, cost, instrument.QuoteCurrency, bookedAt,
+            TransactionSource.InKindTransfer(transferId), origin);
+        posting.CreatedBy = "test";
+        posting.SecurityLegs.ForEach(leg => leg.CreatedBy = "test");
+        db.Transactions.Add(posting);
+        await db.SaveChangesAsync();
+        return posting.PublicId;
     }
 
     /// <summary>A security body for <c>POST /transactions</c> on an External account.</summary>

@@ -13,13 +13,16 @@ public sealed record CustomerTaxYear(
     DateTimeOffset To,
     IReadOnlyList<TaxHolding> Holdings,
     bool Complete,
-    int IncompleteCount)
+    int IncompleteCount,
+    ThresholdTest Threshold)
 {
     /// <summary>
     /// R18, R21–R29 over the events of <see cref="TaxLedger.Build"/>. <paramref name="treatments"/> holds the treatment
     /// of each Instrument for the year (none: not classified); <paramref name="rates"/> the rate row into NZD read for a
     /// currency and the UTC date of a <c>bookedAt</c> (none: no row of the pair); <paramref name="values"/> the lines
     /// of the opening, the closing and each arrival or departure of the year; <paramref name="decimalPlaces"/> NZD's.
+    /// Tax-cost-threshold §5: <paramref name="rates"/> also holds the rows of <see cref="TaxCostLedger.RateKeys"/>, and
+    /// <paramref name="earlierTreatments"/> the treatment of an Instrument for an earlier tax year (none: not classified).
     /// </summary>
     public static CustomerTaxYear Compute(
         int taxYear,
@@ -27,13 +30,22 @@ public sealed record CustomerTaxYear(
         IReadOnlyDictionary<int, TaxTreatment> treatments,
         IReadOnlyDictionary<(string Currency, DateOnly Date), StoredRate> rates,
         TaxYearValues values,
-        int decimalPlaces)
+        int decimalPlaces,
+        IReadOnlyDictionary<(int InstrumentId, int TaxYear), FifTreatment>? earlierTreatments = null)
     {
         var from = Tax.TaxYear.Start(taxYear);
         var to = Tax.TaxYear.End(taxYear);
         var ofYear = events.Where(e => e.BookedAt >= from && e.BookedAt < to).ToList();
         var opening = TaxLedger.QuantitiesAt(events, from);
         var closing = TaxLedger.QuantitiesAt(events, to);
+
+        // Tax-cost-threshold R4, R5: the tax cost of every Instrument that needs a value, from the first event on.
+        var costed = events.Select(e => e.InstrumentId)
+            .Distinct()
+            .Where(id => NeedsValue((treatments.GetValueOrDefault(id) ?? TaxTreatment.NotClassified()).FifTreatment))
+            .ToHashSet();
+        var walk = TaxCostLedger.Walk(events, costed, rates, decimalPlaces);
+        var steps = walk.Steps.ToDictionary(step => step.Event.Ordinal);
 
         // R23: a tax holding is listed when it is held at the start or has an event in the year.
         var instruments = opening.Select(quantity => quantity.InstrumentId)
@@ -60,7 +72,8 @@ public sealed record CustomerTaxYear(
                 yearEvents.Add(Amounts(yearEvents.Count + 1, taxEvent, rates, values, decimalPlaces) with
                 {
                     QuantityAfter = quantity,
-                    ComparableQuantityAfter = comparable?[yearEvents.Count + 1]
+                    ComparableQuantityAfter = comparable?[yearEvents.Count + 1],
+                    Cost = steps.TryGetValue(taxEvent.Ordinal, out var step) ? new TaxEventCost(step.Change, step.CostAfter, step.Fx) : null
                 });
             }
 
@@ -75,11 +88,43 @@ public sealed record CustomerTaxYear(
                 comparable?.Max(),
                 yearEvents,
                 Reasons(treatment, start, end, yearEvents, comparable is not null),
-                Notices(treatment, Of(opening, instrumentId), yearEvents)));
+                Notices(treatment, Of(opening, instrumentId), yearEvents, costed.Contains(instrumentId) && CarriedCost(walk, instrumentId, from, to)),
+                costed.Contains(instrumentId) ? CostOf(walk, instrumentId, from, to) : TaxCost.NotRequired));
         }
 
         var incomplete = holdings.Count(holding => !holding.Complete);
-        return new CustomerTaxYear(taxYear, from, to, holdings, incomplete == 0, incomplete);
+        var threshold = ThresholdTest.Compute(taxYear, walk, treatments, earlierTreatments, FifThreshold.For(taxYear), decimalPlaces);
+        return new CustomerTaxYear(taxYear, from, to, holdings, incomplete == 0, incomplete, threshold);
+    }
+
+    /// <summary>
+    /// Tax-cost-threshold R13, R24: the tax cost at the two instants, and the first cause of an unknown cost at the
+    /// opening or after an event of the year.
+    /// </summary>
+    private static TaxCost CostOf(TaxCostWalk walk, int instrumentId, DateTimeOffset from, DateTimeOffset to)
+    {
+        var opening = walk.At(instrumentId, from);
+        var unknown = opening.Cost is null
+            ? opening.Unknown
+            : walk.Steps.FirstOrDefault(step => step.Event.InstrumentId == instrumentId
+                                               && step.Event.BookedAt >= from
+                                               && step.Event.BookedAt < to
+                                               && step.CostAfter is null)?.Unknown;
+        return new TaxCost(unknown is null ? TaxCostStatus.Known : TaxCostStatus.Unknown, opening.Cost, walk.At(instrumentId, to).Cost, unknown);
+    }
+
+    /// <summary>
+    /// Tax-cost-threshold R25: an arrival whose carried cost was added, booked in the year, or before it after the
+    /// quantity last left 0 when the holding is held at the opening.
+    /// </summary>
+    private static bool CarriedCost(TaxCostWalk walk, int instrumentId, DateTimeOffset from, DateTimeOffset to)
+    {
+        var since = walk.HeldSince(instrumentId, from);
+        return walk.Steps.Any(step => step.Event.InstrumentId == instrumentId
+                                      && step.Event.Kind == TaxEventKind.Arrival
+                                      && step.Change is not null
+                                      && step.Event.BookedAt < to
+                                      && (step.Event.BookedAt >= from || (since is { } held && step.Event.BookedAt >= held)));
     }
 
     /// <summary>
@@ -177,9 +222,15 @@ public sealed record CustomerTaxYear(
     }
 
     /// <summary>R28, R29: each notice of the table that applies, once, in the order of the table.</summary>
-    private static List<TaxNotice> Notices(TaxTreatment treatment, IReadOnlyList<TaxQuantity> opening, IReadOnlyList<TaxYearEvent> events)
+    private static List<TaxNotice> Notices(
+        TaxTreatment treatment, IReadOnlyList<TaxQuantity> opening, IReadOnlyList<TaxYearEvent> events, bool carriedCost)
     {
         var notices = new SortedSet<TaxNotice>();
+        if (carriedCost)
+        {
+            notices.Add(TaxNotice.CarriedCost);
+        }
+
         if (opening.Any(q => q.CustodyMode == CustodyMode.External)
             || events.Any(e => e.Event.CustodyMode == CustodyMode.External || e.Event.Changes.Any(c => c.CustodyMode == CustodyMode.External)))
         {
@@ -260,7 +311,7 @@ public sealed record CustomerTaxYear(
         TaxYearValues values,
         int decimalPlaces)
     {
-        var none = new TaxYearEvent(sequence, taxEvent, 0m, null, null, TaxAmountStatus.None, null, null, null, null, null);
+        var none = new TaxYearEvent(sequence, taxEvent, 0m, null, null, TaxAmountStatus.None, null, null, null, null, null, null);
         switch (taxEvent.Kind)
         {
             case TaxEventKind.Arrival:
@@ -271,13 +322,8 @@ public sealed record CustomerTaxYear(
             case TaxEventKind.Disposal:
             case TaxEventKind.Dividend:
                 var currency = taxEvent.Trade?.Currency ?? taxEvent.Dividend!.Currency;
-                var (status, rate) = RateOf(currency, LedgerDay.Of(taxEvent.BookedAt), rates);
-                decimal? Nzd(decimal amount) => status switch
-                {
-                    TaxAmountStatus.Stated => Round(amount, decimalPlaces),
-                    TaxAmountStatus.Converted => Round(amount * rate!.Rate, decimalPlaces),
-                    _ => null
-                };
+                var (status, rate) = TaxFx.RateOf(currency, LedgerDay.Of(taxEvent.BookedAt), rates);
+                decimal? Nzd(decimal amount) => TaxFx.Nzd(amount, status, rate, decimalPlaces);
 
                 if (taxEvent.Dividend is { } dividend)
                 {
@@ -329,31 +375,12 @@ public sealed record CustomerTaxYear(
         return none with { Status = status, Amount = line.Value, Price = line.Price, Fx = line.Fx };
     }
 
-    /// <summary>R18, R21: an NZD leg is used as booked; any other needs a row of the pair no older than the age limit.</summary>
-    private static (TaxAmountStatus Status, StoredRate? Rate) RateOf(
-        string currency, DateOnly date, IReadOnlyDictionary<(string Currency, DateOnly Date), StoredRate> rates)
-    {
-        if (currency == Nzd)
-        {
-            return (TaxAmountStatus.Stated, null);
-        }
-
-        if (!rates.TryGetValue((currency, date), out var rate))
-        {
-            return (TaxAmountStatus.NoRate, null);
-        }
-
-        return ValuationRules.IsFresh(rate.AsOfDate, date) ? (TaxAmountStatus.Converted, rate) : (TaxAmountStatus.StaleRate, rate);
-    }
-
     /// <summary>R23: an opening and a closing value are worked out for an attributing and a not classified holding.</summary>
     public static bool NeedsValue(FifTreatment treatment) =>
         treatment is FifTreatment.Attributing or FifTreatment.AttributingNoFdr or FifTreatment.NotClassified;
 
     /// <summary>The currency of every figure of a tax year (R31).</summary>
     public const string Nzd = "NZD";
-
-    private static decimal Round(decimal amount, int places) => decimal.Round(amount, places, MidpointRounding.AwayFromZero);
 }
 
 /// <summary>R26: the treatment of an Instrument for the year, with what a report has to keep.</summary>
@@ -387,7 +414,8 @@ public sealed record TaxHolding(
     decimal? PeakQuantity,
     IReadOnlyList<TaxYearEvent> Events,
     IReadOnlyList<TaxIncompleteReason> Incomplete,
-    IReadOnlyList<TaxNotice> Notices)
+    IReadOnlyList<TaxNotice> Notices,
+    TaxCost Cost)
 {
     /// <summary>R27: complete if and only if no reason is listed.</summary>
     public bool Complete => Incomplete.Count == 0;
@@ -403,7 +431,8 @@ public sealed record TaxPoint(
     TaxValueStatus Status,
     IReadOnlyList<TaxValueLine> Lines);
 
-/// <summary>A tax event of the year with its NZD figures and the quantities after it (R18–R25, R31).</summary>
+/// <summary>A tax event of the year with its NZD figures and the quantities after it (R18–R25, R31), and its tax cost
+/// (tax-cost-threshold R24; none when the tax holding needs no tax cost).</summary>
 public sealed record TaxYearEvent(
     int Sequence,
     TaxEvent Event,
@@ -415,7 +444,8 @@ public sealed record TaxYearEvent(
     StoredPrice? Price,
     decimal? Principal,
     decimal? Fee,
-    TaxDividendAmounts? Dividend);
+    TaxDividendAmounts? Dividend,
+    TaxEventCost? Cost);
 
 /// <summary>R11: the figures of a dividend in NZD, each <c>null</c> when it could not be worked out.</summary>
 public sealed record TaxDividendAmounts(

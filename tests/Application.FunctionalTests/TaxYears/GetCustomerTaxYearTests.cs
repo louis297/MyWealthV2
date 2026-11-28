@@ -22,7 +22,7 @@ public class GetCustomerTaxYearTests : TestBase
         var year = await ReadAsync(world.Token, world.Customer.PublicId, 2026);
 
         year.EnumerateObject().Select(property => property.Name).ShouldBe(
-            ["customerId", "taxYear", "from", "to", "currency", "ledgerReadAt", "holdings", "complete", "incompleteCount"]);
+            ["customerId", "taxYear", "from", "to", "currency", "ledgerReadAt", "holdings", "complete", "incompleteCount", "threshold"]);
         year.GetProperty("customerId").GetGuid().ShouldBe(world.Customer.PublicId);
         year.GetProperty("taxYear").GetInt32().ShouldBe(2026);
         year.GetProperty("from").GetString().ShouldBe("2025-03-31T11:00:00Z");
@@ -80,7 +80,7 @@ public class GetCustomerTaxYearTests : TestBase
         var disposal = events[0];
         disposal.EnumerateObject().Select(property => property.Name).ShouldBe([
             "sequence", "kind", "bookedAt", "transactionId", "accountId", "custodyMode", "quantity", "quantityAfter",
-            "comparableQuantityAfter", "amount", "status", "ledger", "fx", "price", "principal", "fee", "dividend", "carriedCost", "move"
+            "comparableQuantityAfter", "amount", "status", "ledger", "fx", "price", "principal", "fee", "dividend", "carriedCost", "move", "cost"
         ]);
         disposal.GetProperty("bookedAt").GetString().ShouldBe("2025-03-31T20:15:00Z");
         (disposal.GetProperty("accountId").GetGuid(), disposal.GetProperty("custodyMode").GetString(), disposal.GetProperty("quantity").GetDecimal())
@@ -200,7 +200,10 @@ public class GetCustomerTaxYearTests : TestBase
         var cost = first.GetProperty("carriedCost");
         (cost.GetProperty("amount").GetDecimal(), cost.GetProperty("currency").GetString()).ShouldBe((700.00m, "USD"));
         cost.GetProperty("acquiredOn").ValueKind.ShouldBe(JsonValueKind.Null);
-        Strings(holding.GetProperty("notices")).ShouldBe(["ExternalFigures", "ArrivalAtMarketValue", "DepartureAtMarketValue"]);
+        // Tax-cost-threshold R9, R25: the carried cost at the rate of the day it was booked, and its notice.
+        (first.GetProperty("cost").GetProperty("change").GetDecimal(), first.GetProperty("cost").GetProperty("fx").GetProperty("rate").GetDecimal())
+            .ShouldBe((1_176.00m, 1.68m));
+        Strings(holding.GetProperty("notices")).ShouldBe(["ExternalFigures", "ArrivalAtMarketValue", "DepartureAtMarketValue", "CarriedCost"]);
         // No price for 31 March 2026 is stored: the closing is not valued and the holding is incomplete.
         Strings(holding.GetProperty("incomplete")).ShouldBe(["ClosingNotValued"]);
     }

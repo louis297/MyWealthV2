@@ -712,7 +712,7 @@ Invariants: an `(Account, day)` has at most one stored valuation; an account's s
 
 ### 8.24 Tax year of a Customer (accepted — tax-year-events slice)
 
-A read model, not an entity: nothing is stored and no event is raised. Types in `src/Domain/Tax`. Field rules: [features/tax-year-events.md](features/tax-year-events.md).
+A read model, not an entity: nothing is stored and no event is raised. Types in `src/Domain/Tax`. Field rules: [features/tax-year-events.md](features/tax-year-events.md); the tax cost and the threshold test: [features/tax-cost-threshold.md](features/tax-cost-threshold.md).
 
 | Type | Kind | Notes |
 | --- | --- | --- |
@@ -722,10 +722,14 @@ A read model, not an entity: nothing is stored and no event is raised. Types in 
 | `TaxEvent` | Value | One event: kind, Transaction, Instrument, Account, quantity, the figures in the Account's currency, and for a move its two legs |
 | `TaxLedger` | Static | `Build(facts)`: the tax events of a Customer in the order `bookedAt`, then the internal Transaction id, over every tax year; reversed Transactions and Reversals left out; moves paired. Reads no clock and no store |
 | `TaxHolding` | Value | One Instrument in one tax year: treatment, opening and closing, events with NZD figures and quantities, peak, reasons and notices |
-| `CustomerTaxYear` | Value | The result. `Compute(taxYear, events, treatments, rates, values, decimalPlaces)` turns amounts into NZD and works out the comparable quantities, the peak, the reasons and the notices |
-| `TaxIncompleteReason`, `TaxNotice` | Enums | `NotClassified`, `OpeningNotValued`, `ClosingNotValued`, `AmountMissing`, `NegativeQuantity`, `NoComparableQuantity`; `ExternalFigures`, `ArrivalAtMarketValue`, `DepartureAtMarketValue`, `Move`, `Scrip`, `Correction`, `DividendTaxSourceDisagrees` |
+| `CustomerTaxYear` | Value | The result. `Compute(taxYear, events, treatments, rates, values, decimalPlaces, earlierTreatments)` turns amounts into NZD and works out the comparable quantities, the peak, the reasons and the notices; it calls `TaxCostLedger.Walk` and `ThresholdTest.Compute` and carries `Threshold`, a `TaxCost` on each tax holding and the cost figures on each event |
+| `FifThreshold` | Static rule | `For(taxYear)`: the threshold in NZD, or none. NZ$50,000 for tax years 2009 to 2026; no value from 2027 until amended |
+| `TaxCostLedger` | Static | `Walk(events, costed, rates, decimalPlaces)`: the tax cost in NZD of each tax holding after each event, from the Customer's first event on: an acquisition adds principal and fee, a disposal or a departure removes the average, an arrival adds its carried cost, a correction its two deltas; or the cause it is unknown. Reads no clock and no store |
+| `TaxCost` | Value | The cost of one tax holding in one tax year: status (`Known`, `Unknown`, `NotRequired`), opening, closing and the first unknown point (`TaxCostUnknownCause`: `NoCarriedCost`, `NoRate`, `StaleRate`, `NegativeQuantity`, `NegativeCost`) |
+| `ThresholdTest` | Value | `Compute(...)`: over the `Attributing` and `AttributingNoFdr` tax holdings of the year, the opening, peak and closing totals, the steps, the outcome (`ThresholdOutcome`: `NotAbove`, `Above`, `Unknown`) and the reasons it is incomplete (`ThresholdIncompleteReason`: `NotClassified`, `CostUnknown`, `TreatmentChanged`, `NoThreshold`) |
+| `TaxIncompleteReason`, `TaxNotice` | Enums | `NotClassified`, `OpeningNotValued`, `ClosingNotValued`, `AmountMissing`, `NegativeQuantity`, `NoComparableQuantity`; `ExternalFigures`, `ArrivalAtMarketValue`, `DepartureAtMarketValue`, `Move`, `Scrip`, `Correction`, `DividendTaxSourceDisagrees`, `CarriedCost` |
 
-Invariants: a reversed Transaction and a Reversal give no event and count in no quantity; the closing quantity and value of tax year `Y` equal the opening of `Y + 1`; a `Dividend` and a `Move` never change a quantity; an event has an amount only when every figure it is made of could be worked out; a tax holding is complete if and only if it lists no reason; the comparable quantity at the closing equals the quantity.
+Invariants: a reversed Transaction and a Reversal give no event and count in no quantity; the closing quantity and value of tax year `Y` equal the opening of `Y + 1`; a `Dividend` and a `Move` never change a quantity; an event has an amount only when every figure it is made of could be worked out; a tax holding is complete if and only if it lists no reason; the comparable quantity at the closing equals the quantity. A tax cost is `≥ 0` or unknown, and 0.00 whenever the quantity is 0; a `Reorganisation`, a `Dividend` and a `Move` never change it; the closing tax cost of `Y` equals the opening of `Y + 1`; the highest total is never below the opening or the closing total; `NotAbove` comes only from a complete test; the test never changes `complete` of a tax holding or of the tax year.
 
 ## 9. Value objects (Domain assembly; may exist in Phase 1)
 
@@ -771,6 +775,7 @@ One row per change. The text of each change is in git (`git log -p -- docs/domai
 | 2026-11-26 | Valuation history: `FxFold`, `FoldLine`, `FoldedTotal`, `FoldLineStatus` (§8.22). No entity or event. [features/valuation-history.md](features/valuation-history.md) |
 | 2026-11-27 | Income on External accounts: `EnteredTax`, `EnteredTaxes`, `Transaction.PostEnteredDividend` and `PostEnteredInterest`; the dividend detail's amount per share and ex-date optional; `CustodyRules` allows `Dividend` on an External account. No event. [features/external-income.md](features/external-income.md) |
 | 2026-11-28 | Tax year events in NZD: `TaxYear`, `LedgerFact`, `TaxEventKind`, `TaxEvent`, `TaxLedger`, `TaxHolding`, `CustomerTaxYear`, `TaxIncompleteReason`, `TaxNotice` (§8.24); `AccountPosition.CutAt` (§8.22). No entity or event. [features/tax-year-events.md](features/tax-year-events.md) |
+| 2026-11-28 | Cost in NZD and the threshold test: `FifThreshold`, `TaxCostLedger`, `TaxCost`, `TaxCostStatus`, `TaxCostUnknownCause`, `ThresholdTest`, `ThresholdOutcome`, `ThresholdIncompleteReason`; `TaxNotice.CarriedCost`; `CustomerTaxYear.Threshold` (§8.24). No entity or event. [features/tax-cost-threshold.md](features/tax-cost-threshold.md) |
 
 ---
 

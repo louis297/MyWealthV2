@@ -100,6 +100,13 @@ public class GetCustomerTaxYearAccessTests : TestBase
 
             year.GetProperty("holdings").EnumerateArray().SelectMany(holding => holding.GetProperty("events").EnumerateArray())
                 .Select(e => e.GetProperty("transactionId").GetGuid()).ShouldAllBe(id => world.T.Values.Contains(id));
+
+            // Tax-cost-threshold: the totals hold the Customer's own purchases only, once.
+            var threshold = year.GetProperty("threshold");
+            (threshold.GetProperty("opening").GetDecimal(), threshold.GetProperty("closing").GetDecimal()).ShouldBe((12_355.70m, 10_792.33m));
+            var steps = threshold.GetProperty("steps").EnumerateArray().Select(step => step.GetProperty("transactionId").GetGuid()).ToList();
+            steps.ShouldNotBeEmpty();
+            steps.ShouldAllBe(id => world.T.Values.Contains(id));
         }
     }
 }
