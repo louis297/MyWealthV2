@@ -16,7 +16,8 @@ public sealed record CustomerTaxYear(
     int IncompleteCount,
     ThresholdTest Threshold,
     FifIncome FifIncome,
-    IReadOnlyList<TaxYearInterest> Interest)
+    IReadOnlyList<TaxYearInterest> Interest,
+    TaxYearIncome Income)
 {
     /// <summary>
     /// R18, R21–R29 over the events of <see cref="TaxLedger.Build"/>. <paramref name="treatments"/> holds the treatment
@@ -108,7 +109,10 @@ public sealed record CustomerTaxYear(
             .Where(item => item.BookedAt >= from && item.BookedAt < to)
             .Select((item, index) => InterestAmounts(index + 1, item, rates, decimalPlaces))
             .ToList();
-        return new CustomerTaxYear(taxYear, from, to, withIncome, incomplete == 0, incomplete, threshold, fifIncome, interestOfYear);
+        // Income-summary R6–R12: the income summary, from the tax holdings and the interest items; it changes no complete.
+        var income = TaxYearIncome.Compute(withIncome, interestOfYear, decimalPlaces);
+        return new CustomerTaxYear(
+            taxYear, from, to, withIncome, incomplete == 0, incomplete, threshold, fifIncome, interestOfYear, income);
     }
 
     /// <summary>
