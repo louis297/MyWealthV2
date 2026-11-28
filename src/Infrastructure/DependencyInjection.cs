@@ -114,6 +114,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<IReportGenerator, AdviserBalancesReportGenerator>();
         builder.Services.AddScoped<IReportGenerator, BankReconciliationReportGenerator>();
         builder.Services.AddScoped<IReportGenerator, CustomerFifReportGenerator>();
+        builder.Services.AddScoped<IReportGenerator, CustomerIncomeSummaryReportGenerator>();
         builder.Services.AddScoped<IReportGeneratorRegistry, ReportGeneratorRegistry>();
         builder.Services.AddScoped<ReportJob>();
         builder.Services.AddScoped<IReconcileClientMoneyAccount, ReconcileClientMoneyAccount>();
