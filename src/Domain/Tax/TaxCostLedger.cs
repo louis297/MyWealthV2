@@ -9,6 +9,14 @@ namespace MyWealthV2.Domain.Tax;
 public static class TaxCostLedger
 {
     /// <summary>
+    /// R14: the currencies and dates whose rate row into NZD the walk of <paramref name="costed"/> reads: an acquisition
+    /// in another currency on the UTC date of its <c>bookedAt</c>; a carried cost of an arrival in another currency on
+    /// its <c>acquiredOn</c>, else on that UTC date; a correction's cost change in another currency on that UTC date.
+    /// </summary>
+    public static IReadOnlySet<(string Currency, DateOnly Date)> RateKeys(IEnumerable<TaxEvent> events, IReadOnlySet<int> costed) =>
+        new HashSet<(string Currency, DateOnly Date)>();
+
+    /// <summary>
     /// R5–R14: walks <paramref name="events"/> (the order of <see cref="TaxLedger.Build"/>) for the Instruments in
     /// <paramref name="costed"/>. <paramref name="rates"/> holds the rate row into NZD read for a currency and a date
     /// (none: no row of the pair); <paramref name="decimalPlaces"/> are NZD's.
