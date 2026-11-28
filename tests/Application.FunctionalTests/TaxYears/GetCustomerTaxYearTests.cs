@@ -22,7 +22,7 @@ public class GetCustomerTaxYearTests : TestBase
         var year = await ReadAsync(world.Token, world.Customer.PublicId, 2026);
 
         year.EnumerateObject().Select(property => property.Name).ShouldBe(
-            ["customerId", "taxYear", "from", "to", "currency", "ledgerReadAt", "holdings", "complete", "incompleteCount", "threshold"]);
+            ["customerId", "taxYear", "from", "to", "currency", "ledgerReadAt", "holdings", "complete", "incompleteCount", "threshold", "fifIncome"]);
         year.GetProperty("customerId").GetGuid().ShouldBe(world.Customer.PublicId);
         year.GetProperty("taxYear").GetInt32().ShouldBe(2026);
         year.GetProperty("from").GetString().ShouldBe("2025-03-31T11:00:00Z");

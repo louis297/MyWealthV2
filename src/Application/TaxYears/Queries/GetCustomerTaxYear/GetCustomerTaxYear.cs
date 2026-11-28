@@ -51,7 +51,8 @@ public class GetCustomerTaxYearQueryHandler(
             .ToList();
         return new CustomerTaxYearDto(
             customer.PublicId, year.TaxYear, year.From, year.To, CustomerTaxYear.Nzd, readAt, holdings, year.Complete, year.IncompleteCount,
-            Threshold(year.Threshold, read));
+            Threshold(year.Threshold, read),
+            Income(year.FifIncome, read));
     }
 
     /// <summary>Tax-cost-threshold R24: the threshold test with PublicIds.</summary>
@@ -83,6 +84,52 @@ public class GetCustomerTaxYearQueryHandler(
                 .ToList());
     }
 
+    /// <summary>FIF income R26: the totals with the PublicId of each Instrument not computed.</summary>
+    private static FifIncomeDto Income(FifIncome income, CustomerTaxLedgerRead read) =>
+        new(
+            income.Rate,
+            income.Fdr is { } fdr
+                ? new FifFdrTotalsDto(fdr.OpeningValue, fdr.Amount, fdr.PeakHoldingAmount, fdr.QuickSaleGainAmount, fdr.QuickSaleAdjustment, fdr.Income)
+                : null,
+            income.Cv is { } cv ? new FifCvTotalsDto(cv.Amount, cv.Income) : null,
+            income.Lower?.ToString(),
+            income.Complete,
+            income.Incomplete
+                .Select(item => new FifIncomeIncompleteDto(item.Reason.ToString(), read.Instruments[item.InstrumentId].PublicId))
+                .ToList());
+
+    /// <summary>FIF income R26: the income of one tax holding.</summary>
+    private static TaxHoldingIncomeDto Income(TaxHoldingIncome income)
+    {
+        var sale = income.QuickSale;
+        return new TaxHoldingIncomeDto(
+            income.Status.ToString(),
+            income.Reason?.ToString(),
+            income.Fdr is { } fdr ? new FifFdrDto(fdr.OpeningValue, fdr.Amount) : null,
+            sale is null
+                ? null
+                : new QuickSaleDto(
+                    sale.OpeningQuantity,
+                    sale.PeakQuantity,
+                    sale.ClosingQuantity,
+                    sale.PeakHoldingDifferential,
+                    sale.PurchasedQuantity,
+                    sale.PurchaseCost,
+                    sale.AverageCost,
+                    sale.PeakHoldingAmount,
+                    sale.MatchedQuantity,
+                    sale.Proceeds,
+                    sale.Dividends,
+                    sale.Cost,
+                    sale.GainAmount,
+                    sale.Matches.Select(match => new QuickSaleMatchDto(match.PurchaseSequence, match.SaleSequence, match.Quantity)).ToList(),
+                    sale.Sales.Select(s => new QuickSaleSaleDto(s.Sequence, s.Quantity, s.MatchedQuantity, s.Amount, s.Proceeds)).ToList(),
+                    sale.DividendShares
+                        .Select(share => new QuickSaleDividendShareDto(share.Sequence, share.Amount, share.HeldQuantity, share.MatchedQuantity, share.Share))
+                        .ToList()),
+            income.Cv is { } cv ? new FifCvDto(cv.OpeningValue, cv.ClosingValue, cv.Sales, cv.Dividends, cv.Purchases, cv.Amount) : null);
+    }
+
     private static TaxCostDto Cost(TaxCost cost) =>
         new(
             cost.Status.ToString(),
@@ -104,7 +151,8 @@ public class GetCustomerTaxYearQueryHandler(
             holding.Complete,
             holding.Incomplete.Select(reason => reason.ToString()).ToList(),
             holding.Notices.Select(notice => notice.ToString()).ToList(),
-            Cost(holding.Cost));
+            Cost(holding.Cost),
+            Income(holding.Income!));
     }
 
     private static TaxPointDto Point(TaxPoint point, CustomerTaxLedgerRead read) =>

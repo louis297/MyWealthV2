@@ -13,7 +13,65 @@ public sealed record CustomerTaxYearDto(
     IReadOnlyList<TaxHoldingDto> Holdings,
     bool Complete,
     int IncompleteCount,
-    ThresholdDto Threshold);
+    ThresholdDto Threshold,
+    FifIncomeDto FifIncome);
+
+/// <summary>FIF income R26: the totals of both methods over the computed tax holdings, or <c>null</c> when a tax holding
+/// that belongs in them is missing (R23). Every amount is in NZD.</summary>
+public sealed record FifIncomeDto(
+    decimal Rate,
+    FifFdrTotalsDto? Fdr,
+    FifCvTotalsDto? Cv,
+    string? Lower,
+    bool Complete,
+    IReadOnlyList<FifIncomeIncompleteDto> Incomplete);
+
+public sealed record FifFdrTotalsDto(
+    decimal OpeningValue,
+    decimal Amount,
+    decimal PeakHoldingAmount,
+    decimal QuickSaleGainAmount,
+    decimal QuickSaleAdjustment,
+    decimal Income);
+
+public sealed record FifCvTotalsDto(decimal Amount, decimal Income);
+
+/// <summary>R23: a tax holding that is not computed.</summary>
+public sealed record FifIncomeIncompleteDto(string Reason, Guid InstrumentId);
+
+/// <summary>R26: the FIF income of one tax holding; the figures are <c>null</c> unless its status is <c>Computed</c>.</summary>
+public sealed record TaxHoldingIncomeDto(string Status, string? Reason, FifFdrDto? Fdr, QuickSaleDto? QuickSale, FifCvDto? Cv);
+
+public sealed record FifFdrDto(decimal OpeningValue, decimal Amount);
+
+/// <summary>R9–R14: the quick sale of a tax holding. Every quantity is a comparable quantity.</summary>
+public sealed record QuickSaleDto(
+    decimal OpeningQuantity,
+    decimal PeakQuantity,
+    decimal ClosingQuantity,
+    decimal PeakHoldingDifferential,
+    decimal PurchasedQuantity,
+    decimal PurchaseCost,
+    decimal? AverageCost,
+    decimal PeakHoldingAmount,
+    decimal MatchedQuantity,
+    decimal Proceeds,
+    decimal Dividends,
+    decimal Cost,
+    decimal GainAmount,
+    IReadOnlyList<QuickSaleMatchDto> Matches,
+    IReadOnlyList<QuickSaleSaleDto> Sales,
+    IReadOnlyList<QuickSaleDividendShareDto> DividendShares);
+
+/// <summary>R13: shares one sale took from one purchase, by the <c>sequence</c> of each in <c>events</c>.</summary>
+public sealed record QuickSaleMatchDto(int PurchaseSequence, int SaleSequence, decimal Quantity);
+
+public sealed record QuickSaleSaleDto(int Sequence, decimal Quantity, decimal MatchedQuantity, decimal Amount, decimal Proceeds);
+
+public sealed record QuickSaleDividendShareDto(int Sequence, decimal Amount, decimal HeldQuantity, decimal MatchedQuantity, decimal Share);
+
+/// <summary>R16: the figures of the CV amount of a tax holding.</summary>
+public sealed record FifCvDto(decimal OpeningValue, decimal ClosingValue, decimal Sales, decimal Dividends, decimal Purchases, decimal Amount);
 
 /// <summary>Tax-cost-threshold R24: the threshold test of the year. Every figure is in NZD.</summary>
 public sealed record ThresholdDto(
@@ -55,7 +113,8 @@ public sealed record TaxHoldingDto(
     bool Complete,
     IReadOnlyList<string> Incomplete,
     IReadOnlyList<string> Notices,
-    TaxCostDto Cost);
+    TaxCostDto Cost,
+    TaxHoldingIncomeDto FifIncome);
 
 public sealed record TaxInstrumentDto(Guid Id, string Symbol, string Name, string QuoteCurrency);
 
