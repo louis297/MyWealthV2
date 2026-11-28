@@ -21,8 +21,9 @@ public sealed record CustomerTaxLedgerRead(
     IReadOnlyDictionary<int, ValuedInstrument> Instruments);
 
 /// <summary>
-/// Tax-year-events §7: the Customer's Accounts, the facts of R6, <see cref="TaxLedger.Build"/>, the rate rows the events
-/// of the year and the tax cost walk need (tax-cost-threshold §7), the treatments of earlier tax years, the values of the opening, the closing and each arrival or departure through
+/// Tax-year-events §7: the Customer's Accounts, the facts of R6, <see cref="TaxLedger.Build"/>, the <c>Interest</c> of the
+/// tax year (income-summary §7), the rate rows the events and the interest of the year and the tax cost walk need
+/// (tax-cost-threshold §7), the treatments of earlier tax years, the values of the opening, the closing and each arrival or departure through
 /// <see cref="IValueAccount.ForPositionAsync"/>, the treatments, then <see cref="CustomerTaxYear.Compute"/>. Reads ignore
 /// the tenant filter and name the Tenant themselves, so that a <c>worker</c> run can call this later.
 /// </summary>
@@ -62,7 +63,10 @@ public class CustomerTaxLedger(
             .Distinct()
             .Where(id => CustomerTaxYear.NeedsValue(treatments.GetValueOrDefault(id)?.FifTreatment ?? FifTreatment.NotClassified))
             .ToHashSet();
-        var rates = await RatesAsync(YearKeys(ofYear).Union(TaxCostLedger.RateKeys(events, costed)), cancellationToken);
+        // Income-summary R3, R5: the Interest of the tax year, and the rate rows its UTC dates need.
+        var interest = TaxLedger.BuildInterest(await InterestFactsAsync(tenantId, byId, from, to, cancellationToken));
+        var rates = await RatesAsync(
+            YearKeys(ofYear).Union(TaxCostLedger.RateKeys(events, costed)).Union(InterestKeys(interest)), cancellationToken);
         var earlierTreatments = EarlierTreatments(events, instruments.Where(instrument => costed.Contains(instrument.Id)), taxYear);
 
         var basisChanges = new Dictionary<int, IReadOnlyList<BasisChange>>();
@@ -72,7 +76,8 @@ public class CustomerTaxLedger(
             await LinesAtAsync(events, to, TaxYear.ClosingDay(taxYear), valued, byId, basisChanges, cancellationToken),
             await MarketValuesAsync(ofYear, byId, cancellationToken));
 
-        var year = CustomerTaxYear.Compute(taxYear, events, treatments, rates, values, Places(CustomerTaxYear.Nzd), earlierTreatments);
+        var year = CustomerTaxYear.Compute(
+            taxYear, events, treatments, rates, values, Places(CustomerTaxYear.Nzd), earlierTreatments, interest);
         return new CustomerTaxLedgerRead(
             year,
             accounts.ToDictionary(account => account.Id, account => account.PublicId),
@@ -159,6 +164,63 @@ public class CustomerTaxLedger(
                 header.InKind is null ? null : new LedgerInKindTransfer(header.InKind.ChangesBeneficialOwner, header.InKind.AcquiredOn)))
             .ToList();
     }
+
+    /// <summary>
+    /// Income-summary R3: every <c>Interest</c> with a cash leg on one of the Accounts, booked in
+    /// <c>[from, end)</c>, with its legs on them, their tax kinds and its interest detail; a reversed one is not read.
+    /// </summary>
+    private async Task<List<LedgerFact>> InterestFactsAsync(
+        int tenantId, IReadOnlyDictionary<int, Account> accounts, DateTimeOffset from, DateTimeOffset end, CancellationToken cancellationToken)
+    {
+        var accountIds = accounts.Keys.ToList();
+        var transactions = db.Transactions.IgnoreQueryFilters()
+            .Where(transaction => transaction.TenantId == tenantId
+                                  && transaction.Type == TransactionType.Interest
+                                  && transaction.BookedAt >= from
+                                  && transaction.BookedAt < end
+                                  && transaction.ReversedByTransactionId == null);
+        var legs = await (
+                from leg in db.TransactionCashLegs.IgnoreQueryFilters()
+                join transaction in transactions on leg.TransactionId equals transaction.Id
+                join tax in db.TransactionTaxDetails.IgnoreQueryFilters() on leg.Id equals tax.CashLegId into taxes
+                from tax in taxes.DefaultIfEmpty()
+                where leg.TenantId == tenantId && accountIds.Contains(leg.AccountId)
+                select new
+                {
+                    leg.TransactionId, transaction.PublicId, transaction.BookedAt, leg.AccountId, leg.Role, leg.Amount, leg.Currency,
+                    Kind = (TaxKind?)tax.Kind
+                })
+            .ToListAsync(cancellationToken);
+
+        var ids = legs.Select(leg => leg.TransactionId).Distinct().ToList();
+        var details = await db.TransactionInterestDetails.IgnoreQueryFilters()
+            .Where(detail => detail.TenantId == tenantId && ids.Contains(detail.TransactionId))
+            .Select(detail => new { detail.TransactionId, detail.PeriodFrom, detail.PeriodTo, detail.Days })
+            .ToDictionaryAsync(detail => detail.TransactionId, cancellationToken);
+
+        return legs
+            .GroupBy(leg => leg.TransactionId)
+            .Select(transaction => new LedgerFact(
+                transaction.Key,
+                transaction.First().PublicId,
+                transaction.First().BookedAt,
+                TransactionType.Interest,
+                false,
+                transaction
+                    .Select(leg => new LedgerCashLeg(leg.AccountId, accounts[leg.AccountId].CustodyMode, leg.Role, leg.Amount, Code(leg.Currency), leg.Kind))
+                    .ToList(),
+                [],
+                Interest: details.TryGetValue(transaction.Key, out var detail)
+                    ? new LedgerInterest(detail.PeriodFrom, detail.PeriodTo, detail.Days)
+                    : null))
+            .ToList();
+    }
+
+    /// <summary>Income-summary R5: each currency other than NZD and each UTC date of a <c>bookedAt</c> of the interest.</summary>
+    private static IEnumerable<(string Currency, DateOnly Date)> InterestKeys(IEnumerable<TaxInterest> interest) =>
+        interest
+            .Where(item => item.Currency is { Length: > 0 } && item.Currency != CustomerTaxYear.Nzd)
+            .Select(item => (item.Currency, LedgerDay.Of(item.BookedAt)));
 
     /// <summary>R26: the treatment for the year and what a report keeps of it.</summary>
     private static TaxTreatment Treatment(Instrument instrument, int taxYear) =>

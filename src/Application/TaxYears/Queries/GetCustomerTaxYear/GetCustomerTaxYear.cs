@@ -8,7 +8,8 @@ using MyWealthV2.Domain.Valuations;
 
 namespace MyWealthV2.Application.TaxYears.Queries.GetCustomerTaxYear;
 
-/// <summary>Tax-year-events R1, R4, R30–R32: one Customer's tax events and holdings of one tax year, in NZD.</summary>
+/// <summary>Tax-year-events R1, R4, R30–R32: one Customer's tax events and holdings of one tax year, in NZD; with the
+/// interest items and the income summary (income-summary R1, R13).</summary>
 [Authorize(Policy = Policies.AccountsRead)]
 public record GetCustomerTaxYearQuery(Guid CustomerId, string? TaxYear) : IRequest<CustomerTaxYearDto>;
 
@@ -53,16 +54,76 @@ public class GetCustomerTaxYearQueryHandler(
             customer.PublicId, year.TaxYear, year.From, year.To, CustomerTaxYear.Nzd, readAt, holdings, year.Complete, year.IncompleteCount,
             Threshold(year.Threshold, read),
             Income(year.FifIncome, read),
-            [],
-            new IncomeSummaryDto(
-                new IncomeDividendsDto([], new IncomeDividendSumDto(0, 0m, 0m, 0m, 0m, 0m, 0m)),
-                new IncomeInterestDto([], new IncomeInterestSumDto(0, 0m, 0m, 0m, 0m, 0m)),
-                new IncomeTaxWithheldDto(0m, 0m, 0m),
-                0m,
-                false,
-                [],
-                []));
+            year.Interest.Select(item => InterestItem(item, read)).ToList(),
+            IncomeSummary(year.Income, read));
     }
+
+    /// <summary>Income-summary R3, R13: an interest item with PublicIds.</summary>
+    private static TaxInterestItemDto InterestItem(TaxYearInterest item, CustomerTaxLedgerRead read)
+    {
+        var booked = item.Item;
+        return new TaxInterestItemDto(
+            item.Sequence,
+            booked.BookedAt,
+            booked.TransactionPublicId,
+            read.AccountIds[booked.AccountId],
+            booked.CustodyMode.ToString(),
+            item.Amount,
+            item.Status.ToString(),
+            new TaxInterestLedgerDto(booked.Currency, booked.Gross, booked.Rwt, booked.Nrwt, booked.ForeignTax),
+            Fx(item.Fx),
+            item.Rwt,
+            item.Nrwt,
+            item.ForeignTax,
+            booked.Period is { } period ? new TaxInterestPeriodDto(period.PeriodFrom, period.PeriodTo, period.Days) : null);
+    }
+
+    /// <summary>
+    /// Income-summary R13: the income summary with PublicIds. The holding rows of a group are in the order of the read's
+    /// holdings: by symbol, then by the Instrument's PublicId.
+    /// </summary>
+    private static IncomeSummaryDto IncomeSummary(TaxYearIncome income, CustomerTaxLedgerRead read)
+    {
+        Guid? InstrumentId(int? id) => id is { } value ? read.Instruments[value].PublicId : null;
+        Guid? AccountId(int? id) => id is { } value ? read.AccountIds[value] : null;
+        return new IncomeSummaryDto(
+            new IncomeDividendsDto(
+                income.Dividends.Groups
+                    .Select(group => new IncomeGroupDto(
+                        group.Group.ToString(),
+                        group.Holdings
+                            .OrderBy(row => read.Instruments[row.InstrumentId].Symbol, StringComparer.Ordinal)
+                            .ThenBy(row => read.Instruments[row.InstrumentId].PublicId)
+                            .Select(row => new IncomeHoldingRowDto(
+                                read.Instruments[row.InstrumentId].PublicId, row.IssuerCountry, row.Sum.Count, row.Sum.Gross,
+                                row.Sum.ImputationCredit, row.Sum.GrossWithImputation, row.Sum.ForeignTax, row.Sum.Rwt, row.Sum.Nrwt))
+                            .ToList(),
+                        group.Countries
+                            .Select(row => new IncomeCountryRowDto(
+                                row.IssuerCountry, row.Sum.Count, row.Sum.Gross, row.Sum.ImputationCredit, row.Sum.GrossWithImputation,
+                                row.Sum.ForeignTax, row.Sum.Rwt, row.Sum.Nrwt))
+                            .ToList(),
+                        DividendSum(group.Total)))
+                    .ToList(),
+                DividendSum(income.Dividends.Total)),
+            new IncomeInterestDto(
+                income.Interest.Accounts
+                    .Select(row => new IncomeAccountRowDto(
+                        read.AccountIds[row.AccountId], row.CustodyMode.ToString(), row.Currency, row.Sum.Count, row.Sum.Received,
+                        row.Sum.Charged, row.Sum.Rwt, row.Sum.Nrwt, row.Sum.ForeignTax))
+                    .ToList(),
+                new IncomeInterestSumDto(
+                    income.Interest.Total.Count, income.Interest.Total.Received, income.Interest.Total.Charged, income.Interest.Total.Rwt,
+                    income.Interest.Total.Nrwt, income.Interest.Total.ForeignTax)),
+            new IncomeTaxWithheldDto(income.TaxWithheld.Rwt, income.TaxWithheld.Nrwt, income.TaxWithheld.ForeignTax),
+            income.ImputationCredit,
+            income.Complete,
+            income.Incomplete.Select(reason => new IncomeIncompleteDto(reason.Reason.ToString(), InstrumentId(reason.InstrumentId), AccountId(reason.AccountId))).ToList(),
+            income.Notices.Select(notice => new IncomeNoticeDto(notice.Notice.ToString(), InstrumentId(notice.InstrumentId), AccountId(notice.AccountId))).ToList());
+    }
+
+    private static IncomeDividendSumDto DividendSum(IncomeDividendSum sum) =>
+        new(sum.Count, sum.Gross, sum.ImputationCredit, sum.GrossWithImputation, sum.ForeignTax, sum.Rwt, sum.Nrwt);
 
     /// <summary>Tax-cost-threshold R24: the threshold test with PublicIds.</summary>
     private static ThresholdDto Threshold(ThresholdTest test, CustomerTaxLedgerRead read)

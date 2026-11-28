@@ -47,8 +47,8 @@ public class GetCustomerTaxYearIncomeSummaryTests : TestBase
         (period.GetProperty("from").GetString(), period.GetProperty("to").GetString(), period.GetProperty("days").GetInt32())
             .ShouldBe(("2026-01-01", "2026-01-31", 31));
 
-        var next = await ReadAsync(world.Token, world.CustomerId, 2027);
-        next.GetProperty("interest").EnumerateArray().Select(i => i.GetProperty("transactionId").GetGuid()).ShouldBe([world.P["I5"]]);
+        // R4: I5, the interest of March 2026 posted on 1 April 2026, is in tax year 2027, which cannot be read yet.
+        items.Select(i => i.GetProperty("transactionId").GetGuid()).ShouldNotContain(world.P["I5"]);
     }
 
     [Test]
