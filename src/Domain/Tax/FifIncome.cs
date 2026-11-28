@@ -45,7 +45,24 @@ public sealed record FifIncome(
 
         var openingValue = holding.Opening.Value!.Value;
         var fdr = new FifFdr(openingValue, Round(rate * openingValue, decimalPlaces));
-        return new TaxHoldingIncome(holding.InstrumentId, FifIncomeStatus.Computed, null, fdr, QuickSaleOf(holding, rate, decimalPlaces), null);
+        return new TaxHoldingIncome(
+            holding.InstrumentId, FifIncomeStatus.Computed, null, fdr, QuickSaleOf(holding, rate, decimalPlaces), CvOf(holding, decimalPlaces));
+    }
+
+    /// <summary>
+    /// R16–R18: <c>(closing value + gains) − (opening value + costs)</c>. Gains are the proceeds of every sale and every
+    /// dividend at its gross plus the imputation credit; costs the cost of every purchase. Each figure already has NZD's
+    /// places, so nothing is rounded.
+    /// </summary>
+    private static FifCv CvOf(TaxHolding holding, int decimalPlaces)
+    {
+        var events = holding.Events;
+        var sales = events.Where(e => IsSale(e.Event.Kind)).Sum(e => e.Amount!.Value) + Zero(decimalPlaces);
+        var dividends = events.Where(e => e.Event.Kind == TaxEventKind.Dividend).Sum(DividendFigure) + Zero(decimalPlaces);
+        var purchases = events.Where(e => IsPurchase(e.Event.Kind)).Sum(e => e.Amount!.Value) + Zero(decimalPlaces);
+        var opening = holding.Opening.Value!.Value;
+        var closing = holding.Closing.Value!.Value;
+        return new FifCv(opening, closing, sales, dividends, purchases, closing + sales + dividends - (opening + purchases));
     }
 
     /// <summary>R9–R12: the quick sale of a computed tax holding.</summary>
