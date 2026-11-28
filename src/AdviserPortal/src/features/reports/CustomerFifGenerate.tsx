@@ -23,7 +23,7 @@ function problemMessages(error: unknown): string[] {
   return [];
 }
 
-/** The FIF Report form of the Customer page (D114, fif-report R27): one field, the tax year. */
+/** The tax year form of the Customer page (D114, fif-report R27; D115, income-summary R34): one field, the tax year. */
 export function CustomerFifGenerate({
   reportId,
   customerId,

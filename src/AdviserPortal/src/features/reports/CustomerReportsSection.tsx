@@ -7,6 +7,9 @@ import { ReportHistory } from "@/features/reports/ReportHistory";
 import { ReportSchedules } from "@/features/reports/ReportSchedules";
 import { useGetReportsQuery } from "@/features/reports/reportsApi";
 
+/** The reports whose form is one tax year: the FIF Report (D114) and the Tax Year Income Summary (D115). */
+const taxYearReportCodes = ["customer-fif", "customer-income-summary"];
+
 export function CustomerReportsSection({ customerId }: { customerId: string }) {
   const role = useAppSelector((state) => state.session.currentUser?.role) ?? "";
   const [selectedId, setSelectedId] = useState("");
@@ -25,8 +28,8 @@ export function CustomerReportsSection({ customerId }: { customerId: string }) {
       renderSelected={(item) =>
         item.code === "customer-transactions" ? (
           <CustomerTransactionsGenerate reportId={item.id} customerId={customerId} onQueued={setFocusId} />
-        ) : item.code === "customer-fif" ? (
-          <CustomerFifGenerate reportId={item.id} customerId={customerId} onQueued={setFocusId} />
+        ) : taxYearReportCodes.includes(item.code) ? (
+          <CustomerFifGenerate key={item.id} reportId={item.id} customerId={customerId} onQueued={setFocusId} />
         ) : (
           <ReportParametersUnavailable />
         )
