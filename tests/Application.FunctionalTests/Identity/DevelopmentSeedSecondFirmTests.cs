@@ -93,7 +93,7 @@ public class DevelopmentSeedSecondFirmTests : TestBase
             json.RootElement.EnumerateArray()
                 .Select(item => item.GetProperty("code").GetString())
                 .OrderBy(code => code)
-                .ShouldBe(["adviser-balances", "customer-transactions"]);
+                .ShouldBe(["adviser-balances", "customer-fif", "customer-transactions"]);
         }
 
         var worth = await AccountHttp.Send(HttpMethod.Get, "/net-worth", adviser.AccessToken);

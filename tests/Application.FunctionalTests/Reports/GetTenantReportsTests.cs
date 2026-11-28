@@ -77,7 +77,7 @@ public class GetTenantReportsTests : TestBase
             {
                 var items = json.RootElement.EnumerateArray().ToList();
                 items.Select(item => item.GetProperty("code").GetString())
-                    .ShouldBe(["adviser-balances", "bank-reconciliation"]);
+                    .ShouldBe(["adviser-balances", "bank-reconciliation", "customer-fif"]);
                 items.ShouldAllBe(item => item.GetProperty("isActive").GetBoolean());
                 items.ShouldAllBe(item => item.GetProperty("granted").GetBoolean() == false);
 
@@ -99,9 +99,10 @@ public class GetTenantReportsTests : TestBase
             after.StatusCode.ShouldBe(HttpStatusCode.OK);
             using var granted = JsonDocument.Parse(await after.Content.ReadAsStringAsync());
             var rows = granted.RootElement.EnumerateArray().ToList();
-            rows.Select(item => item.GetProperty("code").GetString()).ShouldBe(["adviser-balances", "bank-reconciliation"]);
+            rows.Select(item => item.GetProperty("code").GetString()).ShouldBe(["adviser-balances", "bank-reconciliation", "customer-fif"]);
             rows[0].GetProperty("granted").GetBoolean().ShouldBeTrue();
             rows[1].GetProperty("granted").GetBoolean().ShouldBeFalse();
+            rows[2].GetProperty("granted").GetBoolean().ShouldBeFalse();
         }
         finally
         {

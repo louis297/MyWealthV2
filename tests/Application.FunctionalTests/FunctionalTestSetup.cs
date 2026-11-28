@@ -94,7 +94,8 @@ public class FunctionalTestSetup
             INSERT INTO [Reports] ([PublicId], [Code], [Name], [Function], [Scope], [AllowedTriggers], [IsActive]) VALUES
                 ('5a9d3c70-2e84-4b1f-8c36-7f1e0a9d5b22', N'adviser-balances', N'Adviser Balances Report', N'Point-in-time cash and holding lines for an adviser''s customers.', N'Book', N'["manual","scheduled"]', 1),
                 ('8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11', N'customer-transactions', N'Customer Transactions Report', N'Transactions in a date range for one customer.', N'Customer', N'["manual","scheduled"]', 1),
-                ('3e7b9d14-6c2a-4f58-b0e1-9a4d2c7f8e33', N'bank-reconciliation', N'Bank reconciliation', N'A stored bank reconciliation of one client money account: the bank balance, the Custodial cash and the items between them.', N'Tenant', N'["manual","scheduled"]', 1)
+                ('3e7b9d14-6c2a-4f58-b0e1-9a4d2c7f8e33', N'bank-reconciliation', N'Bank reconciliation', N'A stored bank reconciliation of one client money account: the bank balance, the Custodial cash and the items between them.', N'Tenant', N'["manual","scheduled"]', 1),
+                ('7d2f6b48-1a9c-4e35-a7d0-5c8e3b1f9a44', N'customer-fif', N'FIF Report', N'Foreign investment fund (FIF) figures of one customer for one New Zealand tax year: the threshold test, and FIF income under the fair dividend rate and the comparative value methods.', N'Customer', N'["manual"]', 1)
             """);
         await scope.ServiceProvider.GetRequiredService<ICurrencyCatalog>().ReloadAsync();
         await DevelopmentIdentitySeeder.SeedAsync(scope.ServiceProvider, CancellationToken.None);

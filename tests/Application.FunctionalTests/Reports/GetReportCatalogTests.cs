@@ -62,7 +62,7 @@ public class GetReportCatalogTests : TestBase
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
             var items = json.RootElement.EnumerateArray().ToList();
             items.Select(item => item.GetProperty("code").GetString())
-                .ShouldBe(["adviser-balances", "bank-reconciliation", "customer-transactions"]);
+                .ShouldBe(["adviser-balances", "bank-reconciliation", "customer-fif", "customer-transactions"]);
 
             var adviser = items[0];
             adviser.GetProperty("id").GetGuid().ShouldBe(AdviserBalancesId);
@@ -79,7 +79,15 @@ public class GetReportCatalogTests : TestBase
             bank.GetProperty("scope").GetString().ShouldBe("Tenant");
             bank.GetProperty("name").GetString().ShouldBe("Bank reconciliation");
 
-            var customer = items[2];
+            var fif = items[2];
+            fif.GetProperty("id").GetGuid().ShouldBe(Guid.Parse("7d2f6b48-1a9c-4e35-a7d0-5c8e3b1f9a44"));
+            fif.GetProperty("name").GetString().ShouldBe("FIF Report");
+            fif.GetProperty("scope").GetString().ShouldBe("Customer");
+            fif.GetProperty("isActive").GetBoolean().ShouldBeTrue();
+            fif.GetProperty("allowedTriggers").EnumerateArray().Select(trigger => trigger.GetString())
+                .ShouldBe(["manual"]);
+
+            var customer = items[3];
             customer.GetProperty("id").GetGuid().ShouldBe(CustomerTransactionsId);
             customer.GetProperty("isActive").GetBoolean().ShouldBeFalse();
             customer.GetProperty("scope").GetString().ShouldBe("Customer");
