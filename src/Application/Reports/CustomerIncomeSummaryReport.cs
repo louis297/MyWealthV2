@@ -234,8 +234,6 @@ public static partial class CustomerIncomeSummaryReport
             return new IncomeSummarySection("4. Interest", blocks);
         }
 
-        private List<IncomeSummarySection> Details() => [];
-
         private List<string> DividendCells(IncomeDividendSum sum) =>
         [
             Count(sum.Count), Nzd(sum.Gross), Nzd(sum.ImputationCredit), Nzd(sum.GrossWithImputation), Nzd(sum.ForeignTax),
