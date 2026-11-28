@@ -97,20 +97,21 @@ public sealed record FifIncome(
         var opening = holding.Opening.ComparableQuantity!.Value;
         var closing = holding.Closing.ComparableQuantity!.Value;
         var peak = holding.PeakQuantity!.Value;
-        var purchases = Shares(holding).Where(e => IsPurchase(e.Event.Event.Kind)).ToList();
+        var shares = Shares(holding);
+        var purchases = shares.Where(e => IsPurchase(e.Event.Event.Kind)).ToList();
 
         // R10: the lesser of the rise above the opening and the fall from the peak.
         var differential = Math.Max(0m, Math.Min(peak - opening, peak - closing));
 
         // R11: one average over every purchase of the year; none without a purchase.
         var purchased = purchases.Sum(e => e.Shares);
-        var purchaseCost = purchases.Sum(e => e.Event.Amount!.Value);
+        var purchaseCost = purchases.Sum(e => e.Event.Amount!.Value) + Zero(decimalPlaces);
         var hasAverage = purchased > 0m;
 
         // R12: multiplied first and divided after.
         var peakHoldingAmount = hasAverage ? Math.Max(0m, Round(rate * differential * purchaseCost / purchased, decimalPlaces)) : Zero(decimalPlaces);
 
-        var (matches, sales) = Match(Shares(holding), decimalPlaces);
+        var (matches, sales) = Match(shares, decimalPlaces);
         var dividendShares = DividendShares(holding, matches, decimalPlaces);
         var matched = matches.Sum(match => match.Quantity);
         var proceeds = sales.Sum(sale => sale.Proceeds) + Zero(decimalPlaces);
