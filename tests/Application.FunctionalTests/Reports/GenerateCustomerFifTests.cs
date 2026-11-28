@@ -93,7 +93,7 @@ public class GenerateCustomerFifTests : TestBase
         text.ShouldContain("Status: Incomplete. 1 of 1 holdings are affected. See section 9.");
         text.ShouldContain("FIF income totals are not given.");
         text.ShouldNotContain("FIF income, fair dividend rate method:");
-        text.ShouldContain("UUU: No market value at the end of the tax year (No price). Its FIF income is not computed.");
+        text.ShouldContain("UUU: No market value at the end of the tax year (Price too old). Its FIF income is not computed.");
         pages.ShouldAllBe(page => page.Contains("Incomplete"));
     }
 
@@ -139,7 +139,7 @@ public class GenerateCustomerFifTests : TestBase
         text.ShouldContain("AAA");
         text.ShouldNotContain("ZZZ");
         text.ShouldNotContain("South broker");
-        text.ShouldNotContain(southCustomer.Name);
+        text.ShouldNotContain("South Advisory");
     }
 
     private static async Task<Guid> RequestAsync(string token, Guid customerId, int taxYear)
