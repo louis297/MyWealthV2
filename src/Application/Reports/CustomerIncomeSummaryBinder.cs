@@ -12,5 +12,5 @@ public static class CustomerIncomeSummaryBinder
     /// Binds <paramref name="parameters"/>. <paramref name="today"/> is the platform's UTC date, for the tax years that
     /// can be reported (R18, tax-year-events R4).
     /// </summary>
-    public static CustomerTaxYearBinding Bind(JsonElement parameters, DateOnly today) => new(Guid.Empty, 0, string.Empty);
+    public static CustomerTaxYearBinding Bind(JsonElement parameters, DateOnly today) => CustomerTaxYearParameters.Bind(parameters, today);
 }
