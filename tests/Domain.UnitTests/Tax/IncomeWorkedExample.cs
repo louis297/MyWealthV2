@@ -77,4 +77,24 @@ internal static class IncomeWorkedExample
 
         return rates;
     }
+
+    /// <summary>The example's tax year <paramref name="taxYear"/>, with the rates and the treatments of §1.1.</summary>
+    public static CustomerTaxYear Year(
+        int taxYear,
+        IReadOnlyList<LedgerFact>? facts = null,
+        IReadOnlyList<StoredRate>? rates = null,
+        IReadOnlyDictionary<int, TaxTreatment>? treatments = null)
+    {
+        var list = facts ?? Facts;
+        var events = TaxLedger.Build(list);
+        var interest = TaxLedger.BuildInterest(list);
+        return CustomerTaxYear.Compute(
+            taxYear,
+            events,
+            treatments ?? Treatments,
+            RatesFor(events, interest, rates ?? Rates),
+            TaxYearValues.None,
+            2,
+            interest: interest);
+    }
 }
