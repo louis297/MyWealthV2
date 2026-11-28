@@ -45,8 +45,69 @@ public sealed record FifIncome(
 
         var openingValue = holding.Opening.Value!.Value;
         var fdr = new FifFdr(openingValue, Round(rate * openingValue, decimalPlaces));
-        return new TaxHoldingIncome(holding.InstrumentId, FifIncomeStatus.Computed, null, fdr, null, null);
+        return new TaxHoldingIncome(holding.InstrumentId, FifIncomeStatus.Computed, null, fdr, QuickSaleOf(holding, rate, decimalPlaces), null);
     }
+
+    /// <summary>R9–R12: the quick sale of a computed tax holding.</summary>
+    private static QuickSale QuickSaleOf(TaxHolding holding, decimal rate, int decimalPlaces)
+    {
+        var opening = holding.Opening.ComparableQuantity!.Value;
+        var closing = holding.Closing.ComparableQuantity!.Value;
+        var peak = holding.PeakQuantity!.Value;
+        var purchases = Shares(holding).Where(e => IsPurchase(e.Event.Event.Kind)).ToList();
+
+        // R10: the lesser of the rise above the opening and the fall from the peak.
+        var differential = Math.Max(0m, Math.Min(peak - opening, peak - closing));
+
+        // R11: one average over every purchase of the year; none without a purchase.
+        var purchased = purchases.Sum(e => e.Shares);
+        var purchaseCost = purchases.Sum(e => e.Event.Amount!.Value);
+        var hasAverage = purchased > 0m;
+
+        // R12: multiplied first and divided after.
+        var peakHoldingAmount = hasAverage ? Math.Max(0m, Round(rate * differential * purchaseCost / purchased, decimalPlaces)) : Zero(decimalPlaces);
+        return new QuickSale(
+            opening,
+            peak,
+            closing,
+            differential,
+            purchased,
+            purchaseCost,
+            hasAverage ? decimal.Round(purchaseCost / purchased, 8, MidpointRounding.AwayFromZero) : null,
+            peakHoldingAmount,
+            0m,
+            Zero(decimalPlaces),
+            Zero(decimalPlaces),
+            Zero(decimalPlaces),
+            Zero(decimalPlaces),
+            [],
+            [],
+            []);
+    }
+
+    /// <summary>R9: the shares of each event, the change of the comparable quantity at it, in the order of the year.</summary>
+    private static List<(TaxYearEvent Event, decimal Shares)> Shares(TaxHolding holding)
+    {
+        var before = holding.Opening.ComparableQuantity!.Value;
+        var shares = new List<(TaxYearEvent, decimal)>();
+        foreach (var yearEvent in holding.Events.OrderBy(e => e.Sequence))
+        {
+            var after = yearEvent.ComparableQuantityAfter!.Value;
+            shares.Add((yearEvent, after - before));
+            before = after;
+        }
+
+        return shares;
+    }
+
+    /// <summary>R6: an acquisition and an arrival are purchases.</summary>
+    private static bool IsPurchase(TaxEventKind kind) => kind is TaxEventKind.Acquisition or TaxEventKind.Arrival;
+
+    /// <summary>R6: a disposal and a departure are sales.</summary>
+    private static bool IsSale(TaxEventKind kind) => kind is TaxEventKind.Disposal or TaxEventKind.Departure;
+
+    /// <summary>0 with NZD's places, as every other NZD figure is written.</summary>
+    private static decimal Zero(int decimalPlaces) => decimal.Round(0.000000m, decimalPlaces);
 
     /// <summary>R24: every figure of a tax holding is rounded to NZD's places, away from zero.</summary>
     private static decimal Round(decimal amount, int decimalPlaces) => decimal.Round(amount, decimalPlaces, MidpointRounding.AwayFromZero);
