@@ -1235,3 +1235,143 @@ describe("CustomerDetailPage FIF report (D114)", () => {
     return screen.getByRole("button", { name: "Generate now" }).closest("form") as HTMLElement;
   }
 });
+
+describe("CustomerDetailPage Tax Year Income Summary (D115)", () => {
+  const fifReport = {
+    id: "7d2f6b48-1a9c-4e35-a7d0-5c8e3b1f9a44",
+    code: "customer-fif",
+    name: "FIF Report",
+    function: "Foreign investment fund (FIF) figures of one customer for one New Zealand tax year.",
+    scope: "Customer",
+    allowedTriggers: ["manual"],
+  };
+  const incomeReport = {
+    id: "4b6e2d91-3f7a-4c18-9d52-8a1e7c0b6f55",
+    code: "customer-income-summary",
+    name: "Tax Year Income Summary",
+    function: "Dividends and interest paid to one customer in one New Zealand tax year.",
+    scope: "Customer",
+    allowedTriggers: ["manual"],
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-28T03:12:45Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  function render(fetchImpl: (url: string, method: string) => Response | Promise<Response>) {
+    return renderDetail(user(), (url, method) => {
+      if (url.endsWith(`/users/customers/${customerId}`) && method === "GET") {
+        return json(customer);
+      }
+      if (url.includes("/api/accounts") && method === "GET") {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+      }
+      if (url.includes("/api/reports") && method === "GET" && !url.includes("/executions") && !url.includes("/schedules")) {
+        return json([customerTransactions, fifReport, incomeReport]);
+      }
+      return fetchImpl(url, method);
+    });
+  }
+
+  function queued(url: string, method: string) {
+    if (url.includes("/reports/request") && method === "POST") {
+      return json({ id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" }, 202);
+    }
+    if (url.includes("/reports/executions") && method === "GET") {
+      return json({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+    }
+    return new Response("", { status: 404 });
+  }
+
+  async function requestBody(fetchMock: ReturnType<typeof vi.fn>) {
+    const request = fetchMock.mock.calls
+      .map(([input]) => input)
+      .find((input): input is Request => input instanceof Request && input.url.includes("/reports/request"));
+    return JSON.parse(await request!.clone().text());
+  }
+
+  it("offers the tax year form for the report, queues it with the page's customer, and has no schedule form", async () => {
+    const { fetchMock } = render(queued);
+    await chooseOption("Report", "Tax Year Income Summary");
+
+    expect(await screen.findByLabelText("Tax year")).toHaveTextContent("2026 (1 April 2025 to 31 March 2026)");
+    expect(screen.queryByLabelText("Frequency")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create schedule" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("From")).not.toBeInTheDocument();
+    expect(screen.queryByText("parameters not available in this version")).not.toBeInTheDocument();
+    fireEvent.click(within(generateForm()).getByRole("button", { name: "Generate now" }));
+
+    expect(await screen.findByText("Report queued")).toBeInTheDocument();
+    expect(await requestBody(fetchMock)).toEqual({
+      reportId: incomeReport.id,
+      parameters: { customerId, taxYear: 2026 },
+    });
+  });
+
+  it("leaves the FIF Report's form as it is", async () => {
+    const { fetchMock } = render(queued);
+    await chooseOption("Report", "FIF Report");
+
+    expect(await screen.findByLabelText("Tax year")).toBeInTheDocument();
+    await chooseOption("Tax year", "2025 (1 April 2024 to 31 March 2025)");
+    fireEvent.click(within(generateForm()).getByRole("button", { name: "Generate now" }));
+
+    expect(await screen.findByText("Report queued")).toBeInTheDocument();
+    expect(await requestBody(fetchMock)).toEqual({
+      reportId: fifReport.id,
+      parameters: { customerId, taxYear: 2025 },
+    });
+  });
+
+  it("shows a 400 at the form with the server's message", async () => {
+    render((url, method) => {
+      if (url.includes("/reports/request") && method === "POST") {
+        return json({ errors: { taxYear: ["Tax year 2027 can be reported from 2 April 2027."] } }, 400);
+      }
+      return new Response("", { status: 404 });
+    });
+    await chooseOption("Report", "Tax Year Income Summary");
+
+    expect(await screen.findByLabelText("Tax year")).toBeInTheDocument();
+    fireEvent.click(within(generateForm()).getByRole("button", { name: "Generate now" }));
+
+    expect(await within(generateForm()).findByText("Tax year 2027 can be reported from 2 April 2027.")).toBeInTheDocument();
+    expect(screen.queryByText("Report queued")).not.toBeInTheDocument();
+  });
+
+  it("shows Tax year in the History summary", async () => {
+    render((url, method) => {
+      if (url.includes("/reports/executions") && method === "GET") {
+        return json({
+          items: [
+            {
+              id: "e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2",
+              reportId: incomeReport.id,
+              status: "Succeeded",
+              triggerKind: "Manual",
+              created: "2026-11-28T03:12:40Z",
+              parameters: { customerId, taxYear: 2026 },
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          totalCount: 1,
+        });
+      }
+      return new Response("", { status: 404 });
+    });
+
+    expect(await screen.findByText("Tax year 2026")).toBeInTheDocument();
+  });
+
+  function generateForm() {
+    return screen.getByRole("button", { name: "Generate now" }).closest("form") as HTMLElement;
+  }
+});
