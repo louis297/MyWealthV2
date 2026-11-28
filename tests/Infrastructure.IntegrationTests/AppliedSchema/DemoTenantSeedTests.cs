@@ -40,7 +40,7 @@ public class DemoTenantSeedTests
     }
 
     [Test]
-    public async Task EmptyDatabase_CreatesTheTenantTheCatalogAndFourGrants()
+    public async Task EmptyDatabase_CreatesTheTenantTheCatalogAndFiveGrants()
     {
         await using var provider = BuildProvider();
 
@@ -65,7 +65,7 @@ public class DemoTenantSeedTests
                 .OrderBy(row => row.Symbol, StringComparer.Ordinal));
         instruments.ShouldAllBe(row => row.CreatedBy == "system");
 
-        (await GrantedCodesAsync(db, tenant.Id)).ShouldBe(["adviser-balances", "bank-reconciliation", "customer-fif", "customer-transactions"]);
+        (await GrantedCodesAsync(db, tenant.Id)).ShouldBe(["adviser-balances", "bank-reconciliation", "customer-fif", "customer-income-summary", "customer-transactions"]);
     }
 
     // Instrument-tax-attributes R24, §5.1: each instrument of the demo catalog is classified for tax year 2027.
@@ -184,31 +184,31 @@ public class DemoTenantSeedTests
         vti.CreatedBy.ShouldBe("someone");
         (await db.Instruments.CountAsync(row => row.TenantId == tenant.Id)).ShouldBe(ExpectedCatalog.Length);
 
-        (await GrantedCodesAsync(db, tenant.Id)).ShouldBe(["adviser-balances", "bank-reconciliation", "customer-fif", "customer-transactions"]);
+        (await GrantedCodesAsync(db, tenant.Id)).ShouldBe(["adviser-balances", "bank-reconciliation", "customer-fif", "customer-income-summary", "customer-transactions"]);
         _logs.Entries.ShouldContain(entry => entry.Level == LogLevel.Warning && entry.Message.Contains("disabled"));
     }
 
-    // Fif-report R29: a demo tenant that has the three earlier grants gets the fourth and keeps the three.
+    // Income-summary R36: a demo tenant that has the four earlier grants gets the fifth and keeps the four.
     [Test]
-    public async Task DemoTenantWithThreeGrants_GetsTheFourthAndKeepsTheThree()
+    public async Task DemoTenantWithFourGrants_GetsTheFifthAndKeepsTheFour()
     {
         await using var provider = BuildProvider();
         await RunAsync(provider);
         await _database.ExecuteAsync("""
             DELETE FROM [TenantReports]
-            WHERE [ReportId] = (SELECT [Id] FROM [Reports] WHERE [Code] = N'customer-fif');
+            WHERE [ReportId] = (SELECT [Id] FROM [Reports] WHERE [Code] = N'customer-income-summary');
             """);
         var before = await GrantIdsAsync(provider);
 
         await RunAsync(provider);
 
         var after = await GrantIdsAsync(provider);
-        after.Keys.ShouldBe(["adviser-balances", "bank-reconciliation", "customer-fif", "customer-transactions"]);
+        after.Keys.ShouldBe(["adviser-balances", "bank-reconciliation", "customer-fif", "customer-income-summary", "customer-transactions"]);
         foreach (var (code, id) in before)
             after[code].ShouldBe(id);
-        before.Keys.ShouldNotContain("customer-fif");
+        before.Keys.ShouldNotContain("customer-income-summary");
         _logs.Entries.ShouldContain(entry =>
-            entry.Level == LogLevel.Information && entry.Message.EndsWith("reports 1 granted, 3 existing"));
+            entry.Level == LogLevel.Information && entry.Message.EndsWith("reports 1 granted, 4 existing"));
     }
 
     [Test]
@@ -223,7 +223,7 @@ public class DemoTenantSeedTests
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var tenant = (await db.Tenants.AsNoTracking().Where(row => row.Code == "demo").ToListAsync())
             .ShouldHaveSingleItem();
-        (await GrantedCodesAsync(db, tenant.Id)).ShouldBe(["bank-reconciliation", "customer-fif", "customer-transactions"]);
+        (await GrantedCodesAsync(db, tenant.Id)).ShouldBe(["bank-reconciliation", "customer-fif", "customer-income-summary", "customer-transactions"]);
         _logs.Entries.ShouldContain(entry =>
             entry.Level == LogLevel.Warning && entry.Message.Contains("adviser-balances"));
     }
@@ -283,9 +283,9 @@ public class DemoTenantSeedTests
             .ToList();
         summaries.Count.ShouldBe(2);
         summaries[0].ShouldBe(
-            "Demo seed: tenant demo created; instruments 18 created, 0 existing; instruments classified 18, already classified 0; reports 4 granted, 0 existing");
+            "Demo seed: tenant demo created; instruments 18 created, 0 existing; instruments classified 18, already classified 0; reports 5 granted, 0 existing");
         summaries[1].ShouldBe(
-            "Demo seed: tenant demo existing; instruments 0 created, 18 existing; instruments classified 0, already classified 18; reports 0 granted, 4 existing");
+            "Demo seed: tenant demo existing; instruments 0 created, 18 existing; instruments classified 0, already classified 18; reports 0 granted, 5 existing");
     }
 
     private static readonly (string Symbol, string Name, string Quote)[] ExpectedCatalog =

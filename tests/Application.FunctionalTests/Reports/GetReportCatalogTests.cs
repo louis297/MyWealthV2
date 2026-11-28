@@ -62,7 +62,7 @@ public class GetReportCatalogTests : TestBase
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
             var items = json.RootElement.EnumerateArray().ToList();
             items.Select(item => item.GetProperty("code").GetString())
-                .ShouldBe(["adviser-balances", "bank-reconciliation", "customer-fif", "customer-transactions"]);
+                .ShouldBe(["adviser-balances", "bank-reconciliation", "customer-fif", "customer-income-summary", "customer-transactions"]);
 
             var adviser = items[0];
             adviser.GetProperty("id").GetGuid().ShouldBe(AdviserBalancesId);
@@ -87,7 +87,17 @@ public class GetReportCatalogTests : TestBase
             fif.GetProperty("allowedTriggers").EnumerateArray().Select(trigger => trigger.GetString())
                 .ShouldBe(["manual"]);
 
-            var customer = items[3];
+            var income = items[3];
+            income.GetProperty("id").GetGuid().ShouldBe(Guid.Parse("4b6e2d91-3f7a-4c18-9d52-8a1e7c0b6f55"));
+            income.GetProperty("name").GetString().ShouldBe("Tax Year Income Summary");
+            income.GetProperty("function").GetString().ShouldBe(
+                "Dividends and interest paid to one customer in one New Zealand tax year, in New Zealand dollars, with the tax taken from them and the imputation credits.");
+            income.GetProperty("scope").GetString().ShouldBe("Customer");
+            income.GetProperty("isActive").GetBoolean().ShouldBeTrue();
+            income.GetProperty("allowedTriggers").EnumerateArray().Select(trigger => trigger.GetString())
+                .ShouldBe(["manual"]);
+
+            var customer = items[4];
             customer.GetProperty("id").GetGuid().ShouldBe(CustomerTransactionsId);
             customer.GetProperty("isActive").GetBoolean().ShouldBeFalse();
             customer.GetProperty("scope").GetString().ShouldBe("Customer");

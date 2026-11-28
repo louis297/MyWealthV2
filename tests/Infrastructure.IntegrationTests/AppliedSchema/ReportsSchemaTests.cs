@@ -8,7 +8,7 @@ namespace MyWealthV2.Infrastructure.IntegrationTests.AppliedSchema;
 public class ReportsSchemaTests
 {
     [Test]
-    public async Task Apply_SeedsFourReportsAndNoTenantGrants()
+    public async Task Apply_SeedsFiveReportsAndNoTenantGrants()
     {
         var rows = await QueryReports();
 
@@ -38,6 +38,14 @@ public class ReportsSchemaTests
                 """["manual"]""",
                 true),
             (
+                Guid.Parse("4b6e2d91-3f7a-4c18-9d52-8a1e7c0b6f55"),
+                "customer-income-summary",
+                "Tax Year Income Summary",
+                "Dividends and interest paid to one customer in one New Zealand tax year, in New Zealand dollars, with the tax taken from them and the imputation credits.",
+                "Customer",
+                """["manual"]""",
+                true),
+            (
                 Guid.Parse("8c4e1a20-7b3d-4f6a-9e15-2d0c6b8a4f11"),
                 "customer-transactions",
                 "Customer Transactions Report",
@@ -61,6 +69,19 @@ public class ReportsSchemaTests
         await db.Database.ExecuteSqlRawAsync(await File.ReadAllTextAsync(path));
 
         (await db.Reports.CountAsync(row => row.Code == "customer-fif")).ShouldBe(1);
+    }
+
+    // Income-summary R15: script 0063 inserts the row only when no row has the code.
+    [Test]
+    public async Task IncomeSummaryReportScript_RunAgain_LeavesOneRow()
+    {
+        var path = Path.Combine(ScratchSchemaDatabase.SchemaDirectory(), "0063_income_summary_report.sql");
+        File.Exists(path).ShouldBeTrue();
+        await using var db = OpenDb();
+
+        await db.Database.ExecuteSqlRawAsync(await File.ReadAllTextAsync(path));
+
+        (await db.Reports.CountAsync(row => row.Code == "customer-income-summary")).ShouldBe(1);
     }
 
     [Test]

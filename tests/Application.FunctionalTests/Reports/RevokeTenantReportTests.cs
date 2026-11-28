@@ -89,7 +89,7 @@ public class RevokeTenantReportTests : TestBase
         {
             var items = json.RootElement.EnumerateArray().ToList();
             items.Select(item => item.GetProperty("code").GetString())
-                .ShouldBe(["adviser-balances", "bank-reconciliation", "customer-fif", "customer-transactions"]);
+                .ShouldBe(["adviser-balances", "bank-reconciliation", "customer-fif", "customer-income-summary", "customer-transactions"]);
             var customer = items.Single(item => item.GetProperty("id").GetGuid() == CustomerTransactionsId);
             customer.GetProperty("granted").GetBoolean().ShouldBeFalse();
             customer.TryGetProperty("isGranted", out _).ShouldBeFalse();
