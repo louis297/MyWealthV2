@@ -13,8 +13,26 @@ public static class TaxCostLedger
     /// in another currency on the UTC date of its <c>bookedAt</c>; a carried cost of an arrival in another currency on
     /// its <c>acquiredOn</c>, else on that UTC date; a correction's cost change in another currency on that UTC date.
     /// </summary>
-    public static IReadOnlySet<(string Currency, DateOnly Date)> RateKeys(IEnumerable<TaxEvent> events, IReadOnlySet<int> costed) =>
-        new HashSet<(string Currency, DateOnly Date)>();
+    public static IReadOnlySet<(string Currency, DateOnly Date)> RateKeys(IEnumerable<TaxEvent> events, IReadOnlySet<int> costed)
+    {
+        var keys = new HashSet<(string Currency, DateOnly Date)>();
+        foreach (var taxEvent in events.Where(e => costed.Contains(e.InstrumentId)))
+        {
+            (string Currency, DateOnly Date)? key = taxEvent.Kind switch
+            {
+                TaxEventKind.Acquisition => (taxEvent.Trade!.Currency, LedgerDay.Of(taxEvent.BookedAt)),
+                TaxEventKind.Arrival or TaxEventKind.Correction when taxEvent.CarriedCost!.Amount != 0m =>
+                    (taxEvent.CarriedCost.Currency, RateDate(taxEvent)),
+                _ => null
+            };
+            if (key is { Currency: { Length: > 0 } currency } found && currency != CustomerTaxYear.Nzd)
+            {
+                keys.Add(found);
+            }
+        }
+
+        return keys;
+    }
 
     /// <summary>
     /// R5–R14: walks <paramref name="events"/> (the order of <see cref="TaxLedger.Build"/>) for the Instruments in
@@ -40,7 +58,7 @@ public static class TaxCostLedger
         return new TaxCostWalk(steps);
     }
 
-    /// <summary>One event applied to the state of its tax holding before it.</summary>
+    /// <summary>One event applied to the state of its tax holding before it (R6–R13).</summary>
     private static TaxCostStep Next(
         TaxEvent taxEvent,
         TaxCostState before,
@@ -48,37 +66,96 @@ public static class TaxCostLedger
         int decimalPlaces)
     {
         var quantity = before.Quantity + taxEvent.Changes.Sum(change => change.Quantity);
-        decimal? after = before.Cost;
+        var figure = Figure(taxEvent, rates, decimalPlaces);
+        decimal? after = null;
+        var unknown = before.Unknown;
         if (before.Cost is { } cost)
         {
-            after = taxEvent.Kind switch
+            var cause = figure?.Cause;
+            if (cause is null)
             {
-                // R6: the principal and the fee, each converted on its own.
-                TaxEventKind.Acquisition => cost + Acquired(taxEvent, rates, decimalPlaces),
-                // R7: the average of what is held before.
-                TaxEventKind.Disposal => cost - Released(cost, -taxEvent.Quantity, before.Quantity, decimalPlaces),
-                // R8: a reorganisation, a dividend and a move change nothing.
-                _ => cost
-            };
+                after = taxEvent.Kind switch
+                {
+                    // R6, R9, R11: the figure the event adds, signed for a correction.
+                    TaxEventKind.Acquisition or TaxEventKind.Arrival or TaxEventKind.Correction => cost + figure!.Value.Amount,
+                    // R7, R10: the average of what is held before; more than is held is a negative quantity (below).
+                    TaxEventKind.Disposal or TaxEventKind.Departure when quantity >= 0m =>
+                        cost - Released(cost, -taxEvent.Quantity, before.Quantity, decimalPlaces),
+                    TaxEventKind.Disposal or TaxEventKind.Departure => null,
+                    // R8: a reorganisation, a dividend and a move change nothing.
+                    _ => cost
+                };
+                cause = quantity < 0m ? TaxCostUnknownCause.NegativeQuantity
+                    : after < 0m ? TaxCostUnknownCause.NegativeCost
+                    : null;
+            }
+
+            if (cause is { } first)
+            {
+                after = null;
+                unknown = new TaxCostUnknown(first, taxEvent.Ordinal, taxEvent.BookedAt, taxEvent.TransactionPublicId);
+            }
         }
 
-        // R12: nothing held costs nothing.
+        // R12: nothing held costs nothing, whatever was known before.
         if (quantity == 0m)
         {
             after = TaxFx.Zero(decimalPlaces);
+            unknown = null;
         }
 
-        var change = after - before.Cost;
-        return new TaxCostStep(taxEvent, quantity, change, after, null, null);
+        return new TaxCostStep(taxEvent, quantity, after - before.Cost, after, figure?.Fx, unknown);
     }
 
-    private static decimal Acquired(
+    /// <summary>
+    /// R6, R9, R11, R13, R14: the NZD figure an acquisition, an arrival or a correction adds, with the rate row of a
+    /// carried cost or a correction, or the cause it cannot be worked out. None for the other kinds. A correction's cost
+    /// change of 0 needs no rate.
+    /// </summary>
+    private static (decimal Amount, StoredRate? Fx, TaxCostUnknownCause? Cause)? Figure(
         TaxEvent taxEvent, IReadOnlyDictionary<(string Currency, DateOnly Date), StoredRate> rates, int decimalPlaces)
     {
-        var trade = taxEvent.Trade!;
-        var (status, rate) = TaxFx.RateOf(trade.Currency, LedgerDay.Of(taxEvent.BookedAt), rates);
-        return TaxFx.Nzd(trade.Principal, status, rate, decimalPlaces)!.Value + TaxFx.Nzd(trade.Fee, status, rate, decimalPlaces)!.Value;
+        switch (taxEvent.Kind)
+        {
+            case TaxEventKind.Acquisition:
+                var trade = taxEvent.Trade!;
+                var (status, rate) = TaxFx.RateOf(trade.Currency, LedgerDay.Of(taxEvent.BookedAt), rates);
+                if (Unconverted(status) is { } cause)
+                {
+                    return (0m, null, cause);
+                }
+
+                return (TaxFx.Nzd(trade.Principal, status, rate, decimalPlaces)!.Value + TaxFx.Nzd(trade.Fee, status, rate, decimalPlaces)!.Value,
+                    null, null);
+
+            case TaxEventKind.Arrival:
+            case TaxEventKind.Correction:
+                var carried = taxEvent.CarriedCost!;
+                if (carried.Amount == 0m)
+                {
+                    return taxEvent.Kind == TaxEventKind.Arrival && taxEvent.Quantity != 0m
+                        ? (0m, null, TaxCostUnknownCause.NoCarriedCost)
+                        : (TaxFx.Zero(decimalPlaces), null, null);
+                }
+
+                var (carriedStatus, carriedRate) = TaxFx.RateOf(carried.Currency, RateDate(taxEvent), rates);
+                return (TaxFx.Nzd(carried.Amount, carriedStatus, carriedRate, decimalPlaces) ?? 0m, carriedRate, Unconverted(carriedStatus));
+
+            default:
+                return null;
+        }
     }
+
+    /// <summary>R9, R14: the date of a carried cost's rate: <c>acquiredOn</c> when the arrival states one, else the UTC
+    /// date of <c>bookedAt</c>.</summary>
+    private static DateOnly RateDate(TaxEvent taxEvent) => taxEvent.CarriedCost?.AcquiredOn ?? LedgerDay.Of(taxEvent.BookedAt);
+
+    private static TaxCostUnknownCause? Unconverted(TaxAmountStatus status) => status switch
+    {
+        TaxAmountStatus.NoRate => TaxCostUnknownCause.NoRate,
+        TaxAmountStatus.StaleRate => TaxCostUnknownCause.StaleRate,
+        _ => null
+    };
 
     /// <summary>R7: <c>Round(cost × out ÷ before, dp)</c>; everything held taken out removes the whole cost.</summary>
     private static decimal Released(decimal cost, decimal quantityOut, decimal quantityBefore, int decimalPlaces) =>
