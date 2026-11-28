@@ -122,22 +122,19 @@ public class RequestCustomerFifTests : TestBase
         var inProgress = TaxYear.Of(DateTimeOffset.UtcNow);
 
         (await ErrorsAsync(admin, new { taxYear = 2026 }))
-            .ShouldBe(new Dictionary<string, string[]> { ["customerId"] = ["customerId is required."] });
+            .ShouldBeError("customerId", "customerId is required.");
         (await ErrorsAsync(admin, new { customerId }))
-            .ShouldBe(new Dictionary<string, string[]> { ["taxYear"] = ["taxYear is required."] });
+            .ShouldBeError("taxYear", "taxYear is required.");
         (await ErrorsAsync(admin, new { customerId, taxYear = "2026" }))
-            .ShouldBe(new Dictionary<string, string[]> { ["parameters"] = ["parameters are not valid."] });
+            .ShouldBeError("parameters", "parameters are not valid.");
         (await ErrorsAsync(admin, new { customerId, taxYear = 2026.5 }))
-            .ShouldBe(new Dictionary<string, string[]> { ["parameters"] = ["parameters are not valid."] });
+            .ShouldBeError("parameters", "parameters are not valid.");
         (await ErrorsAsync(admin, new { customerId, taxYear = 2026, from = "2025-04-01" }))
-            .ShouldBe(new Dictionary<string, string[]> { ["parameters"] = ["unknown field."] });
+            .ShouldBeError("parameters", "unknown field.");
         (await ErrorsAsync(admin, new { customerId, taxYear = 2008 }))
-            .ShouldBe(new Dictionary<string, string[]> { ["taxYear"] = ["taxYear must be 2009 or later."] });
+            .ShouldBeError("taxYear", "taxYear must be 2009 or later.");
         (await ErrorsAsync(admin, new { customerId, taxYear = inProgress }))
-            .ShouldBe(new Dictionary<string, string[]>
-            {
-                ["taxYear"] = [$"Tax year {inProgress} can be reported from 2 April {inProgress}."]
-            });
+            .ShouldBeError("taxYear", $"Tax year {inProgress} can be reported from 2 April {inProgress}.");
     }
 
     [Test]
@@ -155,7 +152,7 @@ public class RequestCustomerFifTests : TestBase
         {
             var token = (await TestApp.IssueAccessTokenAsync(caller)).AccessToken;
             (await CorporateActionHttp.ErrorsAsync(await PostAsync(token, firm.Customer.PublicId)))
-                .ShouldBe(new Dictionary<string, string[]> { ["customerId"] = [OverseasMessage] });
+                .ShouldBeError("customerId", OverseasMessage);
         }
 
         var outOfScope = await TestApp.IssueAccessTokenAsync(otherAdviser);
@@ -303,5 +300,15 @@ public class RequestCustomerFifTests : TestBase
         var row = await db.ReportExecutions.IgnoreQueryFilters().AsNoTracking()
             .SingleAsync(execution => execution.PublicId == executionId);
         return (row.TriggerKind, row.Status, row.AsOf, row.ParametersJson);
+    }
+}
+
+internal static class RequestErrorAssertions
+{
+    /// <summary>The 400 names one field, with one message.</summary>
+    public static void ShouldBeError(this Dictionary<string, string[]> errors, string key, string message)
+    {
+        errors.Keys.ShouldBe([key]);
+        errors[key].ShouldBe([message]);
     }
 }

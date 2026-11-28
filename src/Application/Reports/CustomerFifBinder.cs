@@ -1,6 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluentValidation.Results;
+using MyWealthV2.Application.Common.Interfaces;
+using MyWealthV2.Domain.Entities;
+using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Tax;
 using ValidationException = MyWealthV2.Application.Common.Exceptions.ValidationException;
 
@@ -53,6 +56,24 @@ public static class CustomerFifBinder
         var snapshot = JsonSerializer.Serialize(new CustomerFifSnapshot(input.CustomerId.Value, taxYear), Options);
         return new CustomerFifBinding(input.CustomerId.Value, taxYear, snapshot);
     }
+
+    /// <summary>R8: the refusal of a Customer whose tax residency is not New Zealand.</summary>
+    public const string OverseasMessage = "A FIF report is made for a customer whose tax residency is New Zealand.";
+
+    /// <summary>
+    /// R8: the tax residency on file for the Customer (interest-run R2); a Customer with no saved profile reads as
+    /// <see cref="TaxResidency.NewZealand"/>. Names the Tenant itself, so a <c>worker</c> run reads it the same way.
+    /// </summary>
+    public static async Task<TaxResidency> ResidencyAsync(
+        IApplicationDbContext db,
+        int tenantId,
+        int customerId,
+        CancellationToken cancellationToken) =>
+        await db.CustomerTaxProfiles.IgnoreQueryFilters().AsNoTracking()
+            .Where(row => row.TenantId == tenantId && row.UserId == customerId)
+            .Select(row => (TaxResidency?)row.TaxResidency)
+            .SingleOrDefaultAsync(cancellationToken)
+        ?? CustomerTaxProfile.NotProvided.TaxResidency;
 
     private static ValidationException Invalid() => Failure("parameters", "parameters are not valid.");
 
