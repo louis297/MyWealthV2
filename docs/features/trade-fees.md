@@ -427,7 +427,7 @@ Still open, not this slice:
 - Showing planned and posted fees in the rebalance result and on the Adviser Portal.
 - A warning when a minimum fee is a large share of the portfolio's minimum trade size (minimum trade 100 with a minimum fee 10 is a 10 % cost).
 - Concurrency between a schedule write and a trade posted on a future date at the same moment (R9 reads posted trades; schedule writes do not take the Account lock).
-- GST on brokerage. Whether brokerage is part of the cost base is answered by [fif-roadmap.md](../roadmaps/fif-roadmap.md) Q10: a buy fee adds to the cost and a sell fee comes off the proceeds. The tax year read gives the principal and the fee of each trade apart ([tax-year-events.md](tax-year-events.md) R10), so the CV method can still leave the fee out if section EX 51 says so.
+- GST on brokerage. Whether brokerage is part of the cost base is answered by [fif-roadmap.md](../roadmaps/fif-roadmap.md) Q10: a buy fee adds to the cost and a sell fee comes off the proceeds. The tax year read gives the principal and the fee of each trade apart ([tax-year-events.md](tax-year-events.md) R10), and FIF income takes a fee into the cost of a purchase and off the proceeds of a sale under both methods ([fif-income.md](fif-income.md) R6).
 - Fees shown on the Customer Portal.
 
 ---
@@ -447,3 +447,4 @@ What changed in this file after it was accepted. The text of each change is in g
 | 2026-11-24 | [dividends.md](dividends.md) | R20: cash leg role `Reinvestment` |
 | 2026-11-26 | — | The changes above were folded into the body. No rule changed |
 | 2026-11-28 | [tax-year-events.md](tax-year-events.md) | §11 Still open: brokerage and the cost base answered by roadmap Q10; GST stays open |
+| 2026-11-28 | [fif-income.md](fif-income.md) | §11 Still open: a fee is in the cost of a purchase and off the proceeds of a sale in FIF income |

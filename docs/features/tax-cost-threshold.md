@@ -156,7 +156,7 @@ What the example shows:
 
 **Out**
 
-- FIF income under either method, and the quick sale adjustment with its own average cost over the purchases of one year: roadmap TR4. That average is not the cost of this slice
+- FIF income under either method, and the quick sale adjustment with its own average cost over the purchases of one year: [fif-income.md](fif-income.md) (its R11). That average is not the cost of this slice
 - The report, and what it says to a Customer whose test is `NotAbove`: TR5. The income summary: TR6
 - Whether the FIF rules apply to the Customer for another reason: tax residency, a transitional resident, the choice to apply the rules below the threshold and its four-year rule (roadmap Q14, §7). The test says above or not, and nothing else
 - Joint holders, trusts and companies. A Customer is one person (ADR 0020)
@@ -510,7 +510,6 @@ Confirmed on 2026-11-28, every one as recommended. Each point states the choice,
 
 Still open, not this slice:
 
-- FIF income, the quick sale adjustment and its own average cost: TR4
 - The report, what it prints for each outcome, and the day of the peak in New Zealand time: TR5
 - The threshold of tax year 2027 and later, once the Bill is law (R15)
 - The deemed sale and purchase at market value when a treatment changes (R22), and the pre-2000 option (R23)
@@ -563,3 +562,13 @@ Read on 2026-11-28. S1 and S2 are the codes of [fif-roadmap.md](../roadmaps/fif-
 | — | Income Tax Act 2007, section CQ 5 and the sections on the cost of an attributing interest | The threshold and its cost in the Act's own words; which cost a disposal removes | Not read: `legislation.govt.nz` and NZLII refused automated reads (403) |
 
 What follows from the refusal: R7 (the average cost) follows roadmap Q9 and the two guides; R9 (the cost of an arrival) follows roadmap Q8; R22 follows the guide's one sentence on a change. Each is a point of §11. The threshold itself, the fee in the cost, the NZD cost at the time of purchase and "at any time" are stated by Inland Revenue in the sources read.
+
+---
+
+## 15. History
+
+What changed in this file after it was accepted. The text of each change is in git (`git log -p -- docs/features/tax-cost-threshold.md`).
+
+| Date | With | Change here |
+| --- | --- | --- |
+| 2026-11-28 | [fif-income.md](fif-income.md) | §2 Out: FIF income and the average cost of the quick sale are that spec's (its R11). "Still open": the TR4 line goes |

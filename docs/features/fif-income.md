@@ -1,6 +1,6 @@
 ---
 title: "FIF income: FDR, the quick sale adjustment and CV"
-status: review
+status: accepted
 phase: 2
 language: en
 owner: ""
@@ -40,7 +40,7 @@ It is a Domain function with no I/O (roadmap T7). It reads no price, no rate and
 
 New: fields on the item of `GET /users/customers/{customerId}/tax-years/{taxYear}` (`fifIncome` on the item and on each tax holding); Domain types `FairDividendRate`, `FifIncome`, `TaxHoldingIncome`, `QuickSale` and their enums; `CustomerTaxYear.Compute` carries them. No route, script, table, permission, problem code, domain event, `TransactionType`, port, job or setting. No write changes. `CustomerTaxLedger` reads nothing more than it does today. No portal page and no simulator change.
 
-**Status is `review` (2026-11-28).** It is not a build contract. The eighteen points of §11 wait for confirmation; each states a recommendation, and the rules are written as recommended. The changes to other docs in §12 are a plan until the spec is accepted.
+**Status is `accepted` (2026-11-28).** The eighteen points of §11 were confirmed on 2026-11-28, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract. Sections EX 51, EX 52 and EX 54 and the calculator were still not checked when it was accepted; they stay open (§11).
 
 The tax statements in this spec were read again from Inland Revenue on 2026-11-28 (§14). The Income Tax Act refused automated reads again, so sections EX 51, EX 52 and EX 54, which roadmap Q11 asked for, were not read; §14 says which rules rest on the guide and the commentaries alone. Nothing here is tax advice.
 
@@ -345,7 +345,7 @@ Invariants:
 
 Domain events: none. Nothing is an entity and nothing is stored.
 
-[domain-model.md](../domain-model.md) §8.24 gains these types when this spec is accepted.
+[domain-model.md](../domain-model.md) §8.24 holds these types.
 
 ---
 
@@ -564,9 +564,9 @@ No new ADR.
 | Where | Fields of `GET /users/customers/{customerId}/tax-years/{taxYear}` |
 | Routes, scripts, permissions, problem codes, events, ports, jobs, settings | None |
 
-### Points to confirm
+### Points confirmed
 
-Each point states the recommendation, written into the rules above, and the alternative.
+Confirmed on 2026-11-28, every one as recommended. Each point states the choice, written into the rules above, and the alternative that was not taken.
 
 1. **The income is a field of the tax year read** (R1, R26). Recommended: it is arithmetic over that read's own figures, so one answer shows the result with every price, rate and event it came from, at one `ledgerReadAt`; roadmap TR4 allows "added to the TR2 read or as a read of its own", and the tax cost was placed the same way. The cost: the item grows again. Alternative: a route of its own (`…/tax-years/{taxYear}/fif-income`), which reads the ledger a second time and may show another state of it.
 2. **The income is computed whatever the threshold test says** (R2). Recommended: roadmap TR4, "TR3 decides whether the result applies, not how it is computed"; a person below the threshold may choose to apply the rules; and the report shows both branches (roadmap Q14). Alternative: `null` when the outcome is `NotAbove`.
@@ -589,8 +589,8 @@ Each point states the recommendation, written into the rules above, and the alte
 
 ### Found while writing
 
-- **The Act was not read.** `legislation.govt.nz`, NZLII and AustLII refused automated reads again (403), and an archived copy could not be reached. Roadmap Q11 asked for sections EX 52 and EX 54, and Q10 for EX 51. R13 and R14 rest on the guide, on the 2006 and 2008 commentaries and on roadmap Q11. A person should read the three sections before this spec is accepted.
-- **Inland Revenue's calculator was not used.** Roadmap TR4 names it as a second check (S3). It is a web form, and no number of this spec was typed into it. A person should type example 2 and the guide's quick sale example in before acceptance.
+- **The Act was not read.** `legislation.govt.nz`, NZLII and AustLII refused automated reads again (403), and an archived copy could not be reached. Roadmap Q11 asked for sections EX 52 and EX 54, and Q10 for EX 51. R13 and R14 rest on the guide, on the 2006 and 2008 commentaries and on roadmap Q11. A person should still read the three sections; they were not read when the spec was accepted.
+- **Inland Revenue's calculator was not used.** Roadmap TR4 names it as a second check (S3). It is a web form, and no number of this spec was typed into it. A person should still type example 2 and the guide's quick sale example in; it was not done when the spec was accepted.
 - **The commentaries were read through a fetch tool** that gives back a restatement with short exact quotes, not the page itself (§14). The figures of S8's examples are as restated and were worked through again here: each agrees with the rules of §4 to the dollar.
 - **Two names for one amount.** The guide says "actual gain" (S1 p.15). The Act, as the 2011 commentary cites it, says "quick sale gain amount". This spec uses the Act's name and gives the guide's in R14.
 - **Roadmap Q11 cites S1 p.15 and S9 for the dividends.** Neither mentions them. The pro rata share of a dividend is in S8, Example 4.
@@ -622,7 +622,7 @@ Still open, not this slice:
 
 ## 12. Changes to other docs
 
-A plan while this spec is in `review`. Each doc is changed in place when it is accepted.
+Each doc was changed in place when this spec was accepted (2026-11-28).
 
 | Doc | Change |
 | --- | --- |
