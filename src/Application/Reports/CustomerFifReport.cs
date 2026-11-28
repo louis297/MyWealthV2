@@ -60,8 +60,10 @@ public static partial class CustomerFifReport
             _generatedAt = generatedAt;
             _ledgerReadAt = ledgerReadAt;
             // R18: sorted as the read sorts them (by symbol, then by the Instrument's PublicId).
+            // Sections 5 to 9 follow the order of section 3: by group, then as sorted.
             _holdings = read.Year.Holdings
-                .OrderBy(holding => Instrument(holding.InstrumentId).Symbol, StringComparer.Ordinal)
+                .OrderBy(GroupOf)
+                .ThenBy(holding => Instrument(holding.InstrumentId).Symbol, StringComparer.Ordinal)
                 .ThenBy(holding => Instrument(holding.InstrumentId).PublicId)
                 .ToList();
         }

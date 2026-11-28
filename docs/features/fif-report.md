@@ -120,44 +120,58 @@ AAA  computed  opening value 13108.48  FDR amount 655.42  peak holding method am
      quick sale gain amount 0.00  CV amount 1740.87
 The quick sale adjustment is the lesser of the two totals over all holdings, not a sum per holding.
 
-6. AAA Alpha Inc
+6. Each holding
+AAA Alpha Inc
+United States of America  Attributing interest  classified from tax year 2025
 Opening, valued as of 2025-03-31
   Trading     Held on platform  100    53.20 USD (2025-03-31)  5320.00 USD  x 1.76 (2025-03-31)   9363.20
   Old broker  Held elsewhere     40    53.20 USD (2025-03-31)  2128.00 USD  x 1.76 (2025-03-31)   3745.28
-  Total 140 (280 on the basis of the year's end)  13108.48
+Total 140 (280 on the basis of the year's end)  13108.48
 Closing, valued as of 2026-03-31
   Trading     Held on platform  240.8  31.00 USD (2026-03-31)  7464.80 USD  x 1.745 (2026-03-31)  13026.08
-  Total 240.8  13026.08
+Total 240.8  13026.08
 Events
-  1  2025-04-01 09:15  Sale                         Trading     -30   110    220    2789.60 (2798.40 less a fee of 8.80)   x 1.76 (2025-03-31)   cost -2647.65  9708.05
-  2  2025-05-20 14:10  Dividend                     Trading       0   110    220      59.15                                x 1.69 (2025-05-20)                  9708.05
-  3  2025-07-01 12:00  Share reorganisation         Old broker  +40   150    220                                                                               9708.05
-  4  2025-07-03 00:01  Share reorganisation         Trading     +70   220    220                                                                               9708.05
-  5  2025-09-15 14:30  Dividend                     Trading       0   220    220      58.80                                x 1.68 (2025-09-15)                  9708.05
-  6  2025-09-15 14:30  Purchase                     Trading    +0.8   220.8  220.8    37.63                                x 1.68 (2025-09-15)   cost   +37.63  9745.68
-  7  2025-11-14 16:20  Moved between your accounts  Trading       0   220.8  220.8   80 from Old broker (2025-11-10 13:00) to Trading                           9745.68
-  8  2026-02-03 10:40  Purchase                     Trading     +20   240.8  240.8  1046.65 (1038.00 and a fee of 8.65)    x 1.73 (2026-02-02)   cost +1046.65 10792.33
+  1  2025-04-01 09:15  Sale                         Trading     -30   110    220    2789.60 (2798.40 less a fee of 8.80)   x 1.76 (2025-03-31)   -2647.65   9708.05
+  2  2025-05-20 14:10  Dividend                     Trading       0   110    220      59.15                                x 1.69 (2025-05-20)               9708.05
+  3  2025-07-01 12:00  Share reorganisation         Old broker  +40   150    220                                                                            9708.05
+  4  2025-07-03 00:01  Share reorganisation         Trading     +70   220    220                                                                            9708.05
+  5  2025-09-15 14:30  Dividend                     Trading       0   220    220      58.80                                x 1.68 (2025-09-15)               9708.05
+  6  2025-09-15 14:30  Purchase                     Trading    +0.8   220.8  220.8    37.63                                x 1.68 (2025-09-15)     +37.63   9745.68
+  7  2025-11-14 16:20  Moved between your accounts  Trading       0   220.8  220.8   80 from Old broker (2025-11-10 13:00) to Trading                        9745.68
+  8  2026-02-03 10:40  Purchase                     Trading     +20   240.8  240.8  1046.65 (1038.00 and a fee of 8.65)    x 1.73 (2026-02-02)   +1046.65  10792.33
 Dividends
-  2  70 shares   gross 59.15  foreign tax 8.87  RWT 10.65  NRWT 0.00  imputation credit 0.00  tax source Foreign
-  5  140 shares  gross 58.80  foreign tax 8.82  RWT 10.58  NRWT 0.00  imputation credit 0.00  tax source Foreign
+  2   70  59.15  8.87  10.65  0.00  0.00  Foreign
+  5  140  58.80  8.82  10.58  0.00  0.00  Foreign
 Tax cost: 12355.70 at the start, 10792.33 at the end
 Fair dividend rate: 0.05 x 13108.48 = 655.42
 Quick sale: opening 280, peak 280, closing 240.8; peak holding differential 0
-  Purchases of the year: 20.8 shares for 1084.28, average cost 52.12884615
-  Peak holding method amount 0.00    Shares matched 0    Quick sale gain amount 0.00
+Purchases of the year: 20.8 shares for 1084.28, average cost 52.12884615
+Peak holding method amount 0.00    Shares matched 0    Quick sale gain amount 0.00
 Comparative value: (13026.08 + 2789.60 + 117.95) - (13108.48 + 1084.28) = 1740.87
+Notices: Held elsewhere; Moved between your accounts. See section 9.
 
 7. Tax taken from dividends
 AAA  United States of America  dividends 117.95  foreign tax 17.69  RWT 21.23  NRWT 0.00  imputation credits 0.00  FDR amount 655.42  CV amount 1740.87
-United States of America  dividends 117.95  foreign tax 17.69  RWT 21.23  NRWT 0.00  imputation credits 0.00
-Total               dividends 117.95  foreign tax 17.69  RWT 21.23  NRWT 0.00  imputation credits 0.00
+United States of America       dividends 117.95  foreign tax 17.69  RWT 21.23  NRWT 0.00  imputation credits 0.00
+Total                          dividends 117.95  foreign tax 17.69  RWT 21.23  NRWT 0.00  imputation credits 0.00
+Foreign tax taken from a dividend may give a foreign tax credit. ...
 
 8. Prices, rates and values used
-Prices: AAA 2025-03-31 53.20 USD (EODHD); AAA 2026-03-31 31.00 USD (EODHD)
-Rates USD to NZD: 2025-03-31 1.76; 2025-05-20 1.69; 2025-09-15 1.68; 2026-02-02 1.73; 2026-03-31 1.745 (Frankfurter)
+Prices
+  AAA  2025-03-31  53.20 USD  EODHD
+  AAA  2026-03-31  31.00 USD  EODHD
+Rates
+  USD to NZD  2025-03-31  1.76   Frankfurter
+  USD to NZD  2025-05-20  1.69   Frankfurter
+  USD to NZD  2025-09-15  1.68   Frankfurter
+  USD to NZD  2026-02-02  1.73   Frankfurter
+  USD to NZD  2026-03-31  1.745  Frankfurter
 FIF threshold of tax year 2026: 50000.00    Fair dividend rate of tax year 2026: 0.05
+Ledger read at 2026-11-28 16:12
+The tax cost at the start of the tax year comes from purchases of earlier tax years. Their rates are not listed here.
 
 9. What to know about these figures
+What these figures rest on
 AAA: Some of these figures come from an account held elsewhere. ...
 AAA: A transfer out of one of your accounts and a transfer into another were read as one move. ...
 ```
@@ -275,7 +289,7 @@ The PDF is built in code with QuestPDF, A4 landscape, as reports §9.3 says. It 
 | R18 | **Section 3, "Holdings and classification".** Every tax holding of the year, sorted as the read sorts them, in three groups: "Attributing interests" (`Attributing`, `AttributingNoFdr`), "Exempt or not foreign" (`ExemptAsxListed`, `ExemptOther`, `NotForeign`) and "Not classified". A row has the symbol, the name, the issuer country by its name (instrument-tax-attributes R6; "not stated" when there is none), the label of the treatment (§4.6), "classified from tax year {rowTaxYear}", the note when there is one, the opening and the closing quantity, and the status of its FIF income as "computed", "not computed" or "not in the FIF rules". An empty group is printed with "None." Under the second group: "These holdings are not in the FIF calculation. Their dividends and sales are taxed under the ordinary rules and are not in this report." Under the third: "A holding that is not classified may be an attributing interest. Ask your adviser to have it classified." A holding of the second group appears in no later section. Sources: S2 ¶7 for the ordinary rules on an exempt interest. |
 | R19 | **Section 4, "Threshold test".** "Threshold for tax year {Y}: {amount}", or "No FIF threshold is set on this platform for tax year {Y}."; the total cost at the start, the highest total with when it was reached ("at the start of the tax year" or "on {New Zealand time}"), and the total at the end; the sentence of the outcome (§4.6); a table of the tax holdings that count (tax-cost-threshold R16) with the tax cost at the start and at the end, or "not known" with the cause (§4.7); and the steps of the test (its R24): time, symbol, the label of the event, the change and the total after it. With the highest total at the start and no step, the table of steps is replaced by "The total cost did not change during the tax year." When the test is incomplete, each reason is in section 9 and the section says "Incomplete: see section 9." |
 | R20 | **Section 5, "FIF income".** The rate of the year. Under "Fair dividend rate method": the sum of the opening values, the sum of the FDR amounts, the sum of the peak holding method amounts, the sum of the quick sale gain amounts, the quick sale adjustment and the FIF income (the fields of `fifIncome.fdr`). Under "Comparative value method": the sum of the CV amounts and the FIF income (`fifIncome.cv`), and when the sum is below zero, "The total is below zero. It gives an income of 0.00 and cannot be used elsewhere." Then a table with one row per tax holding of the first and third group of R18: the symbol, the status, and when it is computed the opening value, the FDR amount, the peak holding method amount, the quick sale gain amount and the CV amount. Under the table: "The quick sale adjustment is the lesser of the two totals over all holdings, not a sum per holding." When the totals are not given, the two blocks are replaced by the sentence of R17 and the table stays. |
-| R21 | **Section 6, one block per tax holding, in the order of section 3, for the first and third group.** (a) A title line as the row of R18. (b) "Opening, valued as of {valuationDay}" and "Closing, valued as of {valuationDay}": one row per line (tax-year-events R31) with the Account's name, the custody label, the quantity, the price with its currency and date, the market value in the quote currency, the rate with its date, and the value in NZD, or the label of the line's status when it is not valued; then the total quantity, with "({comparableQuantity} on the basis of the year's end)" when the two differ, and the total value. A quantity of 0 prints "Nothing held." (c) "Events": one row per event with its sequence, time, label (§4.6), Account, quantity, quantity after, comparable quantity after, amount, the rate with its date, the label of its status when the amount is missing, and the change of the tax cost with the tax cost after. An `Acquisition` with a fee prints "{amount} ({principal} and a fee of {fee})", a `Disposal` "{amount} ({principal} less a fee of {fee})". An `Arrival` or a `Departure` prints its price with its date, and an arrival its carried cost with its currency, the rate it was converted at and `acquiredOn` when stated. A `Move` prints "{quantity} from {account} ({time}) to {account}". No event in the year prints "No events in this tax year." (d) "Dividends", when there is one: per dividend the sequence, the shares, the gross, the foreign tax, the RWT, the NRWT, the imputation credit and the tax source. (e) "Tax cost: {opening} at the start, {closing} at the end", or "not known" with its cause and the time of that cause. (f) The FIF income of the holding when it is computed: "Fair dividend rate: {rate} x {openingValue} = {amount}"; the quick sale figures of fif-income R26 when the holding has a purchase and a sale in the year (the three quantities, the differential, the shares and the cost of the year's purchases with the average cost, the peak holding method amount, each match as "{quantity} of purchase {n} sold in sale {m}", each sale with its matched part of the proceeds, each dividend share, the cost of the matched shares and the gain amount), and otherwise "No quick sale in this tax year."; and "Comparative value: ({closingValue} + {sales} + {dividends}) - ({openingValue} + {purchases}) = {amount}". When it is not computed: the sentence of its reason (§4.7), and no figure of either method. (g) The notices and the reasons of the holding, by their short names, with "See section 9." |
+| R21 | **Section 6, "Each holding": one block per tax holding, in the order of section 3, for the first and third group.** (a) A title line as the row of R18. (b) "Opening, valued as of {valuationDay}" and "Closing, valued as of {valuationDay}": one row per line (tax-year-events R31) with the Account's name, the custody label, the quantity, the price with its currency and date, the market value in the quote currency, the rate with its date, and the value in NZD, or the label of the line's status when it is not valued; then the total quantity, with "({comparableQuantity} on the basis of the year's end)" when the two differ, and the total value. A quantity of 0 prints "Nothing held." (c) "Events": one row per event with its sequence, time, label (§4.6), Account, quantity, quantity after, comparable quantity after, amount, the rate with its date, the label of its status when the amount is missing, and the change of the tax cost with the tax cost after. An `Acquisition` with a fee prints "{amount} ({principal} and a fee of {fee})", a `Disposal` "{amount} ({principal} less a fee of {fee})". An `Arrival` or a `Departure` prints its price with its date, and an arrival its carried cost with its currency, the rate it was converted at and `acquiredOn` when stated. A `Move` prints "{quantity} from {account} ({time}) to {account}". No event in the year prints "No events in this tax year." (d) "Dividends", when there is one: per dividend the sequence, the shares, the gross, the foreign tax, the RWT, the NRWT, the imputation credit and the tax source. (e) "Tax cost: {opening} at the start, {closing} at the end", or "not known" with its cause and the time of that cause. (f) The FIF income of the holding when it is computed: "Fair dividend rate: {rate} x {openingValue} = {amount}"; the quick sale figures of fif-income R26 when the holding has a purchase and a sale in the year (the three quantities, the differential, the shares and the cost of the year's purchases with the average cost, the peak holding method amount, each match as "{quantity} of purchase {n} sold in sale {m}", each sale with its matched part of the proceeds, each dividend share, the cost of the matched shares and the gain amount), and otherwise "No quick sale in this tax year."; and "Comparative value: ({closingValue} + {sales} + {dividends}) - ({openingValue} + {purchases}) = {amount}". When it is not computed: the sentence of its reason (§4.7), and no figure of either method. (g) The reasons of the holding as "Missing: {short names}. See section 9." and its notices as "Notices: {short names}. See section 9.", by the short names of §4.7. |
 | R22 | **Section 7, "Tax taken from dividends" (roadmap Q17).** One row per tax holding of the first and third group that has a `Dividend` in the year: the symbol, the issuer country by its name, and the sums over the dividends of the year of the gross, the foreign tax, the RWT, the NRWT and the imputation credit, each a sum of the NZD figures of the events (tax-year-events R11), and beside them the FDR amount and the CV amount of the holding when its income is computed, so that the tax taken stands next to the income of the same holding. Then one row per country with the sums of its holdings, countries in the order of their names and a holding with no country under "Country not stated", and a row "Total". A dividend with a figure that could not be converted leaves its row and the sums it is in as "not available". Under the table: "Foreign tax taken from a dividend may give a foreign tax credit. The credit is limited, and this report does not work it out. Resident withholding tax (RWT) is offset against the tax you owe. See Inland Revenue's guide to foreign investment funds (IR461)." With no dividend: "No dividends on these holdings in this tax year." The amounts are as booked; the report computes no credit and no tax. Sources: S1 p.20, the credit "is generally limited to the lesser of the tax paid and New Zealand liability on the segment of foreign income", and RWT "is used to offset tax payable with any excess refundable"; S1 p.21 and S2 ¶10 for the overseas income summary. |
 | R23 | **Section 8, "Prices, rates and values used" (roadmap T9).** "Prices": every price row behind an opening line, a closing line, an arrival or a departure, once each: the symbol, the date, the amount with its currency and the source. "Rates": every rate row behind a line, an event or the cost of an event (tax-cost-threshold R24), once each, grouped by pair: the pair as "{currency} to NZD", the date, the rate and the source. Then "FIF threshold of tax year {Y}: {amount}" or "not set", "Fair dividend rate of tax year {Y}: {rate}", and "Ledger read at {time}". Then: "The tax cost at the start of the tax year comes from purchases of earlier tax years. Their rates are not listed here." A date is the date of the row, not of the event that used it. The classifications are in section 3. |
 | R24 | **Section 9, "What to know about these figures".** First "What is missing", when the report is incomplete: one line per reason and tax holding, with the sentence of §4.7, for the reasons of the tax holding (tax-year-events R27), of the threshold test (tax-cost-threshold R20) and of the FIF income (fif-income R23). A reason that says the same of the same holding is printed once: `NotClassified` is one line, and `HoldingIncomplete` is not printed beside the reasons of the holding it stands for. Then "What these figures rest on": one line per notice and tax holding (tax-year-events R28), with the sentence of §4.7. With neither: "Nothing to report." |
@@ -366,6 +380,8 @@ What is missing (R24):
 | FIF income | `FdrNotAllowed` | "The fair dividend rate method is not allowed for this holding. Its income is not computed here and is in no total. It is worked out under the comparative value method on its own, or the deemed rate of return." |
 
 The causes of an unknown tax cost (tax-cost-threshold R13), each followed by "since {time}": `NoCarriedCost` "it was transferred in with no cost stated"; `NoRate` "no exchange rate is stored for the day of a purchase"; `StaleRate` "the exchange rate stored for the day of a purchase is too old"; `NegativeQuantity` "more was sold or transferred out than was held"; `NegativeCost` "a correction left a cost below 0".
+
+The short names of R21 (g), in the order of the tables of this section: `NotClassified` "Not classified"; `OpeningNotValued` "No market value at the start"; `ClosingNotValued` "No market value at the end"; `AmountMissing` "An amount missing"; `NegativeQuantity` "Quantity below 0"; `NoComparableQuantity` "Quantities not comparable"; `CostUnknown` "Cost not known"; `TreatmentChanged` "Classification changed"; `FdrNotAllowed` "Fair dividend rate not allowed"; `ExternalFigures` "Held elsewhere"; `ArrivalAtMarketValue` "Transferred in at market value"; `DepartureAtMarketValue` "Transferred out at market value"; `Move` "Moved between your accounts"; `Scrip` "Shares in place of a dividend"; `Correction` "Correction"; `DividendTaxSourceDisagrees` "Tax source differs from the issuer country"; `CarriedCost` "Cost carried in".
 
 What these figures rest on (R24):
 

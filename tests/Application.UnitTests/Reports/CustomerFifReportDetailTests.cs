@@ -210,7 +210,7 @@ public class CustomerFifReportDetailTests
 
         content.Section(6).Table(2).Rows[0][7].ShouldBe(
             "2808.96 at 53.20 USD (2025-03-31); carried cost 1500.00 USD x 1.74 (2019-06-03), acquired on 2019-06-03");
-        content.Section(8).Table(1).Rows.ShouldContain(["USD to NZD", "2019-06-03", "1.74", "Frankfurter"]);
+        content.Section(8).Table(1).Rows.Select(row => string.Join(" | ", row)).ShouldContain("USD to NZD | 2019-06-03 | 1.74 | Frankfurter");
     }
 
     [Test]
@@ -255,8 +255,8 @@ public class CustomerFifReportDetailTests
         tables[0].Rows.ShouldBe([
             ["AAA", "United States of America", "117.95", "17.69", "21.23", "0.00", "0.00", "655.42", "1740.87"],
             ["BBB", "United Kingdom of Great Britain and Northern Ireland", "117.95", "17.69", "21.23", "0.00", "0.00", "655.42", "1740.87"],
-            ["NNN", "not stated", "117.95", "17.69", "21.23", "0.00", "0.00", "not computed", "not computed"],
-            ["SSS", "United Kingdom of Great Britain and Northern Ireland", "not available", "not available", "not available", "0.00", "0.00", "not computed", "not computed"]
+            ["SSS", "United Kingdom of Great Britain and Northern Ireland", "not available", "not available", "not available", "0.00", "0.00", "not computed", "not computed"],
+            ["NNN", "not stated", "117.95", "17.69", "21.23", "0.00", "0.00", "not computed", "not computed"]
         ]);
         tables[1].Rows.ShouldBe([
             ["United Kingdom of Great Britain and Northern Ireland", "not available", "not available", "not available", "0.00", "0.00"],
@@ -427,9 +427,9 @@ public class CustomerFifReportDetailTests
             "AAA: The quantity is below 0 at some point of the tax year. An entry is missing or was dated too late.",
             "AAA: A share reorganisation was booked on an account that held nothing, so quantities before and after it cannot be compared.",
             "AAA: The cost is not known: a correction left a cost below 0 since 2025-08-01 12:00. It is not in the total of the threshold test.",
-            "NNN: Not classified for tax year 2027. It may be an attributing interest. It is in no total, the threshold test cannot be completed, and FIF income totals are not given.",
             "SSS: Its classification changed while you held it. Tax law then starts the cost again from a market value, which this platform does not work out. The cost shown is the cost paid.",
-            "SSS: The fair dividend rate method is not allowed for this holding. Its income is not computed here and is in no total. It is worked out under the comparative value method on its own, or the deemed rate of return."
+            "SSS: The fair dividend rate method is not allowed for this holding. Its income is not computed here and is in no total. It is worked out under the comparative value method on its own, or the deemed rate of return.",
+            "NNN: Not classified for tax year 2027. It may be an attributing interest. It is in no total, the threshold test cannot be completed, and FIF income totals are not given."
         ]);
     }
 
