@@ -17,7 +17,16 @@ internal static class FifExamples
     public const int Sss = 3;
 
     public sealed record Step(
-        TaxEventKind Kind, decimal Shares, decimal? Amount = null, decimal ImputationCredit = 0m, decimal? Booked = null, int AccountId = 1);
+        TaxEventKind Kind,
+        decimal Shares,
+        decimal? Amount = null,
+        decimal ImputationCredit = 0m,
+        decimal? Booked = null,
+        int AccountId = 1,
+        decimal? Principal = null,
+        decimal? Fee = null,
+        decimal ForeignTax = 0m,
+        decimal Rwt = 0m);
 
     public static Step Buy(decimal shares, decimal amount, int accountId = 1) => new(TaxEventKind.Acquisition, shares, amount, AccountId: accountId);
 
@@ -27,7 +36,16 @@ internal static class FifExamples
 
     public static Step Depart(decimal shares, decimal value) => new(TaxEventKind.Departure, -shares, value);
 
-    public static Step Dividend(decimal gross, decimal imputationCredit = 0m) => new(TaxEventKind.Dividend, 0m, gross, imputationCredit);
+    public static Step Dividend(decimal gross, decimal imputationCredit = 0m, decimal foreignTax = 0m, decimal rwt = 0m) =>
+        new(TaxEventKind.Dividend, 0m, gross, imputationCredit, ForeignTax: foreignTax, Rwt: rwt);
+
+    /// <summary>An acquisition whose amount is the principal and the fee (tax-year-events R10).</summary>
+    public static Step BuyWithFee(decimal shares, decimal principal, decimal fee) =>
+        new(TaxEventKind.Acquisition, shares, principal + fee, Principal: principal, Fee: fee);
+
+    /// <summary>A disposal whose amount is the principal less the fee (tax-year-events R10).</summary>
+    public static Step SellWithFee(decimal shares, decimal principal, decimal fee) =>
+        new(TaxEventKind.Disposal, -shares, principal - fee, Principal: principal, Fee: fee);
 
     public static Step Split(decimal bookedChange) => new(TaxEventKind.Reorganisation, 0m, Booked: bookedChange);
 
@@ -72,10 +90,10 @@ internal static class FifExamples
                 change,
                 [new TaxQuantityChange(step.AccountId, CustodyMode.External, change)]);
             var dividend = step.Kind == TaxEventKind.Dividend
-                ? new TaxDividendAmounts(booked, DividendTaxSource.Foreign, step.Amount, 0m, 0m, 0m, step.ImputationCredit)
+                ? new TaxDividendAmounts(booked, DividendTaxSource.Foreign, step.Amount, step.ForeignTax, step.Rwt, 0m, step.ImputationCredit)
                 : null;
             events.Add(new TaxYearEvent(
-                sequence, taxEvent, booked, comparable, step.Amount, TaxAmountStatus.Stated, null, null, null, null, dividend, null));
+                sequence, taxEvent, booked, comparable, step.Amount, TaxAmountStatus.Stated, null, null, step.Principal, step.Fee, dividend, null));
         }
 
         var peak = events.Select(e => e.ComparableQuantityAfter!.Value).Append(opening).Max();
