@@ -21,7 +21,33 @@ public sealed record FifIncome(
     {
         var rate = FairDividendRate.For(taxYear);
         var incomes = holdings.Select(holding => Income(holding, rate, decimalPlaces)).ToList();
-        return new FifIncome(rate, null, null, null, false, [], incomes);
+
+        // R23: every tax holding not computed, in the order of the holdings.
+        var incomplete = incomes
+            .Where(income => income.Status == FifIncomeStatus.NotComputed)
+            .Select(income => new FifIncomeIncomplete(income.Reason!.Value, income.InstrumentId))
+            .ToList();
+        if (incomplete.Any(item => item.Reason is FifIncomeReason.NotClassified or FifIncomeReason.HoldingIncomplete))
+        {
+            return new FifIncome(rate, null, null, null, false, incomplete, incomes);
+        }
+
+        // R19–R21, R24: sums of the rounded figures of the computed tax holdings.
+        var computed = incomes.Where(income => income.Status == FifIncomeStatus.Computed).ToList();
+        var zero = Zero(decimalPlaces);
+        var openingValue = computed.Sum(income => income.Fdr!.OpeningValue) + zero;
+        var amount = computed.Sum(income => income.Fdr!.Amount) + zero;
+        var peakHoldingAmount = computed.Sum(income => income.QuickSale!.PeakHoldingAmount) + zero;
+        var gainAmount = computed.Sum(income => income.QuickSale!.GainAmount) + zero;
+        // R20: the lesser of two totals, taken once over all the tax holdings; a total gain below zero is zero.
+        var adjustment = Math.Min(peakHoldingAmount, Math.Max(zero, gainAmount));
+        var fdr = new FifFdrTotals(openingValue, amount, peakHoldingAmount, gainAmount, adjustment, amount + adjustment);
+        var cvAmount = computed.Sum(income => income.Cv!.Amount) + zero;
+        var cv = new FifCvTotals(cvAmount, Math.Max(zero, cvAmount));
+
+        // R22: a comparison of the two totals, not a choice.
+        var lower = fdr.Income < cv.Income ? FifLowerMethod.Fdr : cv.Income < fdr.Income ? FifLowerMethod.Cv : FifLowerMethod.Equal;
+        return new FifIncome(rate, fdr, cv, lower, incomplete.Count == 0, incomplete, incomes);
     }
 
     /// <summary>R3, R4: the status of a tax holding; R8: its FDR amount when it is computed.</summary>
