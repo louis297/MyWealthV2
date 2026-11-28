@@ -1,6 +1,7 @@
 using MyWealthV2.Domain.Enums;
 using MyWealthV2.Domain.Tax;
 using MyWealthV2.Domain.Valuations;
+using static MyWealthV2.Application.Reports.TaxReportFormat;
 
 namespace MyWealthV2.Application.Reports;
 
@@ -460,12 +461,6 @@ public static partial class CustomerFifReport
 
     private const string FdrNotAllowedSentence =
         "The fair dividend rate method is not allowed for this holding. Its income is not computed here and is in no total. It is worked out under the comparative value method on its own, or the deemed rate of return.";
-
-    private static string RateText(StoredRate rate) => $"x {Number(rate.Rate)} ({Date(rate.AsOfDate)})";
-
-    /// <summary>Custody-mode-grouping R14.</summary>
-    private static string CustodyLabel(CustodyMode mode) =>
-        mode == CustodyMode.Custodial ? "Held on platform" : "Held elsewhere";
 
     /// <summary>R21 (g): the short name of a reason.</summary>
     private static string ReasonShortName(string reason) => reason switch
