@@ -5,7 +5,7 @@ phase: 2
 language: en
 owner: ""
 created: 2026-11-28
-last_updated: 2026-11-28
+last_updated: 2026-11-29
 related:
   - ../roadmaps/fif-roadmap.md
   - ../future-plans.md
@@ -44,7 +44,25 @@ It has two parts. The tax year read ([tax-year-events.md](tax-year-events.md)) g
 
 New: fields `interest` and `income` on `GET /users/customers/{customerId}/tax-years/{taxYear}`; Domain types `TaxInterest`, `TaxYearInterest`, `TaxYearIncome`, `IncomeGroup`, `IncomeIncompleteReason` and `IncomeNotice`, and the function `TaxLedger.BuildInterest`; catalog report `customer-income-summary` (script `0063_income_summary_report.sql`, one row); Application types `CustomerIncomeSummaryBinder`, `CustomerIncomeSummaryReport`, `CustomerIncomeSummaryPdf` and `CustomerIncomeSummaryReportGenerator`; a branch in `RequestReport`; the fifth grant of the demo seed and of `TestSeed`; the tax year form of each portal offered for a second report. No route, table, permission, problem code, domain event, `TransactionType`, port, job or setting. No write to the ledger. The FIF report does not change. No simulator change.
 
-**Status is `accepted` (2026-11-28).** The twenty points of §11 were confirmed on 2026-11-28, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract. The sentences the report prints about the tax rules were not read by a person who knows the rules when it was accepted; that stays open (§11).
+**Status is `accepted` (2026-11-28).** The twenty points of §11 were confirmed on 2026-11-28, every one as recommended, and are written into the rules. The changes to the docs listed in §12 were made when it was accepted. It is a build contract. The sentences the report prints about the tax rules were not read by a person who knows the rules when it was accepted; that stays open (§11). Landed 2026-11-29.
+
+Notes from landing:
+
+- §5: `LedgerFact` carries the period as `LedgerInterest(PeriodFrom, PeriodTo, Days)`, which is also the `Period` of a `TaxInterest`. `TaxYearInterest` holds the `TaxInterest` as `Item`, with `Amount` (the gross in NZD), `Status`, `Fx` and the three taxes. `TaxYearIncome.Compute(holdings, interest, decimalPlaces)` also takes NZD's decimal places, so that a sum of nothing is 0.00. Its records are `IncomeDividends`, `IncomeDividendGroup`, `IncomeHoldingRow`, `IncomeCountryRow`, `IncomeDividendSum`, `IncomeInterest`, `IncomeAccountRow`, `IncomeInterestSum`, `IncomeTaxWithheld`, `IncomeReason` and `IncomeNoticeLine`. `CustomerTaxYear.Compute` takes the interest as an optional last parameter.
+- R3: an interest item is on the Account of the first `Principal` leg; its gross is the sum of the `Principal` legs on that Account. `CustomerTaxLedger` reads the `Interest` of `[Start(Y), End(Y))` in a query of its own, not with the facts of tax-year-events R6.
+- R10: a sum with a payment whose figures are missing has every figure `null`, `received` and `charged` too, and its `count` still counts the payment. `taxWithheld` is `null` when any dividend or interest item has a missing figure; `imputationCredit` only when a dividend has.
+- R11, R12: the reasons are those of the tax holdings in their order, then those of the Accounts in the order of their first item. The notices are in the order of `IncomeNotice`; those of an Account by its internal id.
+- R13: in the JSON and in the PDF the holding rows of a group are in the order of the read's holdings, by symbol and then by the Instrument's PublicId; Domain keeps them by internal id.
+- R18: the reading of `{ customerId, taxYear }` and of the tax residency on file moved from `CustomerFifBinder` to `CustomerTaxYearParameters`, which both binders and both generators call. The FIF report's messages did not change.
+- §4.4, §4.6: the content is `CustomerIncomeSummaryContent` with `IncomeSummarySection`, `IncomeSummaryText` and `IncomeSummaryTable`, and the names are `CustomerIncomeSummaryNames`. The printing of figures, instants, dates, countries, treatments, statuses, rates and custody modes moved from `CustomerFifReport` to `TaxReportFormat`, which both reports use. `CustomerIncomeSummaryPdf` has the layout of `CustomerFifPdf`.
+- R26: the first column of the summary table has no title. The row "Tax taken and credits" leaves Payments empty.
+- R27: the table of a group has the columns Symbol, Name, Issuer country, Classification, Payments, Dividends, Imputation credits, Gross dividends, Foreign tax, RWT and NRWT; Classification is the label of fif-report §4.6. A country row has the country's name in the first column.
+- R28: the columns are Account, Custody, Currency, Payments, Interest received, Interest charged, RWT, NRWT and Foreign tax.
+- R29: the part "Dividends" or "Interest" is left out when it has no payment. The rate cell holds the rate row when the payment has one, also a row too old; "no conversion" for a payment in NZD; "not available" with no row. The NZD cell of an item below 0 reads "{amount}, charged".
+- R30: a row too old is listed too. With no row and a payment that could not be converted, the section says "None." alone, because "Every payment was booked in New Zealand dollars" would not be true. The last line is "Ledger read at {time}", as in the FIF report.
+- R32: section 1 holds the one line, and section 2 follows it.
+- §10: the functional tests of the read are `TaxYears/GetCustomerTaxYearIncomeSummaryTests`, because `GetCustomerTaxYearIncomeTests` is the file of FIF income. Tax year 2027 cannot be read through the API until 2 April 2027, so I5 in the next tax year is tested in Domain only. The worked example is `IncomeWorkedExample` in Domain.UnitTests, linked into Application.UnitTests, and `TaxYears/IncomeSummaryWorld` in Application.FunctionalTests, which writes the interest run's postings with `Transaction.PostInterest` (`TaxYearHttp.PostInterestAsync`). The field list of the item in `GetCustomerTaxYearTests` gains the two fields.
+- §9: the Adviser Portal gives both codes the component `CustomerFifGenerate`, keyed by the report; the Customer Portal's Reports page has a list of the codes of the tax year form.
 
 The tax statements in this spec were read from Inland Revenue on 2026-11-28 (§14): the individual return guide and the overseas income summary form for the first time, the FIF guide and the fact sheet again, each from the pages of its PDF. The sentences the report prints about the return are the platform's summary of those pages. Nothing here is tax advice, and the report says the same of itself.
 
@@ -524,13 +542,15 @@ The functional tests write their own Instruments, rates and Transactions and dep
 | Application.UnitTests (`Reports/CustomerIncomeSummaryBinderTests`) | The checks of R18, as `CustomerFifBinderTests` |
 | Application.UnitTests (`Reports/CustomerIncomeSummaryReportTests`) | The content of §1.1; the header for `NewZealand` and for `Overseas`, with statement 2 of each; statement 4 only with `ExternalFigures`; the row of each group in section 1 and no row for a group with no dividend; each group's sentence, and "None." with no sentence; the country rows; the two sentences of section 4; each payment of section 5 with "no conversion", a period and "entered by hand"; each rate once in section 6; every sentence of §4.6; a `null` figure is "not available"; complete and incomplete; nothing paid |
 | Application.UnitTests (`Reports/CustomerIncomeSummaryPdfTests`) | `Render` gives a PDF whose text holds the header lines, the seven section titles and the figures of §1.1; the footer has the page count and "Incomplete" on every page of an incomplete report |
-| Application.FunctionalTests (`TaxYears/GetCustomerTaxYearIncomeTests`) | §1.1 through the API: `interest` and `income` as §8.1; an `Interest` entered with an earlier `bookedAt` on the External account changes the next read; a reversed hand `Interest` is in no item; `complete` of the tax year does not change with a missing rate of an interest item, and `income.complete` does. Two-tenant fixture: no Transaction of the other Tenant is in any item or sum, and the other Tenant's Customer → 404 |
+| Application.FunctionalTests (`TaxYears/GetCustomerTaxYearIncomeSummaryTests`) | §1.1 through the API: `interest` and `income` as §8.1; an `Interest` entered with an earlier `bookedAt` on the External account changes the next read; a reversed hand `Interest` is in no item; `complete` of the tax year does not change with a missing rate of an interest item, and `income.complete` does. Two-tenant fixture: no Transaction of the other Tenant is in any item or sum, and the other Tenant's Customer → 404 |
 | Application.FunctionalTests (`Reports/RequestCustomerIncomeSummaryTests`) | No Bearer → 401 not 302; a TenantAdmin, the assigned Adviser and the Customer → 202 with the snapshot; a SystemAdmin → 403; an unassigned Adviser, another Customer and an unknown id → 404; the report not granted → 404; each 400 of §8.2; an `Overseas` Customer → 202; a schedule for the report → 404. Two-tenant fixture: the other Tenant's Customer → 404, and the other Tenant's executions are in no list |
 | Application.FunctionalTests (`Reports/GenerateCustomerIncomeSummaryTests`) | §1.1 through the API, then the job: the execution is `Succeeded`, has no `asOf`, and the text of the downloaded PDF holds the figures of §1.1; a payment backdated on the External account after the first report leaves the first file as it is, and a second request gives another figure; a payment with no rate gives a `Succeeded` execution whose PDF says "Incomplete"; an `Overseas` Customer gets a PDF with "Tax residency on file: Overseas"; no payment of another Tenant's Customer is in the PDF |
 | Infrastructure.IntegrationTests (`AppliedSchema/ReportsSchemaTests`, `AppliedSchema/TestSeedReportsTests`, the demo seed tests) | The catalog row of R15 after the scripts ran, once after a second run; `TestSeed` and the demo seed grant five reports; a demo tenant with four grants gets the fifth and keeps the four |
 | Adviser Portal and Customer Portal tests | The tax year form appears for the report's code; the body of §8.1; no schedule form; "Tax year {Y}" in the History summary; a 400 message at the form; the FIF Report's form is unchanged |
 
 The tests that list the catalog or the grants count five reports. The existing tests of the tax year read, of the FIF report and of `Valuations/` stay green: nothing they assert changes.
+
+Also: `Tax/IncomeWorkedExample` in Domain.UnitTests; `Reports/CustomerIncomeSummaryReportDetailTests` (sections 5 to 7) and `Reports/IncomeSummaryFixture` in Application.UnitTests; `TaxYears/IncomeSummaryWorld` in Application.FunctionalTests; `features/customers/CustomerDetailPage.test.tsx` in the Adviser Portal; `portal.test.tsx` in the Customer Portal.
 
 The schema change touches `database/schema/`, so the whole of Infrastructure.IntegrationTests runs before its commit. The change to `CustomerTaxLedger` and `CustomerTaxYear` is shared code of the tax year read and the FIF report, so the partitions `TaxYears` and `Reports` run before each commit that touches them.
 
@@ -642,21 +662,7 @@ Each doc was changed in place when this spec was accepted (2026-11-28).
 
 ## 13. Suggested commits
 
-Removed when the slice lands. The repository builds after each commit. Each line is one behaviour; an agent splits it into red then green.
-
-1. `TaxLedger.BuildInterest`: the interest of a Customer from the facts, in order, with reversed Transactions left out.
-2. `CustomerTaxYear`: the interest items of a tax year in NZD, with their status and rate.
-3. `TaxYearIncome.Compute`: the groups, the dividend sums, the interest sums, the tax taken, the missing figure, the reasons and the notices.
-4. `CustomerTaxLedger` and `GetCustomerTaxYear`: `interest` and `income` on the tax year read, with the tenant isolation.
-5. Script `0063`: the catalog row `customer-income-summary`, with the demo seed and `TestSeed` granting five reports.
-6. `CustomerIncomeSummaryBinder` and `POST /reports/request` for the report: the parameters, the scope, the 404 cases, an `Overseas` Customer accepted, the snapshot; a schedule is 404. With the tenant isolation.
-7. `CustomerIncomeSummaryReport.Build`: the header, the statements and sections 1 to 4.
-8. `CustomerIncomeSummaryReport.Build`: sections 5 to 7, with every sentence of §4.6.
-9. `CustomerIncomeSummaryPdf.Render`: the pages, the footer and the text of §1.1.
-10. `CustomerIncomeSummaryReportGenerator`: the worked example through the API and the job, a stored report that does not change, an incomplete report, and an `Overseas` Customer.
-11. Adviser Portal: the tax year form for the report on the Customer page (D115).
-12. Customer Portal: the tax year form for the report on the Reports page (C52).
-13. Landing: the docs of §12, with the landing notes.
+Removed when the slice landed (2026-11-29). The commits are in git.
 
 ---
 
